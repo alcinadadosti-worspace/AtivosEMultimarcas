@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Initial implementation of Multimarks Analytics\n\nComplete implementation of sales analytics application for Grupo Boticario:\n\nBackend:\n- FastAPI application with async endpoints\n- Polars for high-performance data processing\n- SQLite database with robust SKU matching\n- SKU normalization with zero-padding strategies\n- Brand name normalization\n- IAF \\(premium\\) tracking functionality\n\nFrontend:\n- Raycast-style dark theme design\n- HTMX + Alpine.js for interactivity\n- Chart.js for visualizations\n- Responsive layout with sidebar navigation\n\nFeatures:\n- Dashboard with overview metrics and charts\n- Multi-brand customer tracking\n- Unregistered products detection\n- SKU audit reports\n- Customer detail view\n- IAF penetration metrics\n- CSV/Excel export functionality\n\nInfrastructure:\n- Render deployment configuration\n- Health check endpoint for uptime monitoring\n- Database import script\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Visao geral de vendas e clientes multimarcas</p>
+</div>
+
+<!-- Upload Section -->
+<div class="section">
+    {% include "components/upload_form.html" %}
+</div>
+
+<!-- Dashboard Content (only visible after upload) -->
+<div x-data="dashboard()" x-show="hasData" x-cloak>
+    <!-- Filters -->
+    {% include "components/filters.html" %}
+
+    <!-- Metrics Cards -->
+    <div class="metrics-grid" x-show="metrics">
+        <div class="metric-card">
+            <span class="label">Clientes Ativos</span>
+            <span class="value" x-text="formatNumber(metrics?.total_ativos || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Multimarcas</span>
+            <span class="value accent" x-text="formatNumber(metrics?.total_multimarcas || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">% Multimarcas</span>
+            <span class="value success" x-text="formatPercent(metrics?.percent_multimarcas || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Total Itens</span>
+            <span class="value" x-text="formatNumber(metrics?.total_itens || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Valor Total</span>
+            <span class="value" x-text="formatCurrency(metrics?.total_valor || 0)"></span>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <!-- Pie Chart: Multimarcas Distribution -->
+        <div class="chart-container">
+            <h3 class="chart-title">Distribuicao Multimarcas</h3>
+            <div style="height: 250px;">
+                <canvas id="chart-multimarcas"></canvas>
+            </div>
+        </div>
+
+        <!-- Pie Chart: Sales by Brand -->
+        <div class="chart-container">
+            <h3 class="chart-title">Vendas por Marca</h3>
+            <div style="height: 250px;">
+                <canvas id="chart-marcas"></canvas>
+            </div>
+        </div>
+
+        <!-- Bar Chart: Top Sectors -->
+        <div class="chart-container">
+            <h3 class="chart-title">Top 5 Setores por Valor</h3>
+            <div style="height: 250px;">
+                <canvas id="chart-setores"></canvas>
+            </div>
+        </div>
+
+        <!-- Line Chart: Evolution -->
+        <div class="chart-container">
+            <h3 class="chart-title">Evolucao por Ciclo</h3>
+            <div style="height: 250px;">
+                <canvas id="chart-evolucao"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Empty State -->
+<div x-data x-show="!$store.app.hasData" class="empty-state">
+    <i data-lucide="bar-chart-3"></i>
+    <h3>Nenhum dado carregado</h3>
+    <p>Faca upload de uma planilha de vendas para visualizar as metricas</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+    return {
+        hasData: {{ 'true' if has_data else 'false' }},
+        metrics: null,
+        marcas: [],
+        setores: [],
+        evolucao: [],
+        charts: {},
+
+        async init() {
+            if (this.hasData) {
+                await this.loadData();
+            }
+
+            // Listen for data loaded event
+            window.addEventListener('data-loaded', () => {
+                this.hasData = true;
+                this.loadData();
+            });
+
+            // Listen for filter changes
+            window.addEventListener('filters-changed', () => {
+                this.loadData();
+            });
+        },
+
+        async loadData() {
+            const queryString = this.$store.filters.getQueryString();
+
+            try {
+                // Load all data in parallel
+                const [metricsRes, marcasRes, setoresRes, evolucaoRes] = await Promise.all([
+                    fetch(`/api/metricas/gerais?${queryString}`),
+                    fetch(`/api/metricas/marcas?${queryString}`),
+                    fetch(`/api/metricas/top-setores?${queryString}`),
+                    fetch(`/api/metricas/evolucao?${queryString}`)
+                ]);
+
+                this.metrics = await metricsRes.json();
+                this.marcas = await marcasRes.json();
+                this.setores = await setoresRes.json();
+                this.evolucao = await evolucaoRes.json();
+
+                // Update charts
+                this.$nextTick(() => {
+                    this.updateCharts();
+                });
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        },
+
+        updateCharts() {
+            // Destroy existing charts
+            Object.values(this.charts).forEach(chart => chart.destroy());
+            this.charts = {};
+
+            // Multimarcas distribution
+            if (this.metrics) {
+                const multimarcasData = [
+                    { label: 'Multimarcas', value: this.metrics.total_multimarcas },
+                    { label: 'Monomarca', value: this.metrics.total_ativos - this.metrics.total_multimarcas }
+                ];
+                this.charts.multimarcas = createPieChart('chart-multimarcas', multimarcasData, 'label', 'value');
+            }
+
+            // Sales by brand
+            if (this.marcas.length > 0) {
+                this.charts.marcas = createPieChart('chart-marcas', this.marcas, 'marca', 'valor');
+            }
+
+            // Top sectors
+            if (this.setores.length > 0) {
+                this.charts.setores = createBarChart('chart-setores', this.setores, 'setor', 'valor');
+            }
+
+            // Evolution
+            if (this.evolucao.length > 0) {
+                this.charts.evolucao = createLineChart('chart-evolucao', this.evolucao, 'ciclo', 'percent');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

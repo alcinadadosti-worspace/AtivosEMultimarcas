@@ -1,0 +1,140 @@
+<div x-data="uploadForm()" class="card">
+    <div id="upload-zone"
+         class="upload-zone"
+         @dragover.prevent="dragover = true"
+         @dragleave.prevent="dragover = false"
+         @drop.prevent="handleDrop($event)"
+         :class="{ 'dragover': dragover }">
+
+        <input type="file"
+               accept=".csv,.xlsx,.xls"
+               @change="handleFileSelect($event)"
+               class="hidden"
+               x-ref="fileInput">
+
+        <template x-if="!uploading && !uploaded">
+            <div>
+                <i data-lucide="upload" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 16px;"></i>
+                <p>Arraste uma planilha de vendas ou clique para selecionar</p>
+                <span>CSV ou Excel (.xlsx, .xls)</span>
+            </div>
+        </template>
+
+        <template x-if="uploading">
+            <div>
+                <div class="spinner" style="margin: 0 auto 16px;"></div>
+                <p>Processando planilha...</p>
+            </div>
+        </template>
+
+        <template x-if="uploaded && !uploading">
+            <div>
+                <i data-lucide="check-circle" style="width: 48px; height: 48px; color: var(--success); margin-bottom: 16px;"></i>
+                <p x-text="message"></p>
+                <span>Clique para enviar outra planilha</span>
+            </div>
+        </template>
+    </div>
+
+    <!-- Upload stats -->
+    <template x-if="stats">
+        <div class="mt-4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+            <div class="metric-card">
+                <span class="label">Total Linhas</span>
+                <span class="value" x-text="formatNumber(stats.total_linhas)"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Vendas</span>
+                <span class="value" x-text="formatNumber(stats.total_vendas)"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">SKUs Encontrados</span>
+                <span class="value success" x-text="formatNumber(stats.encontrados)"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Taxa Match</span>
+                <span class="value accent" x-text="formatPercent(stats.taxa_match * 100)"></span>
+            </div>
+        </div>
+    </template>
+
+    <!-- Warnings -->
+    <template x-if="warnings && warnings.length > 0">
+        <div class="mt-4">
+            <template x-for="warning in warnings" :key="warning">
+                <div class="alert" :class="warning.includes('ALERTA') ? 'alert-warning' : 'alert-info'" x-text="warning"></div>
+            </template>
+        </div>
+    </template>
+</div>
+
+<script>
+function uploadForm() {
+    return {
+        dragover: false,
+        uploading: false,
+        uploaded: false,
+        message: '',
+        stats: null,
+        warnings: [],
+
+        handleDrop(event) {
+            this.dragover = false;
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                this.uploadFile(files[0]);
+            }
+        },
+
+        handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                this.uploadFile(files[0]);
+            }
+        },
+
+        async uploadFile(file) {
+            this.uploading = true;
+            this.uploaded = false;
+            this.message = '';
+            this.stats = null;
+            this.warnings = [];
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    this.uploaded = true;
+                    this.message = data.message;
+                    this.stats = data.estatisticas;
+                    this.warnings = data.avisos || [];
+
+                    // Reload filters and trigger dashboard refresh
+                    Alpine.store('filters').load();
+                    Alpine.store('app').setHasData(true);
+
+                    // Dispatch event for other components
+                    window.dispatchEvent(new CustomEvent('data-loaded'));
+
+                    showToast('Planilha processada com sucesso!', 'success');
+                } else {
+                    throw new Error(data.detail || 'Erro ao processar arquivo');
+                }
+            } catch (error) {
+                this.uploaded = false;
+                showToast(error.message, 'error');
+            } finally {
+                this.uploading = false;
+            }
+        }
+    }
+}
+</script>

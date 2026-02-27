@@ -1,0 +1,14 @@
+{% macro render(label, value, format='number', variant='') %}
+<div class="metric-card">
+    <span class="label">{{ label }}</span>
+    <span class="value {% if variant %}{{ variant }}{% endif %}">
+        {% if format == 'currency' %}
+            {{ value|moeda }}
+        {% elif format == 'percent' %}
+            {{ value|percentual }}
+        {% else %}
+            {{ value|numero }}
+        {% endif %}
+    </span>
+</div>
+{% endmacro %}

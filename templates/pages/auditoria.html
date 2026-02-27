@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Auditoria</h1>
+    <p class="page-subtitle">Problemas de matching de SKUs</p>
+</div>
+
+<div x-data="auditoriaPage()" x-init="init()">
+    <!-- Stats Cards -->
+    <div class="metrics-grid" style="grid-template-columns: repeat(5, 1fr);">
+        <div class="metric-card">
+            <span class="label">Total Vendas</span>
+            <span class="value" x-text="formatNumber(stats?.total_vendas || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Match Exato</span>
+            <span class="value success" x-text="formatNumber(stats?.match_exato || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Match +Zero</span>
+            <span class="value accent" x-text="formatNumber(stats?.match_com_zero || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Match -Zero</span>
+            <span class="value accent" x-text="formatNumber(stats?.match_sem_zero || 0)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Nao Encontrados</span>
+            <span class="value" style="color: var(--error);" x-text="formatNumber(stats?.nao_encontrados || 0)"></span>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Motivo</label>
+            <select class="input select" x-model="selectedMotivo" @change="loadData()">
+                <option value="">Todos</option>
+                <option value="NAO_ENCONTRADO">Nao Encontrado</option>
+                <option value="MATCH_COM_ZERO">Match com Zero</option>
+                <option value="MATCH_SEM_ZERO">Match sem Zero</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container">
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Ciclo</th>
+                        <th>Setor</th>
+                        <th>Cod. Revendedora</th>
+                        <th>Cod. Produto Original</th>
+                        <th>Cod. Normalizado</th>
+                        <th>Nome Produto</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && data.length === 0">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                Nenhum registro de auditoria encontrado
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="item in data" :key="item.codigo_normalizado + item.ciclo">
+                        <tr>
+                            <td x-text="item.ciclo"></td>
+                            <td x-text="item.setor"></td>
+                            <td class="font-mono" x-text="item.codigo_revendedora"></td>
+                            <td class="font-mono" x-text="item.codigo_produto_original"></td>
+                            <td class="font-mono" x-text="item.codigo_normalizado"></td>
+                            <td x-text="item.nome_produto"></td>
+                            <td>
+                                <span class="badge"
+                                      :class="{
+                                          'badge-error': item.motivo === 'NAO_ENCONTRADO',
+                                          'badge-warning': item.motivo.includes('ZERO')
+                                      }"
+                                      x-text="item.motivo"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function auditoriaPage() {
+    return {
+        data: [],
+        stats: null,
+        loading: false,
+        selectedMotivo: '',
+
+        async init() {
+            await this.loadStats();
+            await this.loadData();
+            window.addEventListener('data-loaded', () => {
+                this.loadStats();
+                this.loadData();
+            });
+        },
+
+        async loadStats() {
+            try {
+                const response = await fetch('/api/auditoria/estatisticas');
+                this.stats = await response.json();
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        },
+
+        async loadData() {
+            this.loading = true;
+
+            try {
+                const params = new URLSearchParams();
+                if (this.selectedMotivo) params.set('motivo', this.selectedMotivo);
+                params.set('limite', 200);
+
+                const response = await fetch(`/api/auditoria?${params}`);
+                this.data = await response.json();
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

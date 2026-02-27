@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Multimarcas - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Clientes Multimarcas</h1>
+    <p class="page-subtitle">Clientes que compraram 2 ou mais marcas</p>
+</div>
+
+<div x-data="multimarcasPage()" x-init="init()">
+    <!-- Filters and Export -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Ciclo</label>
+            <select class="input select" x-model="selectedCiclo" @change="loadData()">
+                <option value="">Todos</option>
+                <template x-for="ciclo in $store.filters.ciclos" :key="ciclo">
+                    <option :value="ciclo" x-text="ciclo"></option>
+                </template>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Setor</label>
+            <select class="input select" x-model="selectedSetor" @change="loadData()">
+                <option value="">Todos</option>
+                <template x-for="setor in $store.filters.setores" :key="setor">
+                    <option :value="setor" x-text="setor"></option>
+                </template>
+            </select>
+        </div>
+
+        <div style="margin-left: auto; display: flex; gap: 8px;">
+            <a :href="exportUrl('csv')" class="btn btn-secondary btn-sm">
+                <i data-lucide="download"></i>
+                CSV
+            </a>
+            <a :href="exportUrl('xlsx')" class="btn btn-secondary btn-sm">
+                <i data-lucide="download"></i>
+                Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="metric-card">
+            <span class="label">Total Multimarcas</span>
+            <span class="value accent" x-text="formatNumber(total)"></span>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container">
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Ciclo</th>
+                        <th>Setor</th>
+                        <th>Codigo</th>
+                        <th>Nome</th>
+                        <th class="center">Qtde Marcas</th>
+                        <th>Marcas</th>
+                        <th class="numeric">Itens</th>
+                        <th class="numeric">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="8" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && data.length === 0">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">
+                                Nenhum cliente multimarcas encontrado
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="item in data" :key="item.codigo + item.ciclo">
+                        <tr>
+                            <td x-text="item.ciclo"></td>
+                            <td x-text="item.setor"></td>
+                            <td class="font-mono" x-text="item.codigo"></td>
+                            <td x-text="item.nome"></td>
+                            <td class="center">
+                                <span class="badge badge-accent" x-text="item.qtde_marcas"></span>
+                            </td>
+                            <td x-text="item.marcas"></td>
+                            <td class="numeric" x-text="formatNumber(item.itens)"></td>
+                            <td class="numeric" x-text="formatCurrency(item.valor)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex justify-between items-center mt-4" x-show="total > limit">
+        <span class="text-secondary">
+            Mostrando <span x-text="Math.min(offset + 1, total)"></span>-<span x-text="Math.min(offset + limit, total)"></span> de <span x-text="total"></span>
+        </span>
+        <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" @click="prevPage()" :disabled="offset === 0">Anterior</button>
+            <button class="btn btn-secondary btn-sm" @click="nextPage()" :disabled="offset + limit >= total">Proximo</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function multimarcasPage() {
+    return {
+        data: [],
+        total: 0,
+        loading: false,
+        selectedCiclo: '',
+        selectedSetor: '',
+        limit: 50,
+        offset: 0,
+
+        async init() {
+            await this.$store.filters.load();
+            await this.loadData();
+
+            window.addEventListener('data-loaded', () => this.loadData());
+        },
+
+        async loadData() {
+            this.loading = true;
+            this.offset = 0;
+
+            try {
+                const params = new URLSearchParams();
+                if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
+                if (this.selectedSetor) params.set('setores', this.selectedSetor);
+                params.set('limite', this.limit);
+                params.set('offset', this.offset);
+
+                const response = await fetch(`/api/multimarcas?${params}`);
+                const result = await response.json();
+
+                this.data = result.data || [];
+                this.total = result.total || 0;
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        exportUrl(formato) {
+            const params = new URLSearchParams();
+            if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
+            if (this.selectedSetor) params.set('setores', this.selectedSetor);
+            params.set('formato', formato);
+            return `/api/multimarcas/export?${params}`;
+        },
+
+        async prevPage() {
+            if (this.offset > 0) {
+                this.offset -= this.limit;
+                await this.loadData();
+            }
+        },
+
+        async nextPage() {
+            if (this.offset + this.limit < this.total) {
+                this.offset += this.limit;
+                await this.loadData();
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

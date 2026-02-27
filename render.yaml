@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: multimarks-analytics
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python import_db.py
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: DATABASE_PATH
+        value: "data/produtos.db"
+    healthCheckPath: /health
+    autoDeploy: true

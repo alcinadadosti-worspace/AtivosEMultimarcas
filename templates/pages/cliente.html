@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Cliente - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Detalhe do Cliente</h1>
+    <p class="page-subtitle">Visualize o historico de compras de um cliente</p>
+</div>
+
+<div x-data="clientePage()" x-init="init()">
+    <!-- Search -->
+    <div class="card mb-4">
+        <div class="form-group">
+            <label class="form-label">Buscar Cliente</label>
+            <input type="text"
+                   class="input"
+                   placeholder="Digite o nome ou codigo do cliente..."
+                   x-model="searchTerm"
+                   @input.debounce.300ms="searchClientes()">
+        </div>
+
+        <!-- Search Results -->
+        <div x-show="searchResults.length > 0" class="mt-4">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Codigo</th>
+                        <th>Nome</th>
+                        <th>Setor</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="cliente in searchResults" :key="cliente.cliente_id">
+                        <tr>
+                            <td class="font-mono" x-text="cliente.codigo"></td>
+                            <td x-text="cliente.nome"></td>
+                            <td x-text="cliente.setor"></td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" @click="selectCliente(cliente.cliente_id)">
+                                    Selecionar
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cliente Detail -->
+    <div x-show="cliente && cliente.encontrado">
+        <!-- Info Cards -->
+        <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="metric-card">
+                <span class="label">Codigo</span>
+                <span class="value font-mono" x-text="cliente?.codigo || '-'"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Marcas Compradas</span>
+                <span class="value accent" x-text="cliente?.qtde_marcas || 0"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Total Itens</span>
+                <span class="value" x-text="formatNumber(cliente?.total_itens || 0)"></span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Valor Total</span>
+                <span class="value" x-text="formatCurrency(cliente?.total_valor || 0)"></span>
+            </div>
+        </div>
+
+        <!-- Cliente Info -->
+        <div class="card mb-4">
+            <h3 class="section-title" x-text="cliente?.nome || ''"></h3>
+            <p class="text-secondary">Setor: <span x-text="cliente?.setor || '-'"></span></p>
+            <p class="text-secondary mt-4">
+                <span x-text="cliente?.is_multimarcas ? 'Cliente Multimarcas' : 'Cliente Monomarca'"></span>
+                <span class="badge" :class="cliente?.is_multimarcas ? 'badge-accent' : 'badge-secondary'" x-text="(cliente?.marcas || []).join(', ')"></span>
+            </p>
+        </div>
+
+        <!-- Purchase History -->
+        <div class="section">
+            <h3 class="section-title">Historico de Compras</h3>
+            <div class="table-container">
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ciclo</th>
+                                <th>Setor</th>
+                                <th>Codigo Produto</th>
+                                <th>Nome Produto</th>
+                                <th>Marca</th>
+                                <th class="numeric">Quantidade</th>
+                                <th class="numeric">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="compra in cliente?.compras || []" :key="compra.codigo_produto + compra.ciclo">
+                                <tr>
+                                    <td x-text="compra.ciclo"></td>
+                                    <td x-text="compra.setor"></td>
+                                    <td class="font-mono" x-text="compra.codigo_produto"></td>
+                                    <td x-text="compra.nome_produto"></td>
+                                    <td x-text="compra.marca"></td>
+                                    <td class="numeric" x-text="compra.quantidade"></td>
+                                    <td class="numeric" x-text="formatCurrency(compra.valor)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!cliente" class="empty-state">
+        <i data-lucide="user-search"></i>
+        <h3>Busque um cliente</h3>
+        <p>Digite o nome ou codigo do cliente para ver os detalhes</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function clientePage() {
+    return {
+        searchTerm: '',
+        searchResults: [],
+        cliente: null,
+
+        async init() {
+            // Nothing to load initially
+        },
+
+        async searchClientes() {
+            if (this.searchTerm.length < 2) {
+                this.searchResults = [];
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/clientes?busca=${encodeURIComponent(this.searchTerm)}&limite=10`);
+                this.searchResults = await response.json();
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        },
+
+        async selectCliente(clienteId) {
+            this.searchResults = [];
+            this.searchTerm = '';
+
+            try {
+                const response = await fetch(`/api/clientes/${encodeURIComponent(clienteId)}`);
+                this.cliente = await response.json();
+            } catch (error) {
+                console.error('Failed to load cliente:', error);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

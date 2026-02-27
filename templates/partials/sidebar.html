@@ -1,0 +1,45 @@
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <h1>Multimarks</h1>
+        <span>Analytics</span>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a href="/dashboard" class="sidebar-nav-item {% if page == 'dashboard' %}active{% endif %}">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="/multimarcas" class="sidebar-nav-item {% if page == 'multimarcas' %}active{% endif %}">
+            <i data-lucide="star"></i>
+            <span>Multimarcas</span>
+        </a>
+
+        <a href="/produtos-novos" class="sidebar-nav-item {% if page == 'produtos_novos' %}active{% endif %}">
+            <i data-lucide="package-plus"></i>
+            <span>Produtos Novos</span>
+        </a>
+
+        <a href="/auditoria" class="sidebar-nav-item {% if page == 'auditoria' %}active{% endif %}">
+            <i data-lucide="file-search"></i>
+            <span>Auditoria</span>
+        </a>
+
+        <a href="/cliente" class="sidebar-nav-item {% if page == 'cliente' %}active{% endif %}">
+            <i data-lucide="user"></i>
+            <span>Cliente</span>
+        </a>
+
+        <a href="/iaf" class="sidebar-nav-item {% if page == 'iaf' %}active{% endif %}">
+            <i data-lucide="award"></i>
+            <span>IAF</span>
+        </a>
+    </nav>
+
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+        <div class="sidebar-nav-item" style="cursor: default;">
+            <i data-lucide="database"></i>
+            <span class="text-muted">v1.0.0</span>
+        </div>
+    </div>
+</aside>

@@ -1,0 +1,9 @@
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+polars>=0.20.0
+python-multipart>=0.0.6
+jinja2>=3.1.0
+aiofiles>=23.2.0
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+pydantic>=2.5.0

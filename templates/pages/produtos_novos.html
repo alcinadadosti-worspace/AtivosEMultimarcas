@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Produtos Novos - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Produtos Novos</h1>
+    <p class="page-subtitle">SKUs nao cadastrados no banco de dados (possiveis lancamentos)</p>
+</div>
+
+<div x-data="produtosNovosPage()" x-init="init()">
+    <!-- Export -->
+    <div class="filters-bar">
+        <div style="margin-left: auto; display: flex; gap: 8px;">
+            <a href="/api/produtos-novos/export?formato=csv" class="btn btn-secondary btn-sm">
+                <i data-lucide="download"></i>
+                CSV
+            </a>
+            <a href="/api/produtos-novos/export?formato=xlsx" class="btn btn-secondary btn-sm">
+                <i data-lucide="download"></i>
+                Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container">
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Nome Produto</th>
+                        <th class="numeric">Qtde Vendas</th>
+                        <th class="numeric">Total Itens</th>
+                        <th class="numeric">Valor Total</th>
+                        <th>Ciclos</th>
+                        <th>Setores</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && data.length === 0">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                Nenhum produto novo encontrado
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="item in data" :key="item.sku">
+                        <tr>
+                            <td class="font-mono" x-text="item.sku"></td>
+                            <td x-text="item.nome"></td>
+                            <td class="numeric" x-text="formatNumber(item.qtde_vendas)"></td>
+                            <td class="numeric" x-text="formatNumber(item.total_itens)"></td>
+                            <td class="numeric" x-text="formatCurrency(item.valor_total)"></td>
+                            <td x-text="item.ciclos"></td>
+                            <td x-text="item.setores"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function produtosNovosPage() {
+    return {
+        data: [],
+        loading: false,
+
+        async init() {
+            await this.loadData();
+            window.addEventListener('data-loaded', () => this.loadData());
+        },
+
+        async loadData() {
+            this.loading = true;
+
+            try {
+                const response = await fetch('/api/produtos-novos?limite=200');
+                this.data = await response.json();
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

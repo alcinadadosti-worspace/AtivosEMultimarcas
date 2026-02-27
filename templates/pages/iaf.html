@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}IAF - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">IAF - Premiacao</h1>
+    <p class="page-subtitle">Penetracao de produtos da premiacao (Cabelos e Make)</p>
+</div>
+
+<div x-data="iafPage()" x-init="init()">
+    <!-- Metrics Cards -->
+    <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="metric-card">
+            <span class="label">% IAF Cabelos</span>
+            <span class="value accent" x-text="formatPercent(metricas?.cabelos?.percentual || 0)"></span>
+            <span class="text-secondary text-xs">
+                <span x-text="formatNumber(metricas?.cabelos?.clientes_iaf || 0)"></span> de
+                <span x-text="formatNumber(metricas?.cabelos?.total_clientes || 0)"></span> clientes
+            </span>
+        </div>
+        <div class="metric-card">
+            <span class="label">% IAF Make</span>
+            <span class="value success" x-text="formatPercent(metricas?.make?.percentual || 0)"></span>
+            <span class="text-secondary text-xs">
+                <span x-text="formatNumber(metricas?.make?.clientes_iaf || 0)"></span> de
+                <span x-text="formatNumber(metricas?.make?.total_clientes || 0)"></span> clientes
+            </span>
+        </div>
+        <div class="metric-card">
+            <span class="label">% IAF Total</span>
+            <span class="value" x-text="formatPercent(metricas?.total?.percentual || 0)"></span>
+            <span class="text-secondary text-xs">
+                <span x-text="formatNumber(metricas?.total?.clientes_iaf || 0)"></span> de
+                <span x-text="formatNumber(metricas?.total?.total_clientes || 0)"></span> clientes
+            </span>
+        </div>
+    </div>
+
+    <!-- IAF by Sector -->
+    <div class="section">
+        <h3 class="section-title">IAF por Setor</h3>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Setor</th>
+                        <th class="numeric">Clientes Ativos</th>
+                        <th class="numeric">Cabelos</th>
+                        <th class="numeric">% Cabelos</th>
+                        <th class="numeric">Make</th>
+                        <th class="numeric">% Make</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="setor in setores" :key="setor.setor">
+                        <tr>
+                            <td x-text="setor.setor"></td>
+                            <td class="numeric" x-text="formatNumber(setor.clientes_ativos)"></td>
+                            <td class="numeric" x-text="formatNumber(setor.clientes_cabelos)"></td>
+                            <td class="numeric">
+                                <span class="badge badge-accent" x-text="formatPercent(setor.percent_cabelos)"></span>
+                            </td>
+                            <td class="numeric" x-text="formatNumber(setor.clientes_make)"></td>
+                            <td class="numeric">
+                                <span class="badge badge-success" x-text="formatPercent(setor.percent_make)"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- IAF Sales Detail -->
+    <div class="section">
+        <div class="section-header">
+            <h3 class="section-title">Vendas IAF</h3>
+            <div class="filter-group">
+                <label>Tipo</label>
+                <select class="input select" x-model="selectedTipo" @change="loadVendas()">
+                    <option value="">Todos</option>
+                    <option value="Cabelos">Cabelos</option>
+                    <option value="Make">Make</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-container">
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Ciclo</th>
+                            <th>Setor</th>
+                            <th>Revendedora</th>
+                            <th>SKU</th>
+                            <th>Produto</th>
+                            <th>Marca</th>
+                            <th>Tipo</th>
+                            <th class="numeric">Qtde</th>
+                            <th class="numeric">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-if="vendas.length === 0 && !loading">
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">
+                                    Nenhuma venda IAF encontrada
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-for="venda in vendas" :key="venda.sku + venda.ciclo + venda.codigo_revendedora">
+                            <tr>
+                                <td x-text="venda.ciclo"></td>
+                                <td x-text="venda.setor"></td>
+                                <td x-text="venda.nome_revendedora"></td>
+                                <td class="font-mono" x-text="venda.sku"></td>
+                                <td x-text="venda.nome"></td>
+                                <td x-text="venda.marca"></td>
+                                <td>
+                                    <span class="badge"
+                                          :class="venda.tipo === 'Cabelos' ? 'badge-accent' : 'badge-success'"
+                                          x-text="venda.tipo"></span>
+                                </td>
+                                <td class="numeric" x-text="venda.quantidade"></td>
+                                <td class="numeric" x-text="formatCurrency(venda.valor)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function iafPage() {
+    return {
+        metricas: null,
+        setores: [],
+        vendas: [],
+        loading: false,
+        selectedTipo: '',
+
+        async init() {
+            await Promise.all([
+                this.loadMetricas(),
+                this.loadSetores(),
+                this.loadVendas()
+            ]);
+
+            window.addEventListener('data-loaded', () => {
+                this.loadMetricas();
+                this.loadSetores();
+                this.loadVendas();
+            });
+        },
+
+        async loadMetricas() {
+            try {
+                const response = await fetch('/api/iaf/metricas');
+                this.metricas = await response.json();
+            } catch (error) {
+                console.error('Failed to load metricas:', error);
+            }
+        },
+
+        async loadSetores() {
+            this.loading = true;
+            try {
+                const response = await fetch('/api/iaf/por-setor');
+                this.setores = await response.json();
+            } catch (error) {
+                console.error('Failed to load setores:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadVendas() {
+            try {
+                const params = new URLSearchParams();
+                if (this.selectedTipo) params.set('tipo', this.selectedTipo);
+                params.set('limite', 100);
+
+                const response = await fetch(`/api/iaf/vendas?${params}`);
+                this.vendas = await response.json();
+            } catch (error) {
+                console.error('Failed to load vendas:', error);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

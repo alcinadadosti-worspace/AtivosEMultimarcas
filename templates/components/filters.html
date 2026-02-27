@@ -1,0 +1,54 @@
+<div class="filters-bar" x-data="filterBar()">
+    <div class="filter-group">
+        <label>Ciclo</label>
+        <select class="input select" x-model="selectedCiclo" @change="applyFilters()">
+            <option value="">Todos</option>
+            <template x-for="ciclo in $store.filters.ciclos" :key="ciclo">
+                <option :value="ciclo" x-text="ciclo"></option>
+            </template>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Setor</label>
+        <select class="input select" x-model="selectedSetor" @change="applyFilters()">
+            <option value="">Todos</option>
+            <template x-for="setor in $store.filters.setores" :key="setor">
+                <option :value="setor" x-text="setor"></option>
+            </template>
+        </select>
+    </div>
+
+    <button class="btn btn-secondary btn-sm" @click="clearFilters()">
+        <i data-lucide="x"></i>
+        Limpar
+    </button>
+</div>
+
+<script>
+function filterBar() {
+    return {
+        selectedCiclo: '',
+        selectedSetor: '',
+
+        init() {
+            // Load filters on init
+            this.$store.filters.load();
+        },
+
+        applyFilters() {
+            this.$store.filters.selectedCiclos = this.selectedCiclo ? [this.selectedCiclo] : [];
+            this.$store.filters.selectedSetores = this.selectedSetor ? [this.selectedSetor] : [];
+
+            // Dispatch event for components to refresh
+            window.dispatchEvent(new CustomEvent('filters-changed'));
+        },
+
+        clearFilters() {
+            this.selectedCiclo = '';
+            this.selectedSetor = '';
+            this.applyFilters();
+        }
+    }
+}
+</script>
