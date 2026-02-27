@@ -109,6 +109,9 @@ def criar_indice_sku_em_memoria(conn: sqlite3.Connection) -> Dict[str, Dict]:
     Useful when there are many consecutive searches (spreadsheet processing).
     The index already includes variations with/without zero.
 
+    IMPORTANT: Also includes products from IAF tables (iaf_cabelos, iaf_make)
+    so that IAF-only products are also found during matching.
+
     Args:
         conn: SQLite connection
 
@@ -116,19 +119,18 @@ def criar_indice_sku_em_memoria(conn: sqlite3.Connection) -> Dict[str, Dict]:
         Dict mapping sku_normalizado -> {sku, nome, marca}
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT sku, sku_normalizado, nome, marca FROM produtos")
-
     indice = {}
 
-    for row in cursor.fetchall():
-        sku_original, sku_norm, nome, marca = row
-
-        # Main index
-        indice[sku_norm] = {
-            "sku": sku_original,
-            "nome": nome,
-            "marca": marca
-        }
+    def adicionar_ao_indice(sku_original: str, sku_norm: str, nome: str, marca: str, is_iaf: bool = False):
+        """Helper to add product and its variations to index."""
+        # Main index (don't overwrite if already exists from produtos table)
+        if sku_norm not in indice:
+            indice[sku_norm] = {
+                "sku": sku_original,
+                "nome": nome,
+                "marca": marca,
+                "_is_iaf": is_iaf
+            }
 
         # Create variation without leading zero (for reverse match)
         if len(sku_norm) == 5 and sku_norm.startswith('0'):
@@ -138,7 +140,8 @@ def criar_indice_sku_em_memoria(conn: sqlite3.Connection) -> Dict[str, Dict]:
                     "sku": sku_original,
                     "nome": nome,
                     "marca": marca,
-                    "_variacao": "sem_zero"
+                    "_variacao": "sem_zero",
+                    "_is_iaf": is_iaf
                 }
 
         # Create variation with leading zero (for reverse match)
@@ -149,8 +152,36 @@ def criar_indice_sku_em_memoria(conn: sqlite3.Connection) -> Dict[str, Dict]:
                     "sku": sku_original,
                     "nome": nome,
                     "marca": marca,
-                    "_variacao": "com_zero"
+                    "_variacao": "com_zero",
+                    "_is_iaf": is_iaf
                 }
+
+    # 1. Load from produtos table (main products)
+    cursor.execute("SELECT sku, sku_normalizado, nome, marca FROM produtos")
+    for row in cursor.fetchall():
+        sku_original, sku_norm, nome, marca = row
+        adicionar_ao_indice(sku_original, sku_norm, nome, marca, is_iaf=False)
+
+    # 2. Load from iaf_cabelos table (Siège/Eudora hair products)
+    try:
+        cursor.execute("SELECT sku, sku_normalizado, descricao, marca FROM iaf_cabelos")
+        for row in cursor.fetchall():
+            sku_original, sku_norm, nome, marca = row
+            # Siège is part of Eudora brand
+            if marca.upper() in ('SIAGE', 'SIÀGE', 'SIEGE'):
+                marca = 'Eudora'
+            adicionar_ao_indice(sku_original, sku_norm, nome, marca, is_iaf=True)
+    except sqlite3.OperationalError:
+        pass  # Table doesn't exist
+
+    # 3. Load from iaf_make table (makeup products)
+    try:
+        cursor.execute("SELECT sku, sku_normalizado, descricao, marca FROM iaf_make")
+        for row in cursor.fetchall():
+            sku_original, sku_norm, nome, marca = row
+            adicionar_ao_indice(sku_original, sku_norm, nome, marca, is_iaf=True)
+    except sqlite3.OperationalError:
+        pass  # Table doesn't exist
 
     return indice
 
