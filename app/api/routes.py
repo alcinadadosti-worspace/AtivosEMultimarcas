@@ -68,6 +68,13 @@ def set_session_data(key: str, value):
     _session_data[key] = value
 
 
+def clear_session_data():
+    """Clear all session data."""
+    _session_data["df_vendas"] = None
+    _session_data["df_clientes"] = None
+    _session_data["df_iaf"] = None
+
+
 # =============================================================================
 # HEALTH CHECK
 # =============================================================================
@@ -79,6 +86,26 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "service": "multimarks-analytics"
+    }
+
+
+@api_router.post("/clear")
+async def clear_cache():
+    """Clear session cache and force reload on next upload."""
+    clear_session_data()
+    return {
+        "success": True,
+        "message": "Cache limpo. Faca upload novamente da planilha."
+    }
+
+
+@api_router.get("/clear")
+async def clear_cache_get():
+    """Clear session cache (GET method for easy browser access)."""
+    clear_session_data()
+    return {
+        "success": True,
+        "message": "Cache limpo. Faca upload novamente da planilha."
     }
 
 
