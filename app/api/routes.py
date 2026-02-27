@@ -122,7 +122,11 @@ async def upload_vendas(
     Upload and process a sales spreadsheet.
 
     Accepts CSV or Excel files with required columns.
+    Automatically clears previous session data before processing.
     """
+    # Clear previous session data automatically
+    clear_session_data()
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="Arquivo nao fornecido")
 
