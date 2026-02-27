@@ -100,7 +100,7 @@
         </div>
 
         <!-- Resumo por Ciclo -->
-        <div class="futuristic-table-container">
+        <div class="futuristic-table-container full-width">
             <div class="table-header-futuristic">
                 <div class="table-icon">
                     <i data-lucide="calendar-range"></i>
@@ -108,19 +108,24 @@
                 <h3>Resumo por Ciclo</h3>
                 <div class="table-glow"></div>
             </div>
-            <div class="table-wrapper-futuristic">
+            <div class="table-wrapper-futuristic horizontal-scroll">
                 <table class="futuristic-table">
                     <thead>
                         <tr>
-                            <th>Ciclo</th>
-                            <th class="number-col">Clientes Ativos</th>
-                            <th class="number-col">Multimarcas</th>
-                            <th class="number-col">Total Itens</th>
-                            <th class="number-col">Valor Total</th>
-                            <th class="number-col">% Multi</th>
+                            <th style="min-width: 100px;">Ciclo</th>
+                            <th class="number-col" style="min-width: 120px;">Clientes Ativos</th>
+                            <th class="number-col" style="min-width: 100px;">Multimarcas</th>
+                            <th class="number-col" style="min-width: 100px;">Total Itens</th>
+                            <th class="number-col" style="min-width: 130px;">Valor Total</th>
+                            <th class="number-col" style="min-width: 100px;">% Multi</th>
                         </tr>
                     </thead>
                     <tbody>
+                        <template x-if="resumoCiclos.length === 0">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #94a3b8;">Nenhum dado disponivel</td>
+                            </tr>
+                        </template>
                         <template x-for="ciclo in resumoCiclos" :key="ciclo.ciclo">
                             <tr>
                                 <td class="ciclo-badge"><span x-text="ciclo.ciclo"></span></td>
@@ -147,27 +152,32 @@
                 <h3>Dados por Setor e Ciclo</h3>
                 <div class="table-glow"></div>
             </div>
-            <div class="table-wrapper-futuristic scrollable">
+            <div class="table-wrapper-futuristic scrollable horizontal-scroll">
                 <table class="futuristic-table compact">
                     <thead>
                         <tr>
-                            <th>Ciclo</th>
-                            <th>Setor</th>
-                            <th>Gerencia</th>
-                            <th class="number-col">Clientes</th>
-                            <th class="number-col">Multimarca</th>
-                            <th class="number-col">Itens</th>
-                            <th class="number-col">Valor</th>
-                            <th class="number-col">% Multi</th>
+                            <th style="min-width: 80px;">Ciclo</th>
+                            <th style="min-width: 80px;">Setor</th>
+                            <th style="min-width: 80px;">Gerencia</th>
+                            <th class="number-col" style="min-width: 80px;">Clientes</th>
+                            <th class="number-col" style="min-width: 90px;">Multimarca</th>
+                            <th class="number-col" style="min-width: 70px;">Itens</th>
+                            <th class="number-col" style="min-width: 110px;">Valor</th>
+                            <th class="number-col" style="min-width: 120px;">% Multi</th>
                         </tr>
                     </thead>
                     <tbody>
+                        <template x-if="dadosSetorCiclo.length === 0">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: #94a3b8;">Nenhum dado disponivel</td>
+                            </tr>
+                        </template>
                         <template x-for="item in dadosSetorCiclo" :key="item.ciclo + '_' + item.setor">
-                            <tr :class="{'gerencia-13707': item.gerencia == 13707, 'gerencia-13706': item.gerencia == 13706}">
+                            <tr :class="getGerenciaRowClass(item.gerencia)">
                                 <td><span class="ciclo-mini" x-text="item.ciclo"></span></td>
                                 <td class="setor-name" x-text="item.setor"></td>
                                 <td>
-                                    <span class="gerencia-badge" :class="'ger-' + item.gerencia" x-text="item.gerencia"></span>
+                                    <span class="gerencia-badge" :class="getGerenciaBadgeClass(item.gerencia)" x-text="formatGerenciaValue(item.gerencia)"></span>
                                 </td>
                                 <td class="number-col" x-text="formatNumber(item.clientes_ativos)"></td>
                                 <td class="number-col accent-text" x-text="formatNumber(item.multimarcas)"></td>
@@ -463,6 +473,33 @@
     background: rgba(99, 102, 241, 0.7);
 }
 
+/* Horizontal scroll for tables */
+.table-wrapper-futuristic.horizontal-scroll {
+    overflow-x: auto;
+}
+
+.table-wrapper-futuristic.horizontal-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.table-wrapper-futuristic.horizontal-scroll::-webkit-scrollbar-track {
+    background: rgba(30, 30, 40, 0.5);
+    border-radius: 3px;
+}
+
+.table-wrapper-futuristic.horizontal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 3px;
+}
+
+.table-wrapper-futuristic.horizontal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
+
+.table-wrapper-futuristic.horizontal-scroll table {
+    min-width: 700px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .futuristic-tables-section {
@@ -557,6 +594,31 @@ function dashboard() {
             if (this.marcas.length > 0) {
                 this.charts.marcas = createPieChart('chart-marcas', this.marcas, 'marca', 'valor');
             }
+        },
+
+        // Helper functions for gerencia handling
+        getGerenciaRowClass(gerencia) {
+            if (!gerencia) return '';
+            const g = String(gerencia);
+            if (g.includes('13707')) return 'gerencia-13707';
+            if (g.includes('13706')) return 'gerencia-13706';
+            return '';
+        },
+
+        getGerenciaBadgeClass(gerencia) {
+            if (!gerencia) return '';
+            const g = String(gerencia);
+            if (g.includes('13707')) return 'ger-13707';
+            if (g.includes('13706')) return 'ger-13706';
+            return '';
+        },
+
+        formatGerenciaValue(gerencia) {
+            if (!gerencia) return '-';
+            const g = String(gerencia);
+            if (g.includes('13707')) return '13707';
+            if (g.includes('13706')) return '13706';
+            return g;
         }
     }
 }

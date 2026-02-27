@@ -375,11 +375,8 @@ def calcular_dados_setor_ciclo(
     Returns:
         List of dicts with sector/cycle data including gerencia
     """
-    # First, get gerencia for each sector from vendas
-    df_setor_gerencia = df_vendas.select([
-        VENDAS_COL_SETOR,
-        VENDAS_COL_GERENCIA
-    ]).unique()
+    # Check if gerencia column exists
+    has_gerencia = VENDAS_COL_GERENCIA in df_vendas.columns
 
     # Aggregate client data by sector and cycle
     df_setor_ciclo = df_clientes.group_by([
@@ -392,12 +389,24 @@ def calcular_dados_setor_ciclo(
         pl.col("ValorTotal").sum().alias("ValorTotal"),
     ])
 
-    # Join with gerencia
-    df_setor_ciclo = df_setor_ciclo.join(
-        df_setor_gerencia,
-        on=VENDAS_COL_SETOR,
-        how="left"
-    )
+    # Get gerencia for each sector from vendas (if available)
+    if has_gerencia:
+        # Get first gerencia for each sector (they should be the same)
+        df_setor_gerencia = df_vendas.group_by(VENDAS_COL_SETOR).agg([
+            pl.col(VENDAS_COL_GERENCIA).first().alias("Gerencia")
+        ])
+
+        # Join with gerencia
+        df_setor_ciclo = df_setor_ciclo.join(
+            df_setor_gerencia,
+            on=VENDAS_COL_SETOR,
+            how="left"
+        )
+    else:
+        # Add empty gerencia column
+        df_setor_ciclo = df_setor_ciclo.with_columns([
+            pl.lit("").alias("Gerencia")
+        ])
 
     # Calculate percentage
     df_setor_ciclo = df_setor_ciclo.with_columns([
@@ -407,10 +416,9 @@ def calcular_dados_setor_ciclo(
           .alias("PercentMultimarcas")
     ])
 
-    # Sort by cycle, then gerencia, then sector
+    # Sort by cycle, then sector
     df_setor_ciclo = df_setor_ciclo.sort([
         VENDAS_COL_CICLO,
-        VENDAS_COL_GERENCIA,
         VENDAS_COL_SETOR
     ])
 
@@ -418,7 +426,7 @@ def calcular_dados_setor_ciclo(
         {
             "ciclo": row[VENDAS_COL_CICLO],
             "setor": row[VENDAS_COL_SETOR],
-            "gerencia": row[VENDAS_COL_GERENCIA],
+            "gerencia": row.get("Gerencia", "") or "",
             "clientes_ativos": row["ClientesAtivos"],
             "multimarcas": row["ClientesMultimarcas"],
             "total_itens": int(row["ItensTotal"] or 0),
