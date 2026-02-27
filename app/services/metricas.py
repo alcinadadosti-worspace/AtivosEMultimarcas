@@ -429,6 +429,46 @@ def calcular_dados_setor_ciclo(
     ]
 
 
+def calcular_combinacoes_marcas(
+    df_clientes: pl.DataFrame,
+    limite: int = 20
+) -> List[Dict[str, Any]]:
+    """
+    Calculate most frequent brand combinations.
+
+    Analyzes which brand combinations are purchased together most often.
+
+    Args:
+        df_clientes: DataFrame with customer metrics (must have MarcasCompradas)
+        limite: Maximum number of combinations to return
+
+    Returns:
+        List of dicts with brands combination and frequency
+    """
+    # Filter only multibrand customers
+    df_multi = df_clientes.filter(pl.col("IsMultimarcas"))
+
+    if df_multi.is_empty():
+        return []
+
+    # Get brand combinations and count frequency
+    df_combos = df_multi.group_by("MarcasCompradas").agg([
+        pl.count().alias("Frequencia"),
+        pl.col("ValorTotal").sum().alias("ValorTotal"),
+        pl.col("ItensTotal").sum().alias("ItensTotal"),
+    ]).sort("Frequencia", descending=True).head(limite)
+
+    return [
+        {
+            "marcas": row["MarcasCompradas"],
+            "frequencia": row["Frequencia"],
+            "valor_total": float(row["ValorTotal"] or 0),
+            "itens_total": int(row["ItensTotal"] or 0),
+        }
+        for row in df_combos.iter_rows(named=True)
+    ]
+
+
 def obter_detalhes_cliente(
     df_vendas: pl.DataFrame,
     cliente_id: str

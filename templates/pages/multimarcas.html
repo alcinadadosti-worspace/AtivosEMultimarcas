@@ -3,6 +3,304 @@
 {% block title %}Multimarcas - Multimarks Analytics{% endblock %}
 
 {% block content %}
+<style>
+/* Futuristic Table Styles */
+.futuristic-section {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.futuristic-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.8), rgba(236, 72, 153, 0.8), transparent);
+}
+
+.futuristic-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.futuristic-section-title .icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a78bfa;
+}
+
+.futuristic-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.futuristic-table thead th {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.futuristic-table thead th:first-child {
+    border-radius: 8px 0 0 0;
+}
+
+.futuristic-table thead th:last-child {
+    border-radius: 0 8px 0 0;
+}
+
+.futuristic-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.futuristic-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.futuristic-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    font-size: 0.875rem;
+}
+
+.futuristic-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Brand badges */
+.brand-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.brand-boticario {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.brand-eudora {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(236, 72, 153, 0.1) 100%);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.brand-quem-disse {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
+    color: #fb923c;
+    border: 1px solid rgba(251, 146, 60, 0.3);
+}
+
+.brand-outras {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Quantity badges */
+.qty-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.qty-2 {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 100%);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.qty-3 {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 100%);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.qty-4plus {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(251, 191, 36, 0.15) 100%);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
+}
+
+/* Frequency bar */
+.freq-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.freq-bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    max-width: 120px;
+}
+
+.freq-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.freq-value {
+    font-weight: 700;
+    color: #f8fafc;
+    min-width: 40px;
+}
+
+/* Combo rank badges */
+.combo-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+
+.rank-1 {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: #1c1917;
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
+}
+
+.rank-2 {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    color: #f8fafc;
+    box-shadow: 0 0 12px rgba(148, 163, 184, 0.4);
+}
+
+.rank-3 {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    color: #fef3c7;
+    box-shadow: 0 0 12px rgba(217, 119, 6, 0.4);
+}
+
+.rank-other {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Value cell styling */
+.value-cell {
+    font-family: 'JetBrains Mono', monospace;
+    color: #4ade80;
+    font-weight: 600;
+}
+
+/* Summary stats */
+.combo-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.combo-stat {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.combo-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f8fafc;
+    display: block;
+}
+
+.combo-stat-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+}
+
+/* Table scroll container */
+.futuristic-table-scroll {
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 8px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
+}
+
+/* Grid layout for two tables side by side on larger screens */
+@media (min-width: 1200px) {
+    .tables-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+}
+</style>
+
 <div class="page-header">
     <h1 class="page-title">Clientes Multimarcas</h1>
     <p class="page-subtitle">Clientes que compraram 2 ou mais marcas</p>
@@ -43,28 +341,107 @@
         </div>
     </div>
 
-    <!-- Summary -->
-    <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <!-- Summary Card -->
+    <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
         <div class="metric-card">
             <span class="label">Total Multimarcas</span>
             <span class="value accent" x-text="formatNumber(total)"></span>
         </div>
+        <div class="metric-card">
+            <span class="label">Combinacoes Unicas</span>
+            <span class="value" x-text="formatNumber(combinacoes.length)"></span>
+        </div>
+        <div class="metric-card">
+            <span class="label">Combinacao Mais Frequente</span>
+            <span class="value" style="font-size: 1rem;" x-text="combinacoes.length > 0 ? combinacoes[0].marcas : '-'"></span>
+        </div>
     </div>
 
-    <!-- Data Table -->
-    <div class="table-container">
-        <div class="table-scroll">
-            <table class="table">
+    <!-- Brand Combinations Table - Futuristic -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="git-merge" style="width: 18px; height: 18px;"></i>
+            </span>
+            Combinacoes de Marcas Mais Frequentes
+        </h3>
+
+        <div class="futuristic-table-scroll" style="max-height: 400px;">
+            <table class="futuristic-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px; text-align: center;">#</th>
+                        <th>Combinacao de Marcas</th>
+                        <th style="width: 150px;">Frequencia</th>
+                        <th style="width: 100px; text-align: right;">Itens</th>
+                        <th style="width: 130px; text-align: right;">Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loadingCombos">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loadingCombos && combinacoes.length === 0">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                Nenhuma combinacao encontrada
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="(combo, index) in combinacoes" :key="combo.marcas">
+                        <tr>
+                            <td style="text-align: center;">
+                                <span :class="getRankClass(index)" class="combo-rank" x-text="index + 1"></span>
+                            </td>
+                            <td>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <template x-for="marca in combo.marcas.split(', ')" :key="marca">
+                                        <span :class="getBrandClass(marca)" class="brand-badge" x-text="marca"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="freq-bar-container">
+                                    <span class="freq-value" x-text="combo.frequencia"></span>
+                                    <div class="freq-bar">
+                                        <div class="freq-bar-fill" :style="'width: ' + getFreqPercent(combo.frequencia) + '%'"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="text-align: right;" x-text="formatNumber(combo.itens_total)"></td>
+                            <td style="text-align: right;" class="value-cell" x-text="formatCurrency(combo.valor_total)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Multimarcas Detailed Table - Futuristic -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="users" style="width: 18px; height: 18px;"></i>
+            </span>
+            Clientes Multimarcas Detalhado
+        </h3>
+
+        <div class="futuristic-table-scroll">
+            <table class="futuristic-table">
                 <thead>
                     <tr>
                         <th>Ciclo</th>
                         <th>Setor</th>
                         <th>Codigo</th>
                         <th>Nome</th>
-                        <th class="center">Qtde Marcas</th>
+                        <th style="text-align: center;">Qtde Marcas</th>
                         <th>Marcas</th>
-                        <th class="numeric">Itens</th>
-                        <th class="numeric">Valor</th>
+                        <th style="text-align: right;">Itens</th>
+                        <th style="text-align: right;">Valor</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -88,27 +465,33 @@
                             <td x-text="item.setor"></td>
                             <td class="font-mono" x-text="item.codigo"></td>
                             <td x-text="item.nome"></td>
-                            <td class="center">
-                                <span class="badge badge-accent" x-text="item.qtde_marcas"></span>
+                            <td style="text-align: center;">
+                                <span :class="getQtyClass(item.qtde_marcas)" class="qty-badge" x-text="item.qtde_marcas"></span>
                             </td>
-                            <td x-text="item.marcas"></td>
-                            <td class="numeric" x-text="formatNumber(item.itens)"></td>
-                            <td class="numeric" x-text="formatCurrency(item.valor)"></td>
+                            <td>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <template x-for="marca in item.marcas.split(', ')" :key="marca">
+                                        <span :class="getBrandClass(marca)" class="brand-badge" x-text="marca"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td style="text-align: right;" x-text="formatNumber(item.itens)"></td>
+                            <td style="text-align: right;" class="value-cell" x-text="formatCurrency(item.valor)"></td>
                         </tr>
                     </template>
                 </tbody>
             </table>
         </div>
-    </div>
 
-    <!-- Pagination -->
-    <div class="flex justify-between items-center mt-4" x-show="total > limit">
-        <span class="text-secondary">
-            Mostrando <span x-text="Math.min(offset + 1, total)"></span>-<span x-text="Math.min(offset + limit, total)"></span> de <span x-text="total"></span>
-        </span>
-        <div class="flex gap-2">
-            <button class="btn btn-secondary btn-sm" @click="prevPage()" :disabled="offset === 0">Anterior</button>
-            <button class="btn btn-secondary btn-sm" @click="nextPage()" :disabled="offset + limit >= total">Proximo</button>
+        <!-- Pagination -->
+        <div class="flex justify-between items-center mt-4" x-show="total > limit" style="padding-top: 16px; border-top: 1px solid rgba(139, 92, 246, 0.2);">
+            <span class="text-secondary">
+                Mostrando <span x-text="Math.min(offset + 1, total)"></span>-<span x-text="Math.min(offset + limit, total)"></span> de <span x-text="total"></span>
+            </span>
+            <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" @click="prevPage()" :disabled="offset === 0">Anterior</button>
+                <button class="btn btn-secondary btn-sm" @click="nextPage()" :disabled="offset + limit >= total">Proximo</button>
+            </div>
         </div>
     </div>
 </div>
@@ -119,18 +502,25 @@
 function multimarcasPage() {
     return {
         data: [],
+        combinacoes: [],
         total: 0,
         loading: false,
+        loadingCombos: false,
         selectedCiclo: '',
         selectedSetor: '',
         limit: 50,
         offset: 0,
+        maxFreq: 1,
 
         async init() {
             await this.$store.filters.load();
             await this.loadData();
+            await this.loadCombinacoes();
 
-            window.addEventListener('data-loaded', () => this.loadData());
+            window.addEventListener('data-loaded', () => {
+                this.loadData();
+                this.loadCombinacoes();
+            });
         },
 
         async loadData() {
@@ -156,12 +546,61 @@ function multimarcasPage() {
             }
         },
 
+        async loadCombinacoes() {
+            this.loadingCombos = true;
+
+            try {
+                const params = new URLSearchParams();
+                if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
+                if (this.selectedSetor) params.set('setores', this.selectedSetor);
+                params.set('limite', '20');
+
+                const response = await fetch(`/api/multimarcas/combinacoes?${params}`);
+                this.combinacoes = await response.json();
+
+                // Calculate max frequency for bar scaling
+                if (this.combinacoes.length > 0) {
+                    this.maxFreq = Math.max(...this.combinacoes.map(c => c.frequencia));
+                }
+            } catch (error) {
+                console.error('Failed to load combinations:', error);
+                this.combinacoes = [];
+            } finally {
+                this.loadingCombos = false;
+            }
+        },
+
         exportUrl(formato) {
             const params = new URLSearchParams();
             if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
             if (this.selectedSetor) params.set('setores', this.selectedSetor);
             params.set('formato', formato);
             return `/api/multimarcas/export?${params}`;
+        },
+
+        getBrandClass(marca) {
+            const m = marca.toLowerCase();
+            if (m.includes('boticario') || m.includes('boticário')) return 'brand-boticario';
+            if (m.includes('eudora')) return 'brand-eudora';
+            if (m.includes('quem disse') || m.includes('qdb')) return 'brand-quem-disse';
+            return 'brand-outras';
+        },
+
+        getQtyClass(qty) {
+            if (qty >= 4) return 'qty-4plus';
+            if (qty === 3) return 'qty-3';
+            return 'qty-2';
+        },
+
+        getRankClass(index) {
+            if (index === 0) return 'rank-1';
+            if (index === 1) return 'rank-2';
+            if (index === 2) return 'rank-3';
+            return 'rank-other';
+        },
+
+        getFreqPercent(freq) {
+            return Math.round((freq / this.maxFreq) * 100);
         },
 
         async prevPage() {

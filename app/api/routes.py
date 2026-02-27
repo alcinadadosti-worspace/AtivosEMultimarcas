@@ -32,6 +32,7 @@ from app.services.metricas import (
     calcular_evolucao_ciclos,
     calcular_resumo_ciclos,
     calcular_dados_setor_ciclo,
+    calcular_combinacoes_marcas,
     aplicar_filtros,
     obter_detalhes_cliente,
 )
@@ -360,6 +361,32 @@ async def get_multimarcas(
     ]
 
     return {"data": data, "total": total}
+
+
+@api_router.get("/multimarcas/combinacoes")
+async def get_combinacoes_marcas(
+    limite: int = Query(20, ge=1, le=50),
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+):
+    """Get most frequent brand combinations."""
+    session = get_session_data()
+    df_clientes = session.get("df_clientes")
+
+    if df_clientes is None:
+        return []
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+
+    df_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        apenas_multimarcas=True
+    )
+
+    return calcular_combinacoes_marcas(df_filtrado, limite=limite)
 
 
 @api_router.get("/multimarcas/export")
