@@ -15,7 +15,7 @@ def get_connection() -> sqlite3.Connection:
     Returns:
         SQLite connection with Row factory enabled
     """
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 

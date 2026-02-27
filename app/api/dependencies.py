@@ -14,7 +14,7 @@ def get_db() -> Generator[sqlite3.Connection, None, None]:
     Yields:
         SQLite connection with Row factory enabled
     """
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn

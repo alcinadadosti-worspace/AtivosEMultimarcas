@@ -72,9 +72,9 @@ Thumbs.db
 
 # Project specific
 data/*.db
-data/*.xlsx
 data/*.csv
 !data/.gitkeep
+!data/*.xlsx
 
 # Uploads
 uploads/
