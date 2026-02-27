@@ -471,7 +471,7 @@
                             </td>
                         </tr>
                     </template>
-                    <template x-for="venda in vendas" :key="venda.sku + venda.ciclo + venda.codigo_revendedora">
+                    <template x-for="(venda, index) in vendas" :key="'venda-' + index">
                         <tr>
                             <td x-text="venda.ciclo"></td>
                             <td x-text="venda.setor"></td>
