@@ -3,6 +3,291 @@
 {% block title %}IAF - Multimarks Analytics{% endblock %}
 
 {% block content %}
+<style>
+/* Futuristic Table Styles for IAF */
+.futuristic-section {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.futuristic-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.8), rgba(236, 72, 153, 0.8), transparent);
+}
+
+.futuristic-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.futuristic-section-title .icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a78bfa;
+}
+
+.futuristic-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.futuristic-table thead th {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.futuristic-table thead th:first-child {
+    border-radius: 8px 0 0 0;
+}
+
+.futuristic-table thead th:last-child {
+    border-radius: 0 8px 0 0;
+}
+
+.futuristic-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.futuristic-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.futuristic-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    font-size: 0.875rem;
+}
+
+.futuristic-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* IAF Type badges */
+.iaf-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.iaf-cabelos {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.15) 100%);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.iaf-make {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.3) 0%, rgba(236, 72, 153, 0.15) 100%);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.4);
+}
+
+/* Gerencia badges */
+.gerencia-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.gerencia-13706 {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.25) 0%, rgba(236, 72, 153, 0.1) 100%);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.4);
+}
+
+.gerencia-13707 {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(59, 130, 246, 0.1) 100%);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+/* Percentage bar */
+.percent-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.percent-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    max-width: 80px;
+}
+
+.percent-bar-cabelos {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.percent-bar-make {
+    height: 100%;
+    background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.percent-bar-iaf {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.percent-value {
+    font-weight: 700;
+    min-width: 45px;
+    text-align: right;
+}
+
+.percent-cabelos {
+    color: #a78bfa;
+}
+
+.percent-make {
+    color: #f472b6;
+}
+
+.percent-iaf {
+    color: #4ade80;
+}
+
+/* Value cell styling */
+.value-cell {
+    font-family: 'JetBrains Mono', monospace;
+    color: #4ade80;
+    font-weight: 600;
+}
+
+/* Table scroll container */
+.futuristic-table-scroll {
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 8px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
+}
+
+/* Marca badge */
+.marca-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.marca-eudora {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(236, 72, 153, 0.1) 100%);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.marca-boticario {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.marca-qdb {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
+    color: #fb923c;
+    border: 1px solid rgba(251, 146, 60, 0.3);
+}
+
+/* Filter section */
+.filter-section {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-section .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-section label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filter-section select {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #f8fafc;
+    font-size: 0.875rem;
+}
+</style>
+
 <div class="page-header">
     <h1 class="page-title">IAF - Premiacao</h1>
     <p class="page-subtitle">Penetracao de produtos da premiacao (Cabelos e Make)</p>
@@ -37,40 +322,74 @@
         </div>
     </div>
 
-    <!-- IAF by Sector -->
-    <div class="section">
-        <h3 class="section-title">IAF por Setor</h3>
-        <div class="table-container">
-            <table class="table">
+    <!-- IAF by Sector - Futuristic Table -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="pie-chart" style="width: 18px; height: 18px;"></i>
+            </span>
+            Porcentagem IAF por Setor (baseado em clientes ativos)
+        </h3>
+
+        <div class="futuristic-table-scroll" style="max-height: 450px;">
+            <table class="futuristic-table">
                 <thead>
                     <tr>
                         <th>Setor</th>
-                        <th class="numeric">Clientes Ativos</th>
-                        <th class="numeric">Cabelos</th>
-                        <th class="numeric">% Cabelos</th>
-                        <th class="numeric">Make</th>
-                        <th class="numeric">% Make</th>
+                        <th style="text-align: right;">Clientes Ativos</th>
+                        <th style="text-align: right;">Clientes IAF</th>
+                        <th style="width: 140px;">% IAF</th>
+                        <th style="text-align: right;">Clientes Cabelos</th>
+                        <th style="width: 140px;">% Cabelos</th>
+                        <th style="text-align: right;">Clientes Make</th>
+                        <th style="width: 140px;">% Make</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
                         <tr>
-                            <td colspan="6" class="text-center">
+                            <td colspan="8" class="text-center">
                                 <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loading && setores.length === 0">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">
+                                Nenhum dado encontrado
                             </td>
                         </tr>
                     </template>
                     <template x-for="setor in setores" :key="setor.setor">
                         <tr>
                             <td x-text="setor.setor"></td>
-                            <td class="numeric" x-text="formatNumber(setor.clientes_ativos)"></td>
-                            <td class="numeric" x-text="formatNumber(setor.clientes_cabelos)"></td>
-                            <td class="numeric">
-                                <span class="badge badge-accent" x-text="formatPercent(setor.percent_cabelos)"></span>
+                            <td style="text-align: right;" x-text="formatNumber(setor.clientes_ativos)"></td>
+                            <td style="text-align: right;" x-text="formatNumber(setor.clientes_iaf)"></td>
+                            <td>
+                                <div class="percent-bar-container">
+                                    <span class="percent-value percent-iaf" x-text="setor.percent_iaf + '%'"></span>
+                                    <div class="percent-bar">
+                                        <div class="percent-bar-iaf" :style="'width: ' + Math.min(setor.percent_iaf, 100) + '%'"></div>
+                                    </div>
+                                </div>
                             </td>
-                            <td class="numeric" x-text="formatNumber(setor.clientes_make)"></td>
-                            <td class="numeric">
-                                <span class="badge badge-success" x-text="formatPercent(setor.percent_make)"></span>
+                            <td style="text-align: right;" x-text="formatNumber(setor.clientes_cabelos)"></td>
+                            <td>
+                                <div class="percent-bar-container">
+                                    <span class="percent-value percent-cabelos" x-text="setor.percent_cabelos + '%'"></span>
+                                    <div class="percent-bar">
+                                        <div class="percent-bar-cabelos" :style="'width: ' + Math.min(setor.percent_cabelos, 100) + '%'"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="text-align: right;" x-text="formatNumber(setor.clientes_make)"></td>
+                            <td>
+                                <div class="percent-bar-container">
+                                    <span class="percent-value percent-make" x-text="setor.percent_make + '%'"></span>
+                                    <div class="percent-bar">
+                                        <div class="percent-bar-make" :style="'width: ' + Math.min(setor.percent_make, 100) + '%'"></div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     </template>
@@ -79,63 +398,93 @@
         </div>
     </div>
 
-    <!-- IAF Sales Detail -->
-    <div class="section">
-        <div class="section-header">
-            <h3 class="section-title">Vendas IAF</h3>
+    <!-- IAF Sales Detail - Futuristic Table -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="shopping-bag" style="width: 18px; height: 18px;"></i>
+            </span>
+            Detalhamento de Vendas IAF
+        </h3>
+
+        <div class="filter-section">
             <div class="filter-group">
                 <label>Tipo</label>
-                <select class="input select" x-model="selectedTipo" @change="loadVendas()">
+                <select x-model="selectedTipo" @change="loadVendas()">
                     <option value="">Todos</option>
                     <option value="Cabelos">Cabelos</option>
                     <option value="Make">Make</option>
                 </select>
             </div>
-        </div>
-        <div class="table-container">
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Ciclo</th>
-                            <th>Setor</th>
-                            <th>Revendedora</th>
-                            <th>SKU</th>
-                            <th>Produto</th>
-                            <th>Marca</th>
-                            <th>Tipo</th>
-                            <th class="numeric">Qtde</th>
-                            <th class="numeric">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-if="vendas.length === 0 && !loading">
-                            <tr>
-                                <td colspan="9" class="text-center text-muted">
-                                    Nenhuma venda IAF encontrada
-                                </td>
-                            </tr>
-                        </template>
-                        <template x-for="venda in vendas" :key="venda.sku + venda.ciclo + venda.codigo_revendedora">
-                            <tr>
-                                <td x-text="venda.ciclo"></td>
-                                <td x-text="venda.setor"></td>
-                                <td x-text="venda.nome_revendedora"></td>
-                                <td class="font-mono" x-text="venda.sku"></td>
-                                <td x-text="venda.nome"></td>
-                                <td x-text="venda.marca"></td>
-                                <td>
-                                    <span class="badge"
-                                          :class="venda.tipo === 'Cabelos' ? 'badge-accent' : 'badge-success'"
-                                          x-text="venda.tipo"></span>
-                                </td>
-                                <td class="numeric" x-text="venda.quantidade"></td>
-                                <td class="numeric" x-text="formatCurrency(venda.valor)"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+            <div class="filter-group">
+                <label>Setor</label>
+                <select x-model="selectedSetor" @change="loadVendas()">
+                    <option value="">Todos</option>
+                    <template x-for="s in setores" :key="s.setor">
+                        <option :value="s.setor" x-text="s.setor"></option>
+                    </template>
+                </select>
             </div>
+        </div>
+
+        <div class="futuristic-table-scroll">
+            <table class="futuristic-table">
+                <thead>
+                    <tr>
+                        <th>Ciclo</th>
+                        <th>Setor</th>
+                        <th>Codigo</th>
+                        <th>Nome</th>
+                        <th>SKU</th>
+                        <th>Marca</th>
+                        <th>Tipo</th>
+                        <th style="text-align: right;">Valor</th>
+                        <th style="text-align: center;">Gerencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loadingVendas">
+                        <tr>
+                            <td colspan="9" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loadingVendas && vendas.length === 0">
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">
+                                Nenhuma venda IAF encontrada
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="venda in vendas" :key="venda.sku + venda.ciclo + venda.codigo_revendedora">
+                        <tr>
+                            <td x-text="venda.ciclo"></td>
+                            <td x-text="venda.setor"></td>
+                            <td class="font-mono" x-text="venda.codigo_revendedora"></td>
+                            <td x-text="venda.nome_revendedora"></td>
+                            <td class="font-mono" x-text="venda.sku"></td>
+                            <td>
+                                <span :class="getMarcaClass(venda.marca)" class="marca-badge" x-text="venda.marca"></span>
+                            </td>
+                            <td>
+                                <span :class="venda.tipo === 'Cabelos' ? 'iaf-cabelos' : 'iaf-make'" class="iaf-badge" x-text="venda.tipo"></span>
+                            </td>
+                            <td style="text-align: right;" class="value-cell" x-text="formatCurrency(venda.valor)"></td>
+                            <td style="text-align: center;">
+                                <span :class="getGerenciaClass(venda.gerencia)" class="gerencia-badge" x-text="formatGerencia(venda.gerencia)"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination info -->
+        <div style="padding-top: 16px; border-top: 1px solid rgba(139, 92, 246, 0.2); margin-top: 16px;">
+            <span class="text-secondary text-xs">
+                Mostrando <span x-text="vendas.length"></span> registros (limite: 200)
+            </span>
         </div>
     </div>
 </div>
@@ -149,7 +498,9 @@ function iafPage() {
         setores: [],
         vendas: [],
         loading: false,
+        loadingVendas: false,
         selectedTipo: '',
+        selectedSetor: '',
 
         async init() {
             await Promise.all([
@@ -187,16 +538,45 @@ function iafPage() {
         },
 
         async loadVendas() {
+            this.loadingVendas = true;
             try {
                 const params = new URLSearchParams();
                 if (this.selectedTipo) params.set('tipo', this.selectedTipo);
-                params.set('limite', 100);
+                if (this.selectedSetor) params.set('setor', this.selectedSetor);
+                params.set('limite', 200);
 
                 const response = await fetch(`/api/iaf/vendas?${params}`);
                 this.vendas = await response.json();
             } catch (error) {
                 console.error('Failed to load vendas:', error);
+            } finally {
+                this.loadingVendas = false;
             }
+        },
+
+        getMarcaClass(marca) {
+            if (!marca) return 'marca-badge';
+            const m = marca.toLowerCase();
+            if (m.includes('eudora') || m.includes('siage') || m.includes('siège')) return 'marca-eudora';
+            if (m.includes('boticario') || m.includes('boticário')) return 'marca-boticario';
+            if (m.includes('quem disse') || m.includes('qdb')) return 'marca-qdb';
+            return 'marca-badge';
+        },
+
+        getGerenciaClass(gerencia) {
+            if (!gerencia) return 'gerencia-badge';
+            const g = String(gerencia);
+            if (g.includes('13706')) return 'gerencia-13706';
+            if (g.includes('13707')) return 'gerencia-13707';
+            return 'gerencia-badge';
+        },
+
+        formatGerencia(gerencia) {
+            if (!gerencia) return '-';
+            const g = String(gerencia);
+            if (g.includes('13706')) return '13706';
+            if (g.includes('13707')) return '13707';
+            return g;
         }
     }
 }

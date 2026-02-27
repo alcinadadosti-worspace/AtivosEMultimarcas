@@ -16,6 +16,7 @@ from app.config import (
     VENDAS_COL_NOME_REVENDEDORA,
     VENDAS_COL_QTD_ITENS,
     VENDAS_COL_VALOR,
+    VENDAS_COL_GERENCIA,
 )
 from app.utils.normalizers import normalizar_sku
 
@@ -171,11 +172,15 @@ def cruzar_vendas_com_iaf(
                 marca = "oBoticário"
 
         if tipo_iaf:
+            # Get gerencia - handle missing column gracefully
+            gerencia = row.get(VENDAS_COL_GERENCIA, "")
+
             resultados.append({
                 VENDAS_COL_CICLO: row[VENDAS_COL_CICLO],
                 VENDAS_COL_SETOR: row[VENDAS_COL_SETOR],
                 VENDAS_COL_CODIGO_REVENDEDORA: row[VENDAS_COL_CODIGO_REVENDEDORA],
                 VENDAS_COL_NOME_REVENDEDORA: row[VENDAS_COL_NOME_REVENDEDORA],
+                VENDAS_COL_GERENCIA: gerencia,
                 "ClienteID": row["ClienteID"],
                 "SKU": codigo,
                 "Nome_IAF": descricao,
@@ -265,7 +270,12 @@ def calcular_iaf_por_setor(
         df_iaf: DataFrame of IAF sales
 
     Returns:
-        List of dicts with sector IAF metrics
+        List of dicts with sector IAF metrics including:
+        - clientes_ativos: total active customers in sector
+        - clientes_iaf: customers who bought any IAF (cabelos OR make)
+        - percent_iaf: percentage of active customers with IAF
+        - clientes_cabelos, percent_cabelos: hair product metrics
+        - clientes_make, percent_make: makeup product metrics
     """
     # Get active customers by sector
     df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
@@ -277,6 +287,8 @@ def calcular_iaf_por_setor(
             {
                 "setor": row[VENDAS_COL_SETOR],
                 "clientes_ativos": row["ClientesAtivos"],
+                "clientes_iaf": 0,
+                "percent_iaf": 0,
                 "clientes_cabelos": 0,
                 "percent_cabelos": 0,
                 "clientes_make": 0,
@@ -284,6 +296,11 @@ def calcular_iaf_por_setor(
             }
             for row in df_setores.iter_rows(named=True)
         ]
+
+    # Count total IAF customers by sector (any type)
+    df_iaf_total = df_iaf.group_by(VENDAS_COL_SETOR).agg([
+        pl.col("ClienteID").n_unique().alias("ClientesIAF")
+    ])
 
     # Count IAF customers by sector and type
     # Cabelos: all transaction types
@@ -300,11 +317,13 @@ def calcular_iaf_por_setor(
     ])
 
     # Join all data
-    df_resultado = df_setores.join(df_iaf_cabelos, on=VENDAS_COL_SETOR, how="left")
+    df_resultado = df_setores.join(df_iaf_total, on=VENDAS_COL_SETOR, how="left")
+    df_resultado = df_resultado.join(df_iaf_cabelos, on=VENDAS_COL_SETOR, how="left")
     df_resultado = df_resultado.join(df_iaf_make, on=VENDAS_COL_SETOR, how="left")
 
     # Fill nulls and calculate percentages
     df_resultado = df_resultado.with_columns([
+        pl.col("ClientesIAF").fill_null(0),
         pl.col("ClientesCabelos").fill_null(0),
         pl.col("ClientesMake").fill_null(0),
     ])
@@ -312,15 +331,19 @@ def calcular_iaf_por_setor(
     resultados = []
     for row in df_resultado.iter_rows(named=True):
         clientes_ativos = row["ClientesAtivos"]
+        clientes_iaf = row["ClientesIAF"]
         clientes_cabelos = row["ClientesCabelos"]
         clientes_make = row["ClientesMake"]
 
-        percent_cabelos = round((clientes_cabelos / clientes_ativos * 100)) if clientes_ativos > 0 else 0
-        percent_make = round((clientes_make / clientes_ativos * 100)) if clientes_ativos > 0 else 0
+        percent_iaf = round((clientes_iaf / clientes_ativos * 100), 1) if clientes_ativos > 0 else 0
+        percent_cabelos = round((clientes_cabelos / clientes_ativos * 100), 1) if clientes_ativos > 0 else 0
+        percent_make = round((clientes_make / clientes_ativos * 100), 1) if clientes_ativos > 0 else 0
 
         resultados.append({
             "setor": row[VENDAS_COL_SETOR],
             "clientes_ativos": clientes_ativos,
+            "clientes_iaf": clientes_iaf,
+            "percent_iaf": percent_iaf,
             "clientes_cabelos": clientes_cabelos,
             "percent_cabelos": percent_cabelos,
             "clientes_make": clientes_make,
@@ -346,7 +369,7 @@ def listar_vendas_iaf(
         limite: Maximum number of results
 
     Returns:
-        List of IAF sale records
+        List of IAF sale records including gerencia
     """
     if df_iaf.is_empty():
         return []
@@ -361,12 +384,16 @@ def listar_vendas_iaf(
 
     df_filtrado = df_filtrado.head(limite)
 
+    # Check if gerencia column exists
+    has_gerencia = VENDAS_COL_GERENCIA in df_filtrado.columns
+
     return [
         {
             "ciclo": row[VENDAS_COL_CICLO],
             "setor": row[VENDAS_COL_SETOR],
             "codigo_revendedora": row[VENDAS_COL_CODIGO_REVENDEDORA],
             "nome_revendedora": row[VENDAS_COL_NOME_REVENDEDORA],
+            "gerencia": row.get(VENDAS_COL_GERENCIA, "") if has_gerencia else "",
             "sku": row["SKU"],
             "nome": row["Nome_IAF"],
             "marca": row["Marca_IAF"],
