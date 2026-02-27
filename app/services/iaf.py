@@ -34,31 +34,78 @@ def criar_indice_iaf(conn: sqlite3.Connection) -> Dict[str, Dict]:
 
     indice = {}
 
+    def add_with_variations(sku: str, descricao: str, marca: str, tipo: str):
+        """Add SKU and its variations to index."""
+        indice[sku] = {"descricao": descricao, "marca": marca, "tipo": tipo}
+        if len(sku) == 5 and sku.startswith('0'):
+            indice[sku[1:]] = {"descricao": descricao, "marca": marca, "tipo": tipo}
+        if len(sku) == 4:
+            indice['0' + sku] = {"descricao": descricao, "marca": marca, "tipo": tipo}
+
     # Load Cabelos
     cursor.execute("SELECT sku_normalizado, descricao, marca FROM iaf_cabelos")
     for row in cursor.fetchall():
         sku, descricao, marca = row
-        indice[sku] = {"descricao": descricao, "marca": marca, "tipo": "Cabelos"}
-
-        # Add variations
-        if len(sku) == 5 and sku.startswith('0'):
-            indice[sku[1:]] = {"descricao": descricao, "marca": marca, "tipo": "Cabelos"}
-        if len(sku) == 4:
-            indice['0' + sku] = {"descricao": descricao, "marca": marca, "tipo": "Cabelos"}
+        add_with_variations(sku, descricao, marca, "Cabelos")
 
     # Load Make
     cursor.execute("SELECT sku_normalizado, descricao, marca FROM iaf_make")
     for row in cursor.fetchall():
         sku, descricao, marca = row
-        indice[sku] = {"descricao": descricao, "marca": marca, "tipo": "Make"}
-
-        # Add variations
-        if len(sku) == 5 and sku.startswith('0'):
-            indice[sku[1:]] = {"descricao": descricao, "marca": marca, "tipo": "Make"}
-        if len(sku) == 4:
-            indice['0' + sku] = {"descricao": descricao, "marca": marca, "tipo": "Make"}
+        add_with_variations(sku, descricao, marca, "Make")
 
     return indice
+
+
+def is_siage_hair_product(nome_produto: str) -> bool:
+    """
+    Check if a product is a Siège hair product (combo/kit/sachet).
+
+    These products should be counted as IAF Cabelos even if not in the official list.
+    """
+    if not nome_produto:
+        return False
+    nome_upper = nome_produto.upper()
+
+    # Must contain Siège indicator
+    if 'SIAGE' not in nome_upper and 'SIÀGE' not in nome_upper:
+        return False
+
+    # Must be a hair-related product (combo, kit, sachet, or hair keywords)
+    hair_indicators = [
+        'COMB', 'KIT', 'CJ SCH', 'SACHET', 'SCH ',
+        'SHAMP', 'COND', 'MASC', 'CREME', 'SERUM', 'LEAVE', 'OLEO'
+    ]
+    return any(ind in nome_upper for ind in hair_indicators)
+
+
+def is_makeup_product(nome_produto: str) -> bool:
+    """
+    Check if a product is a makeup product that should be counted as IAF Make.
+
+    Detects makeup products that may not be in the official IAF list.
+    """
+    if not nome_produto:
+        return False
+    nome_upper = nome_produto.upper()
+
+    # Makeup product indicators
+    makeup_indicators = [
+        'BATOM', 'GLOSS', 'SOMBRA', 'PLT SOMBRA', 'PALETTE SOMBRA',
+        'RIMEL', 'MASCARA CILIOS', 'DELINEADOR', 'BLUSH', 'BRONZER',
+        'ILUMINADOR', 'PRIMER', 'CORRETIVO', 'PO COMPACTO', 'CONTORNO',
+        'BASE LIQ', 'BASE STICK', 'MAKE B ', 'MAKEB ', 'LABIAL',
+        'LAPIS OLHO', 'LAPIS BOCA', 'EUD MAKE', 'NIINA'
+    ]
+
+    # Check if product name matches makeup indicators
+    if any(ind in nome_upper for ind in makeup_indicators):
+        # Exclude products that are clearly not makeup
+        exclude_patterns = ['BODY', 'CORPORAL', 'CABELO', 'SHAMP', 'COND']
+        if not any(excl in nome_upper for excl in exclude_patterns):
+            return True
+
+    return False
 
 
 def cruzar_vendas_com_iaf(
@@ -68,12 +115,16 @@ def cruzar_vendas_com_iaf(
     """
     Cross-reference sales with IAF database to identify premium items.
 
+    Also includes Siège hair products (combos/kits) that aren't in the official
+    IAF list but should be counted as IAF Cabelos.
+
     Args:
         df_vendas: Enriched sales DataFrame
         conn: SQLite connection
 
     Returns:
         DataFrame with only IAF sales, including type (Cabelos/Make)
+        Also includes "TipoTransacao" column for filtering Make without Brinde
     """
     # Load IAF index
     indice_iaf = criar_indice_iaf(conn)
@@ -86,9 +137,40 @@ def cruzar_vendas_com_iaf(
 
     for row in df_vendas.iter_rows(named=True):
         codigo = row.get("CodigoProduto_normalizado", "")
+        nome_produto = row.get("NomeProduto", "")
+        tipo_transacao = row.get("Tipo", "Venda")
 
+        tipo_iaf = None
+        descricao = ""
+        marca = ""
+
+        # Check if in official IAF index
         if codigo in indice_iaf:
             info = indice_iaf[codigo]
+            tipo_iaf = info["tipo"]
+            descricao = info["descricao"]
+            marca = info["marca"]
+        # Check if it's a Siège hair product (combo/kit) not in official list
+        elif is_siage_hair_product(nome_produto):
+            tipo_iaf = "Cabelos"
+            descricao = nome_produto
+            marca = "Eudora"
+        # Check if it's a makeup product not in official list
+        elif is_makeup_product(nome_produto):
+            tipo_iaf = "Make"
+            descricao = nome_produto
+            # Determine brand from product name
+            nome_upper = nome_produto.upper() if nome_produto else ""
+            if "EUD" in nome_upper or "EUDORA" in nome_upper:
+                marca = "Eudora"
+            elif "NIINA" in nome_upper:
+                marca = "oBoticário"
+            elif "QDB" in nome_upper or "QUEM DISSE" in nome_upper:
+                marca = "Quem Disse Berenice"
+            else:
+                marca = "oBoticário"
+
+        if tipo_iaf:
             resultados.append({
                 VENDAS_COL_CICLO: row[VENDAS_COL_CICLO],
                 VENDAS_COL_SETOR: row[VENDAS_COL_SETOR],
@@ -96,9 +178,10 @@ def cruzar_vendas_com_iaf(
                 VENDAS_COL_NOME_REVENDEDORA: row[VENDAS_COL_NOME_REVENDEDORA],
                 "ClienteID": row["ClienteID"],
                 "SKU": codigo,
-                "Nome_IAF": info["descricao"],
-                "Marca_IAF": info["marca"],
-                "TipoIAF": info["tipo"],
+                "Nome_IAF": descricao,
+                "Marca_IAF": marca,
+                "TipoIAF": tipo_iaf,
+                "TipoTransacao": tipo_transacao,
                 VENDAS_COL_QTD_ITENS: row[VENDAS_COL_QTD_ITENS],
                 VENDAS_COL_VALOR: row[VENDAS_COL_VALOR],
             })
@@ -117,9 +200,7 @@ def calcular_percentual_iaf(
     """
     Calculate percentage of customers who purchased IAF items.
 
-    SPECIAL RULE FOR MAKE:
-    - If the decimal part of percentage is >= 0.5, add +1.5%
-    - Example: 23.5% -> 25% (23.5 + 1.5 = 25)
+    IMPORTANT: For Make, excludes "Brinde" transaction type from calculation.
 
     Args:
         df_clientes: DataFrame with all active customers
@@ -140,10 +221,13 @@ def calcular_percentual_iaf(
         }
 
     # Filter by type if specified
+    df_iaf_filtrado = df_iaf
     if tipo_iaf:
-        df_iaf_filtrado = df_iaf.filter(pl.col("TipoIAF") == tipo_iaf)
-    else:
-        df_iaf_filtrado = df_iaf
+        df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoIAF") == tipo_iaf)
+
+    # IMPORTANT: For Make, exclude "Brinde" transactions
+    if tipo_iaf == "Make" and "TipoTransacao" in df_iaf_filtrado.columns:
+        df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") != "Brinde")
 
     if df_iaf_filtrado.is_empty():
         return {
@@ -158,14 +242,8 @@ def calcular_percentual_iaf(
     # Calculate percentage
     percentual = (clientes_iaf / total_clientes * 100) if total_clientes > 0 else 0
 
-    # SPECIAL MAKE RULE: +1.5% if decimal >= 0.5
-    if tipo_iaf == "Make":
-        parte_decimal = percentual - int(percentual)
-        if parte_decimal >= 0.5:
-            percentual += 1.5
-
-    # Round
-    percentual = round(percentual)
+    # Round to 2 decimal places
+    percentual = round(percentual, 2)
 
     return {
         "total_clientes": total_clientes,
@@ -208,11 +286,16 @@ def calcular_iaf_por_setor(
         ]
 
     # Count IAF customers by sector and type
+    # Cabelos: all transaction types
     df_iaf_cabelos = df_iaf.filter(pl.col("TipoIAF") == "Cabelos").group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesCabelos")
     ])
 
-    df_iaf_make = df_iaf.filter(pl.col("TipoIAF") == "Make").group_by(VENDAS_COL_SETOR).agg([
+    # Make: exclude "Brinde" transactions
+    df_make_filter = df_iaf.filter(pl.col("TipoIAF") == "Make")
+    if "TipoTransacao" in df_iaf.columns:
+        df_make_filter = df_make_filter.filter(pl.col("TipoTransacao") != "Brinde")
+    df_iaf_make = df_make_filter.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesMake")
     ])
 
