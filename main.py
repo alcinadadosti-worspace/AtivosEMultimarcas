@@ -9,14 +9,15 @@ import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Depends
+from fastapi import Cookie, FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 from app.config import DATABASE_PATH, DATA_DIR
-from app.api.routes import api_router, get_session_data
+from app.api.routes import api_router, SESSION_COOKIE_NAME
 from app.api.dependencies import get_db
+from app.services.session import get_session
 from app.utils.formatters import formatar_moeda, formatar_numero, formatar_percentual
 
 
@@ -83,6 +84,14 @@ app.include_router(api_router)
 # PAGE ROUTES
 # =============================================================================
 
+def get_user_has_data(session_id: str = Cookie(None, alias=SESSION_COOKIE_NAME)) -> bool:
+    """Check if user has data loaded in their session."""
+    if not session_id:
+        return False
+    _, session_data = get_session(session_id)
+    return session_data.get("df_vendas") is not None
+
+
 @app.get("/", response_class=HTMLResponse)
 async def page_home(request: Request):
     """Home page - redirects to dashboard."""
@@ -93,11 +102,11 @@ async def page_home(request: Request):
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def page_dashboard(request: Request):
+async def page_dashboard(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Dashboard page with overview metrics."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/dashboard.html", {
         "request": request,
         "page": "dashboard",
@@ -106,11 +115,11 @@ async def page_dashboard(request: Request):
 
 
 @app.get("/multimarcas", response_class=HTMLResponse)
-async def page_multimarcas(request: Request):
+async def page_multimarcas(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Multi-brand customers page."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/multimarcas.html", {
         "request": request,
         "page": "multimarcas",
@@ -119,11 +128,11 @@ async def page_multimarcas(request: Request):
 
 
 @app.get("/produtos-novos", response_class=HTMLResponse)
-async def page_produtos_novos(request: Request):
+async def page_produtos_novos(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Unregistered products page."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/produtos_novos.html", {
         "request": request,
         "page": "produtos_novos",
@@ -132,11 +141,11 @@ async def page_produtos_novos(request: Request):
 
 
 @app.get("/auditoria", response_class=HTMLResponse)
-async def page_auditoria(request: Request):
+async def page_auditoria(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Audit page for SKU matching issues."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/auditoria.html", {
         "request": request,
         "page": "auditoria",
@@ -145,11 +154,11 @@ async def page_auditoria(request: Request):
 
 
 @app.get("/cliente", response_class=HTMLResponse)
-async def page_cliente(request: Request):
+async def page_cliente(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Customer detail page."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/cliente.html", {
         "request": request,
         "page": "cliente",
@@ -158,11 +167,11 @@ async def page_cliente(request: Request):
 
 
 @app.get("/iaf", response_class=HTMLResponse)
-async def page_iaf(request: Request):
+async def page_iaf(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """IAF premium tracking page."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/iaf.html", {
         "request": request,
         "page": "iaf",
@@ -171,11 +180,11 @@ async def page_iaf(request: Request):
 
 
 @app.get("/categorias", response_class=HTMLResponse)
-async def page_categorias(request: Request):
+async def page_categorias(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
     """Category analytics page."""
-    session = get_session_data()
-    has_data = session.get("df_vendas") is not None
-
     return templates.TemplateResponse("pages/categorias.html", {
         "request": request,
         "page": "categorias",

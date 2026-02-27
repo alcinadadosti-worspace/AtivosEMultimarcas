@@ -3,10 +3,10 @@ FastAPI routes for Multimarks Analytics.
 """
 import sqlite3
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import Response
+from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse, Response
 
 import polars as pl
 
@@ -16,6 +16,13 @@ from app.api.schemas import (
     MetricasGerais,
     FiltrosDisponiveis,
     HealthCheck,
+)
+from app.services.session import (
+    get_session,
+    get_session_data as get_session_by_id,
+    set_session_value,
+    clear_session,
+    get_session_stats,
 )
 from app.services.venda import (
     processar_planilha_vendas,
@@ -61,30 +68,41 @@ from app.utils.exporters import exportar_csv, exportar_excel
 # Router for API endpoints
 api_router = APIRouter(prefix="/api")
 
-# In-memory storage for current session data
-# In production, use Redis or database sessions
-_session_data = {
-    "df_vendas": None,
-    "df_clientes": None,
-    "df_iaf": None,
-}
+# Cookie configuration
+SESSION_COOKIE_NAME = "multimarks_session"
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 24  # 24 hours
 
 
+def get_user_session(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
+    """
+    Dependency to get the current user's session.
+
+    Returns tuple of (session_id, session_data).
+    Creates new session if none exists.
+    """
+    return get_session(session_id)
+
+
+def create_response_with_session(data: Any, session_id: str) -> JSONResponse:
+    """Create a JSON response with session cookie set."""
+    response = JSONResponse(content=data)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        max_age=SESSION_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+
+# Legacy function for compatibility with page routes
 def get_session_data():
-    """Get current session data."""
-    return _session_data
-
-
-def set_session_data(key: str, value):
-    """Set session data."""
-    _session_data[key] = value
-
-
-def clear_session_data():
-    """Clear all session data."""
-    _session_data["df_vendas"] = None
-    _session_data["df_clientes"] = None
-    _session_data["df_iaf"] = None
+    """
+    Legacy function - returns empty dict for page route compatibility.
+    Pages should check has_data via API instead.
+    """
+    return {"df_vendas": None}
 
 
 # =============================================================================
@@ -102,33 +120,62 @@ async def health_check():
 
 
 @api_router.post("/clear")
-async def clear_cache():
+async def clear_cache(
+    session: tuple = Depends(get_user_session),
+):
     """Clear session cache and force reload on next upload."""
-    clear_session_data()
-    return {
+    session_id, _ = session
+    clear_session(session_id)
+    return create_response_with_session({
         "success": True,
         "message": "Cache limpo. Faca upload novamente da planilha."
-    }
+    }, session_id)
 
 
 @api_router.get("/clear")
-async def clear_cache_get():
+async def clear_cache_get(
+    session: tuple = Depends(get_user_session),
+):
     """Clear session cache (GET method for easy browser access)."""
-    clear_session_data()
-    return {
+    session_id, _ = session
+    clear_session(session_id)
+    return create_response_with_session({
         "success": True,
         "message": "Cache limpo. Faca upload novamente da planilha."
-    }
+    }, session_id)
+
+
+@api_router.get("/session/stats")
+async def session_stats():
+    """Get session statistics (for monitoring)."""
+    return get_session_stats()
+
+
+@api_router.get("/session/status")
+async def session_status(
+    session: tuple = Depends(get_user_session),
+):
+    """Check if current session has data loaded."""
+    session_id, session_data = session
+    has_data = session_data.get("df_vendas") is not None
+
+    response = create_response_with_session({
+        "has_data": has_data,
+        "session_id": session_id[:8] + "...",  # Only show first 8 chars for privacy
+    }, session_id)
+
+    return response
 
 
 # =============================================================================
 # UPLOAD
 # =============================================================================
 
-@api_router.post("/upload", response_model=UploadResponse)
+@api_router.post("/upload")
 async def upload_vendas(
     file: UploadFile = File(...),
-    conn: sqlite3.Connection = Depends(get_db)
+    conn: sqlite3.Connection = Depends(get_db),
+    session: tuple = Depends(get_user_session),
 ):
     """
     Upload and process a sales spreadsheet.
@@ -136,8 +183,10 @@ async def upload_vendas(
     Accepts CSV or Excel files with required columns.
     Automatically clears previous session data before processing.
     """
+    session_id, session_data = session
+
     # Clear previous session data automatically
-    clear_session_data()
+    clear_session(session_id)
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="Arquivo nao fornecido")
@@ -159,25 +208,27 @@ async def upload_vendas(
         # Calculate customer metrics
         df_clientes = calcular_metricas_cliente(resultado["df_vendas"])
 
-        # Store in session
-        set_session_data("df_vendas", resultado["df_vendas"])
-        set_session_data("df_clientes", df_clientes)
+        # Store in user's session
+        set_session_value(session_id, "df_vendas", resultado["df_vendas"])
+        set_session_value(session_id, "df_clientes", df_clientes)
 
         # Process IAF if available
         try:
             df_iaf = cruzar_vendas_com_iaf(resultado["df_vendas"], conn)
-            set_session_data("df_iaf", df_iaf)
-            print(f"IAF processado: {len(df_iaf)} registros")
+            set_session_value(session_id, "df_iaf", df_iaf)
+            print(f"[Session {session_id[:8]}] IAF processado: {len(df_iaf)} registros")
         except Exception as e:
-            print(f"Erro ao processar IAF: {e}")
-            set_session_data("df_iaf", pl.DataFrame())
+            print(f"[Session {session_id[:8]}] Erro ao processar IAF: {e}")
+            set_session_value(session_id, "df_iaf", pl.DataFrame())
 
-        return UploadResponse(
-            success=True,
-            message="Arquivo processado com sucesso",
-            estatisticas=resultado["estatisticas"],
-            avisos=resultado["avisos"]
-        )
+        response_data = {
+            "success": True,
+            "message": "Arquivo processado com sucesso",
+            "estatisticas": resultado["estatisticas"],
+            "avisos": resultado["avisos"]
+        }
+
+        return create_response_with_session(response_data, session_id)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -190,10 +241,12 @@ async def upload_vendas(
 # =============================================================================
 
 @api_router.get("/filtros", response_model=FiltrosDisponiveis)
-async def get_filtros():
+async def get_filtros(
+    session: tuple = Depends(get_user_session),
+):
     """Get available filter options from current data."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return FiltrosDisponiveis(ciclos=[], setores=[], marcas=[])
@@ -213,11 +266,12 @@ async def get_filtros():
 async def get_metricas_gerais(
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Get general dashboard metrics."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+    df_clientes = session_data.get("df_clientes")
 
     if df_vendas is None or df_clientes is None:
         return {"error": "Nenhum dado carregado. Faca upload de uma planilha."}
@@ -237,10 +291,11 @@ async def get_metricas_gerais(
 async def get_vendas_por_marca(
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Get sales breakdown by brand."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -256,10 +311,11 @@ async def get_vendas_por_marca(
 async def get_top_setores(
     limite: int = Query(5, ge=1, le=20),
     ciclos: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Get top sectors by value."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return []
@@ -273,10 +329,11 @@ async def get_top_setores(
 @api_router.get("/metricas/evolucao")
 async def get_evolucao_ciclos(
     setores: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Get metrics evolution by cycle."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return []
@@ -288,10 +345,12 @@ async def get_evolucao_ciclos(
 
 
 @api_router.get("/metricas/top10-setores")
-async def get_top10_setores():
+async def get_top10_setores(
+    session: tuple = Depends(get_user_session),
+):
     """Get top 10 sectors by value with complete data."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return []
@@ -300,11 +359,13 @@ async def get_top10_setores():
 
 
 @api_router.get("/metricas/resumo-ciclos")
-async def get_resumo_ciclos():
+async def get_resumo_ciclos(
+    session: tuple = Depends(get_user_session),
+):
     """Get summary metrics by cycle."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_vendas = session_data.get("df_vendas")
 
     if df_clientes is None or df_vendas is None:
         return []
@@ -313,11 +374,13 @@ async def get_resumo_ciclos():
 
 
 @api_router.get("/metricas/dados-setor-ciclo")
-async def get_dados_setor_ciclo():
+async def get_dados_setor_ciclo(
+    session: tuple = Depends(get_user_session),
+):
     """Get detailed data by sector and cycle including gerencia."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_vendas = session_data.get("df_vendas")
 
     if df_clientes is None or df_vendas is None:
         return []
@@ -335,10 +398,11 @@ async def get_multimarcas(
     setores: Optional[str] = Query(None),
     limite: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    session: tuple = Depends(get_user_session),
 ):
     """Get multi-brand customers list."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return {"data": [], "total": 0}
@@ -378,10 +442,11 @@ async def get_combinacoes_marcas(
     limite: int = Query(20, ge=1, le=50),
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Get most frequent brand combinations."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return []
@@ -401,13 +466,14 @@ async def get_combinacoes_marcas(
 
 @api_router.get("/multimarcas/export")
 async def export_multimarcas(
-    formato: str = Query("csv", regex="^(csv|xlsx)$"),
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
 ):
     """Export multi-brand customers to CSV or Excel."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         raise HTTPException(status_code=400, detail="Nenhum dado carregado")
@@ -446,10 +512,11 @@ async def export_multimarcas(
 async def listar_clientes(
     busca: Optional[str] = Query(None),
     limite: int = Query(50, ge=1, le=200),
+    session: tuple = Depends(get_user_session),
 ):
     """List customers for selection."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
 
     if df_clientes is None:
         return []
@@ -481,10 +548,13 @@ async def listar_clientes(
 
 
 @api_router.get("/clientes/{cliente_id}")
-async def get_cliente_detalhe(cliente_id: str):
+async def get_cliente_detalhe(
+    cliente_id: str,
+    session: tuple = Depends(get_user_session),
+):
     """Get detailed information for a specific customer."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         raise HTTPException(status_code=400, detail="Nenhum dado carregado")
@@ -497,10 +567,12 @@ async def get_cliente_detalhe(cliente_id: str):
 # =============================================================================
 
 @api_router.get("/auditoria/estatisticas")
-async def get_auditoria_estatisticas():
+async def get_auditoria_estatisticas(
+    session: tuple = Depends(get_user_session),
+):
     """Get audit statistics."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return {"error": "Nenhum dado carregado"}
@@ -512,10 +584,11 @@ async def get_auditoria_estatisticas():
 async def get_auditoria(
     motivo: Optional[str] = Query(None),
     limite: int = Query(100, ge=1, le=1000),
+    session: tuple = Depends(get_user_session),
 ):
     """Get audit records list."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -526,10 +599,11 @@ async def get_auditoria(
 @api_router.get("/produtos-novos")
 async def get_produtos_novos(
     limite: int = Query(100, ge=1, le=500),
+    session: tuple = Depends(get_user_session),
 ):
     """Get unregistered products list."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -539,11 +613,12 @@ async def get_produtos_novos(
 
 @api_router.get("/produtos-novos/export")
 async def export_produtos_novos(
-    formato: str = Query("csv", regex="^(csv|xlsx)$"),
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    session: tuple = Depends(get_user_session),
 ):
     """Export unregistered products to CSV or Excel."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         raise HTTPException(status_code=400, detail="Nenhum dado carregado")
@@ -575,11 +650,13 @@ async def export_produtos_novos(
 # =============================================================================
 
 @api_router.get("/iaf/metricas")
-async def get_iaf_metricas():
+async def get_iaf_metricas(
+    session: tuple = Depends(get_user_session),
+):
     """Get IAF penetration metrics."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
-    df_iaf = session.get("df_iaf")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_iaf = session_data.get("df_iaf")
 
     if df_clientes is None:
         return {"error": "Nenhum dado carregado"}
@@ -595,11 +672,13 @@ async def get_iaf_metricas():
 
 
 @api_router.get("/iaf/por-setor")
-async def get_iaf_por_setor():
+async def get_iaf_por_setor(
+    session: tuple = Depends(get_user_session),
+):
     """Get IAF metrics by sector."""
-    session = get_session_data()
-    df_clientes = session.get("df_clientes")
-    df_iaf = session.get("df_iaf")
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_iaf = session_data.get("df_iaf")
 
     if df_clientes is None:
         return []
@@ -615,20 +694,18 @@ async def get_iaf_vendas(
     tipo: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
     limite: int = Query(200, ge=1, le=500),
+    session: tuple = Depends(get_user_session),
 ):
     """Get IAF sales list."""
-    session = get_session_data()
-    df_iaf = session.get("df_iaf")
+    session_id, session_data = session
+    df_iaf = session_data.get("df_iaf")
 
     if df_iaf is None:
-        print("df_iaf is None")
         return []
 
     if isinstance(df_iaf, pl.DataFrame) and df_iaf.is_empty():
-        print("df_iaf is empty DataFrame")
         return []
 
-    print(f"df_iaf tem {len(df_iaf)} registros, colunas: {df_iaf.columns}")
     return listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=limite)
 
 
@@ -643,10 +720,12 @@ async def get_categorias_lista():
 
 
 @api_router.get("/categorias/metricas")
-async def get_categorias_metricas():
+async def get_categorias_metricas(
+    session: tuple = Depends(get_user_session),
+):
     """Get metrics by category."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -657,10 +736,12 @@ async def get_categorias_metricas():
 
 
 @api_router.get("/categorias/por-ciclo")
-async def get_categorias_por_ciclo():
+async def get_categorias_por_ciclo(
+    session: tuple = Depends(get_user_session),
+):
     """Get category metrics by cycle."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -670,10 +751,12 @@ async def get_categorias_por_ciclo():
 
 
 @api_router.get("/categorias/por-setor")
-async def get_categorias_por_setor():
+async def get_categorias_por_setor(
+    session: tuple = Depends(get_user_session),
+):
     """Get category metrics by sector."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
@@ -686,10 +769,11 @@ async def get_categorias_por_setor():
 async def get_produtos_categoria(
     categoria: str,
     limite: int = Query(50, ge=1, le=200),
+    session: tuple = Depends(get_user_session),
 ):
     """Get products in a specific category."""
-    session = get_session_data()
-    df_vendas = session.get("df_vendas")
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
         return []
