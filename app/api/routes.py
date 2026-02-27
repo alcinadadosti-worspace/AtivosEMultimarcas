@@ -159,7 +159,9 @@ async def upload_vendas(
         try:
             df_iaf = cruzar_vendas_com_iaf(resultado["df_vendas"], conn)
             set_session_data("df_iaf", df_iaf)
-        except Exception:
+            print(f"IAF processado: {len(df_iaf)} registros")
+        except Exception as e:
+            print(f"Erro ao processar IAF: {e}")
             set_session_data("df_iaf", pl.DataFrame())
 
         return UploadResponse(
@@ -604,13 +606,19 @@ async def get_iaf_por_setor():
 async def get_iaf_vendas(
     tipo: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
-    limite: int = Query(100, ge=1, le=500),
+    limite: int = Query(200, ge=1, le=500),
 ):
     """Get IAF sales list."""
     session = get_session_data()
     df_iaf = session.get("df_iaf")
 
-    if df_iaf is None or df_iaf.is_empty():
+    if df_iaf is None:
+        print("df_iaf is None")
         return []
 
+    if isinstance(df_iaf, pl.DataFrame) and df_iaf.is_empty():
+        print("df_iaf is empty DataFrame")
+        return []
+
+    print(f"df_iaf tem {len(df_iaf)} registros, colunas: {df_iaf.columns}")
     return listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=limite)

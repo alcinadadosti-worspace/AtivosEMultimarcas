@@ -133,6 +133,9 @@ def cruzar_vendas_com_iaf(
     if not indice_iaf:
         return pl.DataFrame()
 
+    # Check if gerencia column exists in vendas
+    has_gerencia = VENDAS_COL_GERENCIA in df_vendas.columns
+
     # Filter sales that are in IAF
     resultados = []
 
@@ -173,7 +176,7 @@ def cruzar_vendas_com_iaf(
 
         if tipo_iaf:
             # Get gerencia - handle missing column gracefully
-            gerencia = row.get(VENDAS_COL_GERENCIA, "")
+            gerencia = row.get(VENDAS_COL_GERENCIA, "") if has_gerencia else ""
 
             resultados.append({
                 VENDAS_COL_CICLO: row[VENDAS_COL_CICLO],
