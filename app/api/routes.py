@@ -47,6 +47,14 @@ from app.services.auditoria import (
     listar_auditoria,
     listar_produtos_novos,
 )
+from app.services.categoria import (
+    classificar_vendas,
+    calcular_metricas_categoria,
+    calcular_categoria_por_ciclo,
+    calcular_categoria_por_setor,
+    listar_produtos_categoria,
+    obter_categorias_disponiveis,
+)
 from app.utils.exporters import exportar_csv, exportar_excel
 
 
@@ -622,3 +630,69 @@ async def get_iaf_vendas(
 
     print(f"df_iaf tem {len(df_iaf)} registros, colunas: {df_iaf.columns}")
     return listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=limite)
+
+
+# =============================================================================
+# CATEGORIAS
+# =============================================================================
+
+@api_router.get("/categorias/lista")
+async def get_categorias_lista():
+    """Get list of available categories."""
+    return obter_categorias_disponiveis()
+
+
+@api_router.get("/categorias/metricas")
+async def get_categorias_metricas():
+    """Get metrics by category."""
+    session = get_session_data()
+    df_vendas = session.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    # Classify and calculate metrics
+    df_classificado = classificar_vendas(df_vendas)
+    return calcular_metricas_categoria(df_classificado)
+
+
+@api_router.get("/categorias/por-ciclo")
+async def get_categorias_por_ciclo():
+    """Get category metrics by cycle."""
+    session = get_session_data()
+    df_vendas = session.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    df_classificado = classificar_vendas(df_vendas)
+    return calcular_categoria_por_ciclo(df_classificado)
+
+
+@api_router.get("/categorias/por-setor")
+async def get_categorias_por_setor():
+    """Get category metrics by sector."""
+    session = get_session_data()
+    df_vendas = session.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    df_classificado = classificar_vendas(df_vendas)
+    return calcular_categoria_por_setor(df_classificado)
+
+
+@api_router.get("/categorias/{categoria}/produtos")
+async def get_produtos_categoria(
+    categoria: str,
+    limite: int = Query(50, ge=1, le=200),
+):
+    """Get products in a specific category."""
+    session = get_session_data()
+    df_vendas = session.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    df_classificado = classificar_vendas(df_vendas)
+    return listar_produtos_categoria(df_classificado, categoria, limite=limite)

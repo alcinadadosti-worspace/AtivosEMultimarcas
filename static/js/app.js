@@ -187,11 +187,11 @@ document.addEventListener('alpine:init', () => {
 // =============================================================================
 
 window.chartColors = {
-    'oBoticario': '#00a86b',
-    'Eudora': '#9333ea',
-    'Quem Disse Berenice': '#ec4899',
-    'O.U.I': '#f59e0b',
-    'AuAmigos': '#06b6d4',
+    'oBoticario': '#00a86b',        // Green
+    'Eudora': '#9333ea',            // Purple
+    'Quem Disse Berenice': '#ec4899', // Pink
+    'O.U.I': '#ef4444',             // Red
+    'AuAmigos': '#fbbf24',          // Yellow
     'DESCONHECIDA': '#525252',
     'default': [
         '#3b82f6',

@@ -170,6 +170,19 @@ async def page_iaf(request: Request):
     })
 
 
+@app.get("/categorias", response_class=HTMLResponse)
+async def page_categorias(request: Request):
+    """Category analytics page."""
+    session = get_session_data()
+    has_data = session.get("df_vendas") is not None
+
+    return templates.TemplateResponse("pages/categorias.html", {
+        "request": request,
+        "page": "categorias",
+        "has_data": has_data,
+    })
+
+
 # =============================================================================
 # HEALTH CHECK (root level)
 # =============================================================================

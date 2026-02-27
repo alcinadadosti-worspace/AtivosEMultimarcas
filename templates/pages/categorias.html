@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}Categorias - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<style>
+/* Futuristic Category Styles */
+.futuristic-section {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.futuristic-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.8), rgba(236, 72, 153, 0.8), transparent);
+}
+
+.futuristic-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.futuristic-section-title .icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a78bfa;
+}
+
+/* Category Cards Grid */
+.category-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.category-card {
+    background: linear-gradient(145deg, rgba(40, 40, 55, 0.9), rgba(25, 25, 40, 0.95));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.category-card:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+}
+
+.category-card.selected {
+    border-color: rgba(139, 92, 246, 0.8);
+    background: linear-gradient(145deg, rgba(139, 92, 246, 0.15), rgba(25, 25, 40, 0.95));
+}
+
+.category-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.category-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.category-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.15) 100%);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.category-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.category-stat {
+    text-align: center;
+}
+
+.category-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    display: block;
+}
+
+.category-stat-value.value-green {
+    color: #4ade80;
+}
+
+.category-stat-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Percentage bar in card */
+.category-percent-bar {
+    margin-top: 12px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.category-percent-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #ec4899);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+/* Futuristic Table */
+.futuristic-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.futuristic-table thead th {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.futuristic-table thead th:first-child {
+    border-radius: 8px 0 0 0;
+}
+
+.futuristic-table thead th:last-child {
+    border-radius: 0 8px 0 0;
+}
+
+.futuristic-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.futuristic-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.futuristic-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    font-size: 0.875rem;
+}
+
+.futuristic-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Value styling */
+.value-cell {
+    font-family: 'JetBrains Mono', monospace;
+    color: #4ade80;
+    font-weight: 600;
+}
+
+/* Category color badges */
+.cat-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cat-perfumaria { background: rgba(236, 72, 153, 0.2); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); }
+.cat-maquiagem { background: rgba(251, 146, 60, 0.2); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.3); }
+.cat-cabelos { background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+.cat-cuidados { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+.cat-desodorantes { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.cat-acessorios { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+.cat-outros { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+/* Table scroll */
+.futuristic-table-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 8px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.futuristic-table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+}
+
+/* Summary stats */
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.summary-stat {
+    background: linear-gradient(145deg, rgba(40, 40, 55, 0.9), rgba(25, 25, 40, 0.95));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+}
+
+.summary-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #f8fafc;
+    display: block;
+}
+
+.summary-stat-value.accent { color: #a78bfa; }
+.summary-stat-value.success { color: #4ade80; }
+.summary-stat-value.warning { color: #fbbf24; }
+
+.summary-stat-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .category-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">Analytics de Categorias</h1>
+    <p class="page-subtitle">Analise de vendas por categoria de produtos</p>
+</div>
+
+<div x-data="categoriasPage()" x-init="init()">
+    <!-- Summary Stats -->
+    <div class="summary-stats">
+        <div class="summary-stat">
+            <span class="summary-stat-value" x-text="categorias.length"></span>
+            <span class="summary-stat-label">Categorias</span>
+        </div>
+        <div class="summary-stat">
+            <span class="summary-stat-value accent" x-text="formatNumber(totalItens)"></span>
+            <span class="summary-stat-label">Total Itens</span>
+        </div>
+        <div class="summary-stat">
+            <span class="summary-stat-value success" x-text="formatCurrency(totalValor)"></span>
+            <span class="summary-stat-label">Valor Total</span>
+        </div>
+        <div class="summary-stat">
+            <span class="summary-stat-value warning" x-text="formatNumber(totalProdutos)"></span>
+            <span class="summary-stat-label">Produtos Unicos</span>
+        </div>
+    </div>
+
+    <!-- Category Cards -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="grid-3x3" style="width: 18px; height: 18px;"></i>
+            </span>
+            Categorias de Produtos
+        </h3>
+
+        <template x-if="loading">
+            <div class="text-center" style="padding: 40px;">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </template>
+
+        <div class="category-cards-grid" x-show="!loading">
+            <template x-for="(cat, index) in categorias" :key="'cat-' + index">
+                <div class="category-card"
+                     :class="{'selected': selectedCategoria === cat.categoria}"
+                     @click="selectCategoria(cat.categoria)">
+                    <div class="category-card-header">
+                        <span class="category-name" x-text="cat.categoria"></span>
+                        <span class="category-badge" x-text="cat.percent_valor.toFixed(1) + '%'"></span>
+                    </div>
+                    <div class="category-stats">
+                        <div class="category-stat">
+                            <span class="category-stat-value" x-text="formatNumber(cat.qtde_itens)"></span>
+                            <span class="category-stat-label">Itens</span>
+                        </div>
+                        <div class="category-stat">
+                            <span class="category-stat-value value-green" x-text="formatCurrencyShort(cat.valor_total)"></span>
+                            <span class="category-stat-label">Valor</span>
+                        </div>
+                    </div>
+                    <div class="category-percent-bar">
+                        <div class="category-percent-fill" :style="'width: ' + cat.percent_valor + '%'"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Products in Selected Category -->
+    <div class="futuristic-section" x-show="selectedCategoria">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="package" style="width: 18px; height: 18px;"></i>
+            </span>
+            Produtos em: <span x-text="selectedCategoria" style="color: #a78bfa;"></span>
+        </h3>
+
+        <div class="futuristic-table-scroll">
+            <table class="futuristic-table">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Nome do Produto</th>
+                        <th style="text-align: right;">Qtde Itens</th>
+                        <th style="text-align: right;">Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loadingProdutos">
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loadingProdutos && produtos.length === 0">
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">
+                                Nenhum produto encontrado
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="(prod, index) in produtos" :key="'prod-' + index">
+                        <tr>
+                            <td class="font-mono" x-text="prod.sku"></td>
+                            <td x-text="prod.nome"></td>
+                            <td style="text-align: right;" x-text="formatNumber(prod.qtde_itens)"></td>
+                            <td style="text-align: right;" class="value-cell" x-text="formatCurrency(prod.valor_total)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Category by Cycle -->
+    <div class="futuristic-section">
+        <h3 class="futuristic-section-title">
+            <span class="icon">
+                <i data-lucide="calendar" style="width: 18px; height: 18px;"></i>
+            </span>
+            Categorias por Ciclo
+        </h3>
+
+        <div class="futuristic-table-scroll">
+            <table class="futuristic-table">
+                <thead>
+                    <tr>
+                        <th>Ciclo</th>
+                        <th>Categoria</th>
+                        <th style="text-align: right;">Qtde Itens</th>
+                        <th style="text-align: right;">Valor Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loadingCiclos">
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!loadingCiclos && porCiclo.length === 0">
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">
+                                Nenhum dado encontrado
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="(item, index) in porCiclo" :key="'ciclo-' + index">
+                        <tr>
+                            <td x-text="item.ciclo"></td>
+                            <td>
+                                <span :class="getCategoryBadgeClass(item.categoria)" class="cat-badge" x-text="item.categoria"></span>
+                            </td>
+                            <td style="text-align: right;" x-text="formatNumber(item.qtde_itens)"></td>
+                            <td style="text-align: right;" class="value-cell" x-text="formatCurrency(item.valor_total)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function categoriasPage() {
+    return {
+        categorias: [],
+        produtos: [],
+        porCiclo: [],
+        loading: false,
+        loadingProdutos: false,
+        loadingCiclos: false,
+        selectedCategoria: null,
+        totalItens: 0,
+        totalValor: 0,
+        totalProdutos: 0,
+
+        async init() {
+            await this.loadData();
+
+            window.addEventListener('data-loaded', () => {
+                this.loadData();
+            });
+        },
+
+        async loadData() {
+            this.loading = true;
+            this.loadingCiclos = true;
+
+            try {
+                const [categoriasRes, ciclosRes] = await Promise.all([
+                    fetch('/api/categorias/metricas'),
+                    fetch('/api/categorias/por-ciclo')
+                ]);
+
+                this.categorias = await categoriasRes.json();
+                this.porCiclo = await ciclosRes.json();
+
+                // Calculate totals
+                this.totalItens = this.categorias.reduce((sum, c) => sum + c.qtde_itens, 0);
+                this.totalValor = this.categorias.reduce((sum, c) => sum + c.valor_total, 0);
+                this.totalProdutos = this.categorias.reduce((sum, c) => sum + c.produtos_unicos, 0);
+
+                // Reinitialize Lucide icons
+                this.$nextTick(() => {
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            } finally {
+                this.loading = false;
+                this.loadingCiclos = false;
+            }
+        },
+
+        async selectCategoria(categoria) {
+            if (this.selectedCategoria === categoria) {
+                this.selectedCategoria = null;
+                this.produtos = [];
+                return;
+            }
+
+            this.selectedCategoria = categoria;
+            this.loadingProdutos = true;
+
+            try {
+                const response = await fetch(`/api/categorias/${encodeURIComponent(categoria)}/produtos?limite=50`);
+                this.produtos = await response.json();
+            } catch (error) {
+                console.error('Failed to load products:', error);
+                this.produtos = [];
+            } finally {
+                this.loadingProdutos = false;
+            }
+        },
+
+        getCategoryBadgeClass(categoria) {
+            const cat = categoria.toLowerCase();
+            if (cat.includes('perfum')) return 'cat-perfumaria';
+            if (cat.includes('maquiagem')) return 'cat-maquiagem';
+            if (cat.includes('cabelos')) return 'cat-cabelos';
+            if (cat.includes('cuidados')) return 'cat-cuidados';
+            if (cat.includes('desodorante')) return 'cat-desodorantes';
+            if (cat.includes('acessorio')) return 'cat-acessorios';
+            return 'cat-outros';
+        },
+
+        formatCurrencyShort(value) {
+            if (value >= 1000000) {
+                return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+            } else if (value >= 1000) {
+                return 'R$ ' + (value / 1000).toFixed(1) + 'K';
+            }
+            return formatCurrency(value);
+        }
+    }
+}
+</script>
+{% endblock %}
