@@ -279,12 +279,26 @@
 }
 
 .filter-section select {
-    background: rgba(139, 92, 246, 0.1);
+    background: #1e1e2e;
     border: 1px solid rgba(139, 92, 246, 0.3);
     border-radius: 8px;
     padding: 8px 12px;
     color: #f8fafc;
     font-size: 0.875rem;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.filter-section select:focus {
+    outline: none;
+    border-color: rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.filter-section select option {
+    background: #1e1e2e;
+    color: #f8fafc;
+    padding: 8px;
 }
 </style>
 
