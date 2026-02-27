@@ -59,22 +59,133 @@
                 <canvas id="chart-marcas"></canvas>
             </div>
         </div>
+    </div>
 
-        <!-- Bar Chart: Top Sectors -->
-        <div class="chart-container">
-            <h3 class="chart-title">Top 5 Setores por Valor</h3>
-            <div style="height: 250px;">
-                <canvas id="chart-setores"></canvas>
+    <!-- Futuristic Tables Section -->
+    <div class="futuristic-tables-section">
+
+        <!-- Top 10 Setores -->
+        <div class="futuristic-table-container">
+            <div class="table-header-futuristic">
+                <div class="table-icon">
+                    <i data-lucide="trophy"></i>
+                </div>
+                <h3>Top 10 Setores por Valor</h3>
+                <div class="table-glow"></div>
+            </div>
+            <div class="table-wrapper-futuristic">
+                <table class="futuristic-table">
+                    <thead>
+                        <tr>
+                            <th class="rank-col">#</th>
+                            <th>Setor</th>
+                            <th class="number-col">Clientes</th>
+                            <th class="number-col">Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(setor, index) in top10Setores" :key="setor.setor">
+                            <tr :class="{'highlight-row': index < 3}">
+                                <td class="rank-col">
+                                    <span class="rank-badge" :class="'rank-' + (index + 1)" x-text="setor.posicao"></span>
+                                </td>
+                                <td class="setor-name" x-text="setor.setor"></td>
+                                <td class="number-col" x-text="formatNumber(setor.clientes)"></td>
+                                <td class="number-col value-highlight" x-text="formatCurrency(setor.valor)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Line Chart: Evolution -->
-        <div class="chart-container">
-            <h3 class="chart-title">Evolucao por Ciclo</h3>
-            <div style="height: 250px;">
-                <canvas id="chart-evolucao"></canvas>
+        <!-- Resumo por Ciclo -->
+        <div class="futuristic-table-container">
+            <div class="table-header-futuristic">
+                <div class="table-icon">
+                    <i data-lucide="calendar-range"></i>
+                </div>
+                <h3>Resumo por Ciclo</h3>
+                <div class="table-glow"></div>
+            </div>
+            <div class="table-wrapper-futuristic">
+                <table class="futuristic-table">
+                    <thead>
+                        <tr>
+                            <th>Ciclo</th>
+                            <th class="number-col">Clientes Ativos</th>
+                            <th class="number-col">Multimarcas</th>
+                            <th class="number-col">Total Itens</th>
+                            <th class="number-col">Valor Total</th>
+                            <th class="number-col">% Multi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="ciclo in resumoCiclos" :key="ciclo.ciclo">
+                            <tr>
+                                <td class="ciclo-badge"><span x-text="ciclo.ciclo"></span></td>
+                                <td class="number-col" x-text="formatNumber(ciclo.clientes_ativos)"></td>
+                                <td class="number-col accent-text" x-text="formatNumber(ciclo.multimarcas)"></td>
+                                <td class="number-col" x-text="formatNumber(ciclo.total_itens)"></td>
+                                <td class="number-col value-highlight" x-text="formatCurrency(ciclo.valor_total)"></td>
+                                <td class="number-col">
+                                    <span class="percent-badge" x-text="ciclo.percent_multimarcas.toFixed(2) + '%'"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
         </div>
+
+        <!-- Dados por Setor e Ciclo -->
+        <div class="futuristic-table-container full-width">
+            <div class="table-header-futuristic">
+                <div class="table-icon">
+                    <i data-lucide="layout-grid"></i>
+                </div>
+                <h3>Dados por Setor e Ciclo</h3>
+                <div class="table-glow"></div>
+            </div>
+            <div class="table-wrapper-futuristic scrollable">
+                <table class="futuristic-table compact">
+                    <thead>
+                        <tr>
+                            <th>Ciclo</th>
+                            <th>Setor</th>
+                            <th>Gerencia</th>
+                            <th class="number-col">Clientes</th>
+                            <th class="number-col">Multimarca</th>
+                            <th class="number-col">Itens</th>
+                            <th class="number-col">Valor</th>
+                            <th class="number-col">% Multi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="item in dadosSetorCiclo" :key="item.ciclo + '_' + item.setor">
+                            <tr :class="{'gerencia-13707': item.gerencia == 13707, 'gerencia-13706': item.gerencia == 13706}">
+                                <td><span class="ciclo-mini" x-text="item.ciclo"></span></td>
+                                <td class="setor-name" x-text="item.setor"></td>
+                                <td>
+                                    <span class="gerencia-badge" :class="'ger-' + item.gerencia" x-text="item.gerencia"></span>
+                                </td>
+                                <td class="number-col" x-text="formatNumber(item.clientes_ativos)"></td>
+                                <td class="number-col accent-text" x-text="formatNumber(item.multimarcas)"></td>
+                                <td class="number-col" x-text="formatNumber(item.total_itens)"></td>
+                                <td class="number-col value-highlight" x-text="formatCurrency(item.valor_total)"></td>
+                                <td class="number-col">
+                                    <div class="percent-bar-container">
+                                        <div class="percent-bar" :style="'width: ' + Math.min(item.percent_multimarcas, 100) + '%'"></div>
+                                        <span class="percent-text" x-text="item.percent_multimarcas.toFixed(2) + '%'"></span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -84,6 +195,281 @@
     <h3>Nenhum dado carregado</h3>
     <p>Faca upload de uma planilha de vendas para visualizar as metricas</p>
 </div>
+
+<style>
+/* Futuristic Tables Styles */
+.futuristic-tables-section {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.futuristic-table-container {
+    background: linear-gradient(145deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 30, 0.95));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.futuristic-table-container.full-width {
+    grid-column: 1 / -1;
+}
+
+.table-header-futuristic {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    position: relative;
+}
+
+.table-header-futuristic h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: 0.5px;
+}
+
+.table-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 10px;
+    color: white;
+}
+
+.table-icon i {
+    width: 18px;
+    height: 18px;
+}
+
+.table-glow {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1));
+    pointer-events: none;
+}
+
+.table-wrapper-futuristic {
+    padding: 0.5rem;
+}
+
+.table-wrapper-futuristic.scrollable {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.futuristic-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.futuristic-table.compact {
+    font-size: 0.8rem;
+}
+
+.futuristic-table thead tr {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.futuristic-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #a5b4fc;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.futuristic-table td {
+    padding: 0.75rem 1rem;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.futuristic-table tbody tr:hover {
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.futuristic-table tbody tr.highlight-row {
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.number-col {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.rank-col {
+    width: 50px;
+    text-align: center;
+}
+
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    background: rgba(100, 100, 120, 0.3);
+    color: #a5b4fc;
+}
+
+.rank-badge.rank-1 {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1a1a2e;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+}
+
+.rank-badge.rank-2 {
+    background: linear-gradient(135deg, #94a3b8, #64748b);
+    color: #1a1a2e;
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.3);
+}
+
+.rank-badge.rank-3 {
+    background: linear-gradient(135deg, #cd7c32, #a16207);
+    color: #1a1a2e;
+    box-shadow: 0 0 8px rgba(205, 124, 50, 0.3);
+}
+
+.setor-name {
+    font-weight: 500;
+    color: #f1f5f9;
+}
+
+.value-highlight {
+    color: #34d399;
+    font-weight: 600;
+}
+
+.accent-text {
+    color: #a78bfa;
+    font-weight: 600;
+}
+
+.ciclo-badge span {
+    display: inline-block;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #a5b4fc;
+}
+
+.ciclo-mini {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.percent-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.2));
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #34d399;
+}
+
+.gerencia-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.gerencia-badge.ger-13707 {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+}
+
+.gerencia-badge.ger-13706 {
+    background: rgba(236, 72, 153, 0.2);
+    border: 1px solid rgba(236, 72, 153, 0.4);
+    color: #f472b6;
+}
+
+.percent-bar-container {
+    position: relative;
+    width: 100%;
+    height: 24px;
+    background: rgba(30, 30, 40, 0.5);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.percent-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.6), rgba(139, 92, 246, 0.6));
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.percent-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Scrollbar styling */
+.table-wrapper-futuristic.scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.table-wrapper-futuristic.scrollable::-webkit-scrollbar-track {
+    background: rgba(30, 30, 40, 0.5);
+    border-radius: 3px;
+}
+
+.table-wrapper-futuristic.scrollable::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 3px;
+}
+
+.table-wrapper-futuristic.scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .futuristic-tables-section {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -95,6 +481,9 @@ function dashboard() {
         marcas: [],
         setores: [],
         evolucao: [],
+        top10Setores: [],
+        resumoCiclos: [],
+        dadosSetorCiclo: [],
         charts: {},
 
         async init() {
@@ -119,21 +508,31 @@ function dashboard() {
 
             try {
                 // Load all data in parallel
-                const [metricsRes, marcasRes, setoresRes, evolucaoRes] = await Promise.all([
+                const [metricsRes, marcasRes, setoresRes, evolucaoRes, top10Res, resumoCiclosRes, setorCicloRes] = await Promise.all([
                     fetch(`/api/metricas/gerais?${queryString}`),
                     fetch(`/api/metricas/marcas?${queryString}`),
                     fetch(`/api/metricas/top-setores?${queryString}`),
-                    fetch(`/api/metricas/evolucao?${queryString}`)
+                    fetch(`/api/metricas/evolucao?${queryString}`),
+                    fetch(`/api/metricas/top10-setores`),
+                    fetch(`/api/metricas/resumo-ciclos`),
+                    fetch(`/api/metricas/dados-setor-ciclo`)
                 ]);
 
                 this.metrics = await metricsRes.json();
                 this.marcas = await marcasRes.json();
                 this.setores = await setoresRes.json();
                 this.evolucao = await evolucaoRes.json();
+                this.top10Setores = await top10Res.json();
+                this.resumoCiclos = await resumoCiclosRes.json();
+                this.dadosSetorCiclo = await setorCicloRes.json();
 
                 // Update charts
                 this.$nextTick(() => {
                     this.updateCharts();
+                    // Reinitialize Lucide icons for new content
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
                 });
             } catch (error) {
                 console.error('Failed to load dashboard data:', error);
@@ -157,16 +556,6 @@ function dashboard() {
             // Sales by brand
             if (this.marcas.length > 0) {
                 this.charts.marcas = createPieChart('chart-marcas', this.marcas, 'marca', 'valor');
-            }
-
-            // Top sectors
-            if (this.setores.length > 0) {
-                this.charts.setores = createBarChart('chart-setores', this.setores, 'setor', 'valor');
-            }
-
-            // Evolution
-            if (this.evolucao.length > 0) {
-                this.charts.evolucao = createLineChart('chart-evolucao', this.evolucao, 'ciclo', 'percent');
             }
         }
     }

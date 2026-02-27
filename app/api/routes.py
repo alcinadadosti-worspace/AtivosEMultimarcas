@@ -28,7 +28,10 @@ from app.services.metricas import (
     calcular_metricas_gerais,
     calcular_vendas_por_marca,
     calcular_top_setores,
+    calcular_top_setores_completo,
     calcular_evolucao_ciclos,
+    calcular_resumo_ciclos,
+    calcular_dados_setor_ciclo,
     aplicar_filtros,
     obter_detalhes_cliente,
 )
@@ -271,6 +274,44 @@ async def get_evolucao_ciclos(
     df_filtrado = aplicar_filtros(df_clientes, setores=setores_list)
 
     return calcular_evolucao_ciclos(df_filtrado)
+
+
+@api_router.get("/metricas/top10-setores")
+async def get_top10_setores():
+    """Get top 10 sectors by value with complete data."""
+    session = get_session_data()
+    df_clientes = session.get("df_clientes")
+
+    if df_clientes is None:
+        return []
+
+    return calcular_top_setores_completo(df_clientes, limite=10)
+
+
+@api_router.get("/metricas/resumo-ciclos")
+async def get_resumo_ciclos():
+    """Get summary metrics by cycle."""
+    session = get_session_data()
+    df_clientes = session.get("df_clientes")
+    df_vendas = session.get("df_vendas")
+
+    if df_clientes is None or df_vendas is None:
+        return []
+
+    return calcular_resumo_ciclos(df_clientes, df_vendas)
+
+
+@api_router.get("/metricas/dados-setor-ciclo")
+async def get_dados_setor_ciclo():
+    """Get detailed data by sector and cycle including gerencia."""
+    session = get_session_data()
+    df_clientes = session.get("df_clientes")
+    df_vendas = session.get("df_vendas")
+
+    if df_clientes is None or df_vendas is None:
+        return []
+
+    return calcular_dados_setor_ciclo(df_clientes, df_vendas)
 
 
 # =============================================================================

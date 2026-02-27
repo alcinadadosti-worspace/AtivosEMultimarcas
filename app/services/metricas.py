@@ -284,6 +284,151 @@ def aplicar_filtros(
     return df_filtrado
 
 
+def calcular_top_setores_completo(
+    df_clientes: pl.DataFrame,
+    limite: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Calculate top sectors by sales value with complete data.
+
+    Args:
+        df_clientes: DataFrame with customer metrics
+        limite: Number of top sectors to return
+
+    Returns:
+        List of dicts with sector, clients, items, value
+    """
+    df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
+        pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
+        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
+        pl.col("ItensTotal").sum().alias("ItensTotal"),
+        pl.col("ValorTotal").sum().alias("ValorTotal"),
+    ]).sort("ValorTotal", descending=True).head(limite)
+
+    return [
+        {
+            "posicao": idx + 1,
+            "setor": row[VENDAS_COL_SETOR],
+            "clientes": row["ClientesAtivos"],
+            "multimarcas": row["ClientesMultimarcas"],
+            "itens": int(row["ItensTotal"] or 0),
+            "valor": float(row["ValorTotal"] or 0),
+        }
+        for idx, row in enumerate(df_setores.iter_rows(named=True))
+    ]
+
+
+def calcular_resumo_ciclos(
+    df_clientes: pl.DataFrame,
+    df_vendas: pl.DataFrame
+) -> List[Dict[str, Any]]:
+    """
+    Calculate summary metrics by cycle.
+
+    Args:
+        df_clientes: DataFrame with customer metrics
+        df_vendas: DataFrame with sales data
+
+    Returns:
+        List of dicts with cycle summary
+    """
+    # Aggregate by cycle
+    df_ciclos = df_clientes.group_by(VENDAS_COL_CICLO).agg([
+        pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
+        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
+        pl.col("ItensTotal").sum().alias("ItensTotal"),
+        pl.col("ValorTotal").sum().alias("ValorTotal"),
+    ]).sort(VENDAS_COL_CICLO)
+
+    # Calculate percentage
+    df_ciclos = df_ciclos.with_columns([
+        pl.when(pl.col("ClientesAtivos") > 0)
+          .then((pl.col("ClientesMultimarcas") / pl.col("ClientesAtivos") * 100).round(2))
+          .otherwise(0.0)
+          .alias("PercentMultimarcas")
+    ])
+
+    return [
+        {
+            "ciclo": row[VENDAS_COL_CICLO],
+            "clientes_ativos": row["ClientesAtivos"],
+            "multimarcas": row["ClientesMultimarcas"],
+            "total_itens": int(row["ItensTotal"] or 0),
+            "valor_total": float(row["ValorTotal"] or 0),
+            "percent_multimarcas": float(row["PercentMultimarcas"]),
+        }
+        for row in df_ciclos.iter_rows(named=True)
+    ]
+
+
+def calcular_dados_setor_ciclo(
+    df_clientes: pl.DataFrame,
+    df_vendas: pl.DataFrame
+) -> List[Dict[str, Any]]:
+    """
+    Calculate detailed data by sector and cycle, including gerencia.
+
+    Args:
+        df_clientes: DataFrame with customer metrics
+        df_vendas: DataFrame with sales data (contains Gerencia)
+
+    Returns:
+        List of dicts with sector/cycle data including gerencia
+    """
+    # First, get gerencia for each sector from vendas
+    df_setor_gerencia = df_vendas.select([
+        VENDAS_COL_SETOR,
+        VENDAS_COL_GERENCIA
+    ]).unique()
+
+    # Aggregate client data by sector and cycle
+    df_setor_ciclo = df_clientes.group_by([
+        VENDAS_COL_CICLO,
+        VENDAS_COL_SETOR
+    ]).agg([
+        pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
+        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
+        pl.col("ItensTotal").sum().alias("ItensTotal"),
+        pl.col("ValorTotal").sum().alias("ValorTotal"),
+    ])
+
+    # Join with gerencia
+    df_setor_ciclo = df_setor_ciclo.join(
+        df_setor_gerencia,
+        on=VENDAS_COL_SETOR,
+        how="left"
+    )
+
+    # Calculate percentage
+    df_setor_ciclo = df_setor_ciclo.with_columns([
+        pl.when(pl.col("ClientesAtivos") > 0)
+          .then((pl.col("ClientesMultimarcas") / pl.col("ClientesAtivos") * 100).round(2))
+          .otherwise(0.0)
+          .alias("PercentMultimarcas")
+    ])
+
+    # Sort by cycle, then gerencia, then sector
+    df_setor_ciclo = df_setor_ciclo.sort([
+        VENDAS_COL_CICLO,
+        VENDAS_COL_GERENCIA,
+        VENDAS_COL_SETOR
+    ])
+
+    return [
+        {
+            "ciclo": row[VENDAS_COL_CICLO],
+            "setor": row[VENDAS_COL_SETOR],
+            "gerencia": row[VENDAS_COL_GERENCIA],
+            "clientes_ativos": row["ClientesAtivos"],
+            "multimarcas": row["ClientesMultimarcas"],
+            "total_itens": int(row["ItensTotal"] or 0),
+            "valor_total": float(row["ValorTotal"] or 0),
+            "percent_multimarcas": float(row["PercentMultimarcas"]),
+        }
+        for row in df_setor_ciclo.iter_rows(named=True)
+    ]
+
+
 def obter_detalhes_cliente(
     df_vendas: pl.DataFrame,
     cliente_id: str
