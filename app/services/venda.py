@@ -63,24 +63,52 @@ def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
     if filename.lower().endswith(('.xlsx', '.xls')):
         df = pl.read_excel(io.BytesIO(file_bytes), infer_schema_length=0)
     else:
-        # Try multiple encodings for CSV
+        # Try multiple encodings and separators for CSV
         df = None
         encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']
+        separators = [',', ';', '|', '\t']  # comma, semicolon, pipe, tab
 
+        # First, detect the separator by reading the first line
+        detected_separator = None
         for encoding in encodings:
             try:
-                df = pl.read_csv(
-                    io.BytesIO(file_bytes),
-                    encoding=encoding,
-                    infer_schema_length=0,
-                    ignore_errors=True
-                )
-                break
+                first_line = file_bytes.decode(encoding).split('\n')[0]
+                # Count occurrences of each separator
+                sep_counts = {sep: first_line.count(sep) for sep in separators}
+                # The separator with most occurrences is likely the correct one
+                detected_separator = max(sep_counts, key=sep_counts.get)
+                if sep_counts[detected_separator] > 0:
+                    break
             except Exception:
                 continue
 
+        # Try to read with detected separator first, then fallback to others
+        if detected_separator:
+            separators = [detected_separator] + [s for s in separators if s != detected_separator]
+
+        for encoding in encodings:
+            for separator in separators:
+                try:
+                    df = pl.read_csv(
+                        io.BytesIO(file_bytes),
+                        encoding=encoding,
+                        separator=separator,
+                        infer_schema_length=0,
+                        ignore_errors=True
+                    )
+                    # Check if we got reasonable number of columns (more than 5)
+                    if len(df.columns) >= 5:
+                        print(f"[INFO] CSV lido com encoding={encoding}, separator='{separator}'")
+                        break
+                    else:
+                        df = None
+                except Exception:
+                    continue
+            if df is not None:
+                break
+
         if df is None:
-            raise ValueError("Nao foi possivel ler o arquivo CSV com nenhum encoding")
+            raise ValueError("Nao foi possivel ler o arquivo CSV. Verifique o formato do arquivo.")
 
     # Normalize column names (remove whitespace)
     df = df.rename({col: col.strip() for col in df.columns})
