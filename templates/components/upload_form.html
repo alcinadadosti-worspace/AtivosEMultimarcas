@@ -1,4 +1,4 @@
-<div x-data="uploadForm()" class="card">
+<div x-data="uploadForm()" x-init="init()" class="card">
     <!-- Clear button when data is loaded -->
     <template x-if="uploaded && !uploading">
         <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
@@ -88,6 +88,21 @@ function uploadForm() {
         message: '',
         stats: null,
         warnings: [],
+
+        async init() {
+            // Check if data is already loaded (when returning to dashboard)
+            try {
+                const response = await fetch('/api/session/status');
+                const data = await response.json();
+                if (data.has_data) {
+                    this.uploaded = true;
+                    this.message = 'Planilha carregada';
+                    this.$nextTick(() => lucide.createIcons());
+                }
+            } catch (error) {
+                console.error('Failed to check session status:', error);
+            }
+        },
 
         handleDrop(event) {
             this.dragover = false;

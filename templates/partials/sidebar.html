@@ -46,10 +46,97 @@
         </a>
     </nav>
 
-    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-subtle);"
+         x-data="sidebarControls()" x-init="init()">
+
+        <!-- Remove spreadsheet button (only visible when data is loaded) -->
+        <template x-if="hasData">
+            <button @click="clearData()"
+                    class="sidebar-nav-item sidebar-clear-btn"
+                    :disabled="clearing"
+                    style="width: 100%; border: none; background: transparent; cursor: pointer; text-align: left;">
+                <i data-lucide="trash-2" style="color: #ef4444;"></i>
+                <span style="color: #ef4444;" x-text="clearing ? 'Removendo...' : 'Remover Planilha'"></span>
+            </button>
+        </template>
+
         <div class="sidebar-nav-item" style="cursor: default;">
             <i data-lucide="database"></i>
             <span class="text-muted">v1.0.0</span>
         </div>
     </div>
+
+    <script>
+    function sidebarControls() {
+        return {
+            hasData: false,
+            clearing: false,
+
+            init() {
+                // Check initial state
+                this.checkDataStatus();
+
+                // Listen for data events
+                window.addEventListener('data-loaded', () => {
+                    this.hasData = true;
+                    this.$nextTick(() => lucide.createIcons());
+                });
+
+                window.addEventListener('data-cleared', () => {
+                    this.hasData = false;
+                });
+            },
+
+            async checkDataStatus() {
+                try {
+                    const response = await fetch('/api/session/status');
+                    const data = await response.json();
+                    this.hasData = data.has_data || false;
+                    this.$nextTick(() => lucide.createIcons());
+                } catch (error) {
+                    console.error('Failed to check data status:', error);
+                }
+            },
+
+            async clearData() {
+                if (!confirm('Deseja remover a planilha atual? Todos os dados de analise serao perdidos.')) {
+                    return;
+                }
+
+                this.clearing = true;
+
+                try {
+                    const response = await fetch('/api/clear', { method: 'POST' });
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        this.hasData = false;
+
+                        // Reset app state
+                        if (typeof Alpine !== 'undefined' && Alpine.store('app')) {
+                            Alpine.store('app').setHasData(false);
+                        }
+                        if (typeof Alpine !== 'undefined' && Alpine.store('filters')) {
+                            Alpine.store('filters').reset();
+                        }
+
+                        // Dispatch event for other components
+                        window.dispatchEvent(new CustomEvent('data-cleared'));
+
+                        showToast('Planilha removida com sucesso!', 'success');
+
+                        // Redirect to dashboard
+                        window.location.href = '/dashboard';
+                    } else {
+                        throw new Error(data.detail || 'Erro ao limpar dados');
+                    }
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    this.clearing = false;
+                }
+            }
+        }
+    }
+    </script>
 </aside>
