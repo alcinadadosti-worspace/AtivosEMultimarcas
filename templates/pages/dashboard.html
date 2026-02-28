@@ -559,10 +559,31 @@ function dashboard() {
                 this.loadData();
             });
 
+            // Listen for data cleared event
+            window.addEventListener('data-cleared', () => {
+                this.hasData = false;
+                this.clearData();
+            });
+
             // Listen for filter changes
             window.addEventListener('filters-changed', () => {
                 this.loadData();
             });
+        },
+
+        clearData() {
+            // Reset all data
+            this.metrics = null;
+            this.marcas = [];
+            this.setores = [];
+            this.evolucao = [];
+            this.top10Setores = [];
+            this.resumoCiclos = [];
+            this.dadosSetorCiclo = [];
+
+            // Destroy all charts
+            Object.values(this.charts).forEach(chart => chart.destroy());
+            this.charts = {};
         },
 
         async loadData() {

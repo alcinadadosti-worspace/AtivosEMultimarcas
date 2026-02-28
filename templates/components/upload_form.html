@@ -3,8 +3,7 @@
     <template x-if="uploaded && !uploading">
         <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
             <button @click="clearData()"
-                    class="btn btn-outline"
-                    style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; color: var(--danger); border-color: var(--danger);">
+                    style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
                 <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                 Remover planilha
             </button>

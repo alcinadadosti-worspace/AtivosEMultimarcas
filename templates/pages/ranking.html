@@ -224,7 +224,7 @@
     <p class="page-subtitle">Top revendedoras e comparativo entre ciclos</p>
 </div>
 
-<div x-data="rankingPage()" x-init="init()">
+<div x-data="rankingPage()" x-init="init()" x-show="hasData" x-cloak>
     <!-- Filters -->
     {% include "components/filters.html" %}
 
@@ -408,6 +408,7 @@
 <script>
 function rankingPage() {
     return {
+        hasData: {{ 'true' if has_data else 'false' }},
         ranking: [],
         comparativo: { ciclos: [], metricas: [], total_ciclos: 0 },
         evolution: [],
@@ -416,17 +417,32 @@ function rankingPage() {
         showModal: false,
 
         async init() {
-            if ({{ 'true' if has_data else 'false' }}) {
+            if (this.hasData) {
                 await this.loadData();
             }
 
             window.addEventListener('data-loaded', () => {
+                this.hasData = true;
                 this.loadData();
             });
 
-            window.addEventListener('filters-changed', () => {
-                this.loadData();
+            window.addEventListener('data-cleared', () => {
+                this.hasData = false;
+                this.clearData();
             });
+
+            window.addEventListener('filters-changed', () => {
+                if (this.hasData) {
+                    this.loadData();
+                }
+            });
+        },
+
+        clearData() {
+            this.ranking = [];
+            this.comparativo = { ciclos: [], metricas: [], total_ciclos: 0 };
+            this.evolution = [];
+            this.showModal = false;
         },
 
         async loadData() {
