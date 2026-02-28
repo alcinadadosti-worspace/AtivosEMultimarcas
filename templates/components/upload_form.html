@@ -1,4 +1,16 @@
 <div x-data="uploadForm()" class="card">
+    <!-- Clear button when data is loaded -->
+    <template x-if="uploaded && !uploading">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+            <button @click="clearData()"
+                    class="btn btn-outline"
+                    style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; color: var(--danger); border-color: var(--danger);">
+                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                Remover planilha
+            </button>
+        </div>
+    </template>
+
     <div id="upload-zone"
          class="upload-zone"
          @dragover.prevent="dragover = true"
@@ -133,6 +145,39 @@ function uploadForm() {
                 showToast(error.message, 'error');
             } finally {
                 this.uploading = false;
+                // Reinitialize icons after template change
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        async clearData() {
+            try {
+                const response = await fetch('/api/clear', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Reset component state
+                    this.uploaded = false;
+                    this.message = '';
+                    this.stats = null;
+                    this.warnings = [];
+
+                    // Reset app state
+                    Alpine.store('app').setHasData(false);
+                    Alpine.store('filters').reset();
+
+                    // Dispatch event for other components
+                    window.dispatchEvent(new CustomEvent('data-cleared'));
+
+                    showToast('Planilha removida com sucesso!', 'success');
+
+                    // Reinitialize icons
+                    this.$nextTick(() => lucide.createIcons());
+                } else {
+                    throw new Error(data.detail || 'Erro ao limpar dados');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
             }
         }
     }

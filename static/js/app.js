@@ -174,6 +174,16 @@ document.addEventListener('alpine:init', () => {
                 params.set('gerencias', this.selectedGerencias.join(','));
             }
             return params.toString();
+        },
+
+        reset() {
+            this.ciclos = [];
+            this.setores = [];
+            this.marcas = [];
+            this.gerencias = [];
+            this.selectedCiclos = [];
+            this.selectedSetores = [];
+            this.selectedGerencias = [];
         }
     });
 

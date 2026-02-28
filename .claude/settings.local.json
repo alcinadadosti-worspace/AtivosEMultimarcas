@@ -12,7 +12,8 @@
       "Bash(pip install:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Add fastexcel dependency for Excel file reading\n\nRequired by Polars for reading .xlsx files.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(python:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(findstr:*)"
     ]
   }
 }
