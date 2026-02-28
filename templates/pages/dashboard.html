@@ -47,6 +47,7 @@
         <!-- Pie Chart: Multimarcas Distribution -->
         <div class="chart-container">
             <h3 class="chart-title">Distribuicao Multimarcas</h3>
+            <p class="chart-hint">Clique no grafico para detalhes</p>
             <div style="height: 250px;">
                 <canvas id="chart-multimarcas"></canvas>
             </div>
@@ -55,9 +56,19 @@
         <!-- Pie Chart: Sales by Brand -->
         <div class="chart-container">
             <h3 class="chart-title">Vendas por Marca</h3>
+            <p class="chart-hint">Clique em uma marca para detalhes</p>
             <div style="height: 250px;">
                 <canvas id="chart-marcas"></canvas>
             </div>
+        </div>
+    </div>
+
+    <!-- Evolution Chart -->
+    <div class="chart-container full-width" x-show="evolucao.length > 0">
+        <h3 class="chart-title">Evolucao por Ciclo</h3>
+        <p class="chart-hint">Use scroll do mouse para zoom | Arraste para mover | Clique no ponto para detalhes</p>
+        <div style="height: 300px;">
+            <canvas id="chart-evolucao"></canvas>
         </div>
     </div>
 
@@ -207,6 +218,20 @@
 </div>
 
 <style>
+/* Chart Hints */
+.chart-hint {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin: -8px 0 8px 0;
+    text-align: center;
+}
+
+/* Full width chart container */
+.chart-container.full-width {
+    grid-column: 1 / -1;
+    margin-top: 1rem;
+}
+
 /* Futuristic Tables Styles */
 .futuristic-tables-section {
     display: grid;
@@ -581,18 +606,113 @@ function dashboard() {
             Object.values(this.charts).forEach(chart => chart.destroy());
             this.charts = {};
 
-            // Multimarcas distribution
+            const self = this;
+
+            // Multimarcas distribution with drill-down
             if (this.metrics) {
                 const multimarcasData = [
-                    { label: 'Multimarcas', value: this.metrics.total_multimarcas },
-                    { label: 'Monomarca', value: this.metrics.total_ativos - this.metrics.total_multimarcas }
+                    { label: 'Multimarcas', value: this.metrics.total_multimarcas, clientes: this.metrics.total_multimarcas },
+                    { label: 'Monomarca', value: this.metrics.total_ativos - this.metrics.total_multimarcas, clientes: this.metrics.total_ativos - this.metrics.total_multimarcas }
                 ];
-                this.charts.multimarcas = createPieChart('chart-multimarcas', multimarcasData, 'label', 'value');
+                this.charts.multimarcas = createPieChart('chart-multimarcas', multimarcasData, 'label', 'value', {
+                    onDrilldown: function(item, label) {
+                        if (label === 'Multimarcas') {
+                            window.location.href = '/multimarcas';
+                        } else {
+                            showToast('Clique em "Multimarcas" para ver detalhes', 'info');
+                        }
+                    }
+                });
             }
 
-            // Sales by brand
+            // Sales by brand with drill-down
             if (this.marcas.length > 0) {
-                this.charts.marcas = createPieChart('chart-marcas', this.marcas, 'marca', 'valor');
+                this.charts.marcas = createPieChart('chart-marcas', this.marcas, 'marca', 'valor', {
+                    onDrilldown: function(item, label) {
+                        self.showBrandDrilldown(item, label);
+                    }
+                });
+            }
+
+            // Evolution chart with zoom
+            if (this.evolucao.length > 0) {
+                this.charts.evolucao = createLineChart('chart-evolucao', this.evolucao, 'ciclo', 'valor', {
+                    color: '#8b5cf6',
+                    onDrilldown: function(item, label) {
+                        self.showCycleDrilldown(item, label);
+                    }
+                });
+            }
+        },
+
+        async showCycleDrilldown(item, ciclo) {
+            const content = `
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: rgba(139, 92, 246, 0.1); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 2rem; font-weight: 700; color: #a78bfa;">${formatNumber(item.clientes)}</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">Clientes Ativos</div>
+                    </div>
+                    <div style="background: rgba(34, 197, 94, 0.1); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 2rem; font-weight: 700; color: #4ade80;">${formatNumber(item.multimarcas)}</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">Multimarcas</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                    <div style="background: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 2rem; font-weight: 700; color: #60a5fa;">${formatCurrency(item.valor)}</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">Valor Total</div>
+                    </div>
+                    <div style="background: rgba(251, 191, 36, 0.1); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 2rem; font-weight: 700; color: #fbbf24;">${item.percent.toFixed(1)}%</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin-top: 4px;">% Multimarcas</div>
+                    </div>
+                </div>
+            `;
+            showDrilldownModal(`Ciclo ${ciclo}`, content);
+        },
+
+        async showBrandDrilldown(item, marca) {
+            // Show loading
+            showDrilldownModal(`Detalhes: ${marca}`, '<div class="text-center"><div class="loading"><div class="spinner"></div></div></div>');
+
+            try {
+                // Fetch top products for this brand
+                const queryString = this.$store.filters.getQueryString();
+                const response = await fetch(`/api/metricas/marcas?${queryString}`);
+                const data = await response.json();
+
+                const brandData = data.find(d => d.marca === marca);
+                if (!brandData) {
+                    closeDrilldownModal();
+                    return;
+                }
+
+                const content = `
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+                        <div style="background: rgba(139, 92, 246, 0.1); padding: 16px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #a78bfa;">${formatNumber(brandData.vendas)}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Vendas</div>
+                        </div>
+                        <div style="background: rgba(34, 197, 94, 0.1); padding: 16px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #4ade80;">${formatNumber(brandData.itens)}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Itens</div>
+                        </div>
+                        <div style="background: rgba(59, 130, 246, 0.1); padding: 16px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #60a5fa;">${formatCurrency(brandData.valor)}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">Valor Total</div>
+                        </div>
+                    </div>
+                    <p style="color: #94a3b8; text-align: center; font-size: 0.9rem;">
+                        <span style="color: #a78bfa;">${marca}</span> representa
+                        <strong style="color: #4ade80;">${((brandData.valor / this.metrics.total_valor) * 100).toFixed(1)}%</strong>
+                        do valor total de vendas.
+                    </p>
+                `;
+
+                showDrilldownModal(`Detalhes: ${marca}`, content);
+            } catch (error) {
+                console.error('Failed to load brand details:', error);
+                closeDrilldownModal();
             }
         },
 

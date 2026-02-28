@@ -189,7 +189,7 @@ document.addEventListener('alpine:init', () => {
 });
 
 // =============================================================================
-// CHART UTILITIES
+// CHART UTILITIES - INTERACTIVE CHARTS
 // =============================================================================
 
 window.chartColors = {
@@ -199,6 +199,8 @@ window.chartColors = {
     'O.U.I': '#ef4444',             // Red
     'AuAmigos': '#fbbf24',          // Yellow
     'DESCONHECIDA': '#525252',
+    'Multimarcas': '#8b5cf6',
+    'Monomarca': '#64748b',
     'default': [
         '#3b82f6',
         '#22c55e',
@@ -210,7 +212,114 @@ window.chartColors = {
     ]
 };
 
-window.createPieChart = function(elementId, data, labelKey, valueKey) {
+// Store for drill-down data
+window.chartDrilldownData = {};
+
+// Enhanced tooltip configuration
+const enhancedTooltip = {
+    enabled: true,
+    backgroundColor: 'rgba(20, 20, 30, 0.95)',
+    titleColor: '#f8fafc',
+    bodyColor: '#e2e8f0',
+    borderColor: 'rgba(139, 92, 246, 0.5)',
+    borderWidth: 1,
+    cornerRadius: 8,
+    padding: 12,
+    titleFont: { size: 14, weight: 'bold' },
+    bodyFont: { size: 13 },
+    displayColors: true,
+    boxPadding: 6
+};
+
+// Create interactive pie/doughnut chart with drill-down
+window.createPieChart = function(elementId, data, labelKey, valueKey, options = {}) {
+    const ctx = document.getElementById(elementId);
+    if (!ctx) return;
+
+    const labels = data.map(d => d[labelKey]);
+    const values = data.map(d => d[valueKey]);
+    const total = values.reduce((a, b) => a + b, 0);
+    const colors = labels.map((label, i) =>
+        chartColors[label] || chartColors.default[i % chartColors.default.length]
+    );
+
+    // Store original data for drill-down
+    window.chartDrilldownData[elementId] = data;
+
+    const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: 'rgba(20, 20, 30, 0.8)',
+                hoverBorderColor: '#fff',
+                hoverBorderWidth: 3,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: '#a1a1a1',
+                        font: { size: 12 },
+                        padding: 12,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    ...enhancedTooltip,
+                    callbacks: {
+                        title: function(context) {
+                            return context[0].label;
+                        },
+                        label: function(context) {
+                            const value = context.raw;
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return [
+                                `Valor: ${formatCurrency(value)}`,
+                                `Percentual: ${percentage}%`
+                            ];
+                        },
+                        afterLabel: function(context) {
+                            const item = data[context.dataIndex];
+                            if (item.itens) {
+                                return `Itens: ${formatNumber(item.itens)}`;
+                            }
+                            if (item.vendas) {
+                                return `Vendas: ${formatNumber(item.vendas)}`;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0 && options.onDrilldown) {
+                    const index = elements[0].index;
+                    const item = data[index];
+                    options.onDrilldown(item, labels[index], values[index]);
+                }
+            },
+            onHover: function(event, elements) {
+                event.native.target.style.cursor = elements.length > 0 && options.onDrilldown ? 'pointer' : 'default';
+            }
+        }
+    });
+
+    return chart;
+};
+
+// Create interactive bar chart with drill-down and zoom
+window.createBarChart = function(elementId, data, labelKey, valueKey, options = {}) {
     const ctx = document.getElementById(elementId);
     if (!ctx) return;
 
@@ -220,108 +329,385 @@ window.createPieChart = function(elementId, data, labelKey, valueKey) {
         chartColors[label] || chartColors.default[i % chartColors.default.length]
     );
 
-    return new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: colors,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        color: '#a1a1a1',
-                        font: { size: 12 },
-                        padding: 12
-                    }
-                }
-            }
-        }
-    });
-};
+    // Store original data for drill-down
+    window.chartDrilldownData[elementId] = data;
 
-window.createBarChart = function(elementId, data, labelKey, valueKey) {
-    const ctx = document.getElementById(elementId);
-    if (!ctx) return;
-
-    const labels = data.map(d => d[labelKey]);
-    const values = data.map(d => d[valueKey]);
-
-    return new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: '#3b82f6',
-                borderRadius: 4
+                backgroundColor: colors,
+                borderRadius: 6,
+                borderSkipped: false,
+                hoverBackgroundColor: colors.map(c => c + 'dd'),
+                barThickness: options.horizontal ? 24 : 'flex'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            indexAxis: 'y',
+            indexAxis: options.horizontal ? 'y' : 'x',
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    ...enhancedTooltip,
+                    callbacks: {
+                        title: function(context) {
+                            return context[0].label;
+                        },
+                        label: function(context) {
+                            const value = context.raw;
+                            const item = data[context.dataIndex];
+                            const lines = [`Valor: ${formatCurrency(value)}`];
+
+                            if (item.itens) lines.push(`Itens: ${formatNumber(item.itens)}`);
+                            if (item.vendas) lines.push(`Vendas: ${formatNumber(item.vendas)}`);
+                            if (item.clientes) lines.push(`Clientes: ${formatNumber(item.clientes)}`);
+                            if (item.percent) lines.push(`Percentual: ${item.percent.toFixed(1)}%`);
+
+                            return lines;
+                        }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    },
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x',
+                        onZoomComplete: function({chart}) {
+                            // Show reset button when zoomed
+                            showZoomResetButton(elementId, chart);
+                        }
+                    }
+                }
             },
             scales: {
                 x: {
-                    grid: { color: '#1f1f1f' },
-                    ticks: { color: '#a1a1a1' }
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#a1a1a1', font: { size: 11 } }
                 },
                 y: {
-                    grid: { display: false },
-                    ticks: { color: '#a1a1a1' }
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#a1a1a1',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                            return value;
+                        }
+                    }
                 }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0 && options.onDrilldown) {
+                    const index = elements[0].index;
+                    const item = data[index];
+                    options.onDrilldown(item, labels[index], values[index]);
+                }
+            },
+            onHover: function(event, elements) {
+                event.native.target.style.cursor = elements.length > 0 && options.onDrilldown ? 'pointer' : 'default';
             }
         }
     });
+
+    return chart;
 };
 
-window.createLineChart = function(elementId, data, labelKey, valueKey) {
+// Create interactive line chart with zoom
+window.createLineChart = function(elementId, data, labelKey, valueKey, options = {}) {
     const ctx = document.getElementById(elementId);
     if (!ctx) return;
 
     const labels = data.map(d => d[labelKey]);
     const values = data.map(d => d[valueKey]);
 
-    return new Chart(ctx, {
+    // Calculate trend (up/down)
+    const firstValue = values[0] || 0;
+    const lastValue = values[values.length - 1] || 0;
+    const trend = lastValue >= firstValue ? 'up' : 'down';
+    const trendColor = trend === 'up' ? '#22c55e' : '#ef4444';
+
+    // Store original data for drill-down
+    window.chartDrilldownData[elementId] = data;
+
+    const chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
                 data: values,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: options.color || '#3b82f6',
+                backgroundColor: (options.color || '#3b82f6') + '20',
                 fill: true,
-                tension: 0.3
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 8,
+                pointBackgroundColor: options.color || '#3b82f6',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: options.color || '#3b82f6',
+                pointHoverBorderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    ...enhancedTooltip,
+                    callbacks: {
+                        title: function(context) {
+                            return `Ciclo: ${context[0].label}`;
+                        },
+                        label: function(context) {
+                            const value = context.raw;
+                            const item = data[context.dataIndex];
+                            const lines = [`Valor: ${formatCurrency(value)}`];
+
+                            if (item.clientes) lines.push(`Clientes: ${formatNumber(item.clientes)}`);
+                            if (item.multimarcas) lines.push(`Multimarcas: ${formatNumber(item.multimarcas)}`);
+                            if (item.percent) lines.push(`% Multi: ${item.percent.toFixed(1)}%`);
+
+                            return lines;
+                        },
+                        afterBody: function(context) {
+                            const index = context[0].dataIndex;
+                            if (index > 0) {
+                                const current = values[index];
+                                const previous = values[index - 1];
+                                if (previous > 0) {
+                                    const variation = ((current - previous) / previous * 100).toFixed(1);
+                                    const sign = variation >= 0 ? '+' : '';
+                                    return [`Variacao: ${sign}${variation}%`];
+                                }
+                            }
+                            return [];
+                        }
+                    }
+                },
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    },
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x',
+                        onZoomComplete: function({chart}) {
+                            showZoomResetButton(elementId, chart);
+                        }
+                    }
+                }
             },
             scales: {
                 x: {
-                    grid: { color: '#1f1f1f' },
-                    ticks: { color: '#a1a1a1' }
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#a1a1a1', font: { size: 11 } }
                 },
                 y: {
-                    grid: { color: '#1f1f1f' },
-                    ticks: { color: '#a1a1a1' }
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#a1a1a1',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                            return value;
+                        }
+                    }
                 }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0 && options.onDrilldown) {
+                    const index = elements[0].index;
+                    const item = data[index];
+                    options.onDrilldown(item, labels[index], values[index]);
+                }
+            },
+            onHover: function(event, elements) {
+                event.native.target.style.cursor = elements.length > 0 && options.onDrilldown ? 'pointer' : 'default';
             }
         }
     });
+
+    return chart;
+};
+
+// Show zoom reset button
+function showZoomResetButton(elementId, chart) {
+    const canvas = document.getElementById(elementId);
+    if (!canvas) return;
+
+    // Remove existing button
+    const existingBtn = document.getElementById(`${elementId}-reset-zoom`);
+    if (existingBtn) existingBtn.remove();
+
+    // Create reset button
+    const btn = document.createElement('button');
+    btn.id = `${elementId}-reset-zoom`;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset Zoom';
+    btn.style.cssText = `
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 6px 12px;
+        background: rgba(139, 92, 246, 0.2);
+        border: 1px solid rgba(139, 92, 246, 0.4);
+        border-radius: 6px;
+        color: #a78bfa;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        z-index: 10;
+    `;
+
+    btn.addEventListener('click', function() {
+        chart.resetZoom();
+        btn.remove();
+    });
+
+    // Add button to canvas container
+    const container = canvas.parentElement;
+    container.style.position = 'relative';
+    container.appendChild(btn);
+}
+
+// Drill-down modal helper
+window.showDrilldownModal = function(title, content) {
+    // Remove existing modal
+    const existingModal = document.getElementById('drilldown-modal');
+    if (existingModal) existingModal.remove();
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'drilldown-modal';
+    modal.innerHTML = `
+        <div class="drilldown-overlay" onclick="closeDrilldownModal()">
+            <div class="drilldown-content" onclick="event.stopPropagation()">
+                <div class="drilldown-header">
+                    <h3>${title}</h3>
+                    <button onclick="closeDrilldownModal()" class="drilldown-close">&times;</button>
+                </div>
+                <div class="drilldown-body">
+                    ${content}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add styles if not exists
+    if (!document.getElementById('drilldown-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'drilldown-styles';
+        styles.textContent = `
+            .drilldown-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            .drilldown-content {
+                background: linear-gradient(145deg, #1a1a2e, #16162a);
+                border: 1px solid rgba(139, 92, 246, 0.3);
+                border-radius: 16px;
+                max-width: 800px;
+                width: 90%;
+                max-height: 80vh;
+                overflow: hidden;
+                animation: slideUp 0.3s ease;
+            }
+            .drilldown-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px 24px;
+                border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+            }
+            .drilldown-header h3 {
+                margin: 0;
+                color: #f8fafc;
+                font-size: 1.25rem;
+            }
+            .drilldown-close {
+                background: none;
+                border: none;
+                color: #94a3b8;
+                font-size: 1.5rem;
+                cursor: pointer;
+                padding: 0;
+                line-height: 1;
+            }
+            .drilldown-close:hover { color: #f8fafc; }
+            .drilldown-body {
+                padding: 24px;
+                max-height: 60vh;
+                overflow-y: auto;
+            }
+            .drilldown-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .drilldown-table th {
+                text-align: left;
+                padding: 12px;
+                color: #a78bfa;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+            }
+            .drilldown-table td {
+                padding: 12px;
+                color: #e2e8f0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .drilldown-table tr:hover {
+                background: rgba(139, 92, 246, 0.08);
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+};
+
+window.closeDrilldownModal = function() {
+    const modal = document.getElementById('drilldown-modal');
+    if (modal) {
+        modal.querySelector('.drilldown-overlay').style.animation = 'fadeIn 0.2s ease reverse';
+        setTimeout(() => modal.remove(), 200);
+    }
 };
 
 // =============================================================================
