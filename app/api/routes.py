@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse, Response
 import polars as pl
 
 from app.api.dependencies import get_db
+from app.config import MARCAS_GRUPO
+from app.utils.normalizers import normalizar_sku
 from app.api.schemas import (
     UploadResponse,
     MetricasGerais,
@@ -892,3 +894,143 @@ async def get_comparativo_ciclos(
     )
 
     return calcular_comparativo_ciclos(df_clientes_filtrado, df_vendas_filtrado, ciclos_list)
+
+
+# =============================================================================
+# PRODUCT MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@api_router.get("/marcas-disponiveis")
+async def get_marcas_disponiveis():
+    """Get list of available brands for product registration."""
+    return MARCAS_GRUPO
+
+
+@api_router.post("/produtos/cadastrar")
+async def cadastrar_produto(
+    sku: str = Form(...),
+    nome: str = Form(...),
+    marca: str = Form(...),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    """
+    Register a new product in the database.
+
+    Args:
+        sku: Product SKU code
+        nome: Product name
+        marca: Brand name (must be one of MARCAS_GRUPO)
+
+    Returns:
+        Success message with product details
+    """
+    # Validate brand
+    if marca not in MARCAS_GRUPO:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Marca invalida. Opcoes: {', '.join(MARCAS_GRUPO)}"
+        )
+
+    # Normalize SKU
+    sku_normalizado = normalizar_sku(sku)
+    if not sku_normalizado:
+        raise HTTPException(status_code=400, detail="SKU invalido")
+
+    # Check if already exists
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM produtos WHERE sku_normalizado = ?",
+        (sku_normalizado,)
+    )
+    if cursor.fetchone():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Produto com SKU {sku} ja existe no banco de dados"
+        )
+
+    # Insert product
+    try:
+        cursor.execute(
+            """
+            INSERT INTO produtos (sku, sku_normalizado, nome, marca)
+            VALUES (?, ?, ?, ?)
+            """,
+            (sku, sku_normalizado, nome.strip(), marca)
+        )
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": f"Produto cadastrado com sucesso",
+            "produto": {
+                "sku": sku,
+                "sku_normalizado": sku_normalizado,
+                "nome": nome.strip(),
+                "marca": marca
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao cadastrar: {str(e)}")
+
+
+@api_router.post("/produtos/cadastrar-lote")
+async def cadastrar_produtos_lote(
+    produtos: List[Dict[str, str]],
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    """
+    Register multiple products at once.
+
+    Args:
+        produtos: List of dicts with sku, nome, marca
+
+    Returns:
+        Summary of registered products
+    """
+    cursor = conn.cursor()
+    cadastrados = 0
+    erros = []
+
+    for p in produtos:
+        sku = p.get("sku", "")
+        nome = p.get("nome", "")
+        marca = p.get("marca", "")
+
+        if marca not in MARCAS_GRUPO:
+            erros.append(f"SKU {sku}: marca invalida '{marca}'")
+            continue
+
+        sku_normalizado = normalizar_sku(sku)
+        if not sku_normalizado:
+            erros.append(f"SKU {sku}: SKU invalido")
+            continue
+
+        # Check if exists
+        cursor.execute(
+            "SELECT id FROM produtos WHERE sku_normalizado = ?",
+            (sku_normalizado,)
+        )
+        if cursor.fetchone():
+            erros.append(f"SKU {sku}: ja existe")
+            continue
+
+        try:
+            cursor.execute(
+                """
+                INSERT INTO produtos (sku, sku_normalizado, nome, marca)
+                VALUES (?, ?, ?, ?)
+                """,
+                (sku, sku_normalizado, nome.strip(), marca)
+            )
+            cadastrados += 1
+        except Exception as e:
+            erros.append(f"SKU {sku}: {str(e)}")
+
+    conn.commit()
+
+    return {
+        "success": True,
+        "cadastrados": cadastrados,
+        "erros": erros,
+        "total_erros": len(erros)
+    }

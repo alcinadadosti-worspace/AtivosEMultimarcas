@@ -3,15 +3,186 @@
 {% block title %}Produtos Novos - Multimarks Analytics{% endblock %}
 
 {% block content %}
+<style>
+/* Produtos Novos Page Styles */
+.produto-row {
+    transition: background-color 0.2s ease;
+}
+
+.produto-row:hover {
+    background-color: rgba(139, 92, 246, 0.05);
+}
+
+.produto-row.saved {
+    background-color: rgba(34, 197, 94, 0.1);
+    opacity: 0.7;
+}
+
+.produto-row.saved td {
+    text-decoration: line-through;
+    color: #64748b;
+}
+
+.marca-select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    background: rgba(30, 30, 40, 0.8);
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    min-width: 160px;
+    cursor: pointer;
+}
+
+.marca-select:focus {
+    outline: none;
+    border-color: rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.marca-select option {
+    background: #1e1e2e;
+    color: #e2e8f0;
+}
+
+.btn-salvar {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-salvar:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-salvar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-salvar.saving {
+    background: #6366f1;
+}
+
+.btn-salvar-todos {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-salvar-todos:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
+}
+
+.btn-salvar-todos:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.saved-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 30, 0.95));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.stats-bar .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stats-bar .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.stats-bar .stat-value.accent {
+    color: #a78bfa;
+}
+
+.stats-bar .stat-value.success {
+    color: #22c55e;
+}
+
+.stats-bar .stat-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.action-col {
+    width: 280px;
+}
+</style>
+
 <div class="page-header">
     <h1 class="page-title">Produtos Novos</h1>
-    <p class="page-subtitle">SKUs nao cadastrados no banco de dados (possiveis lancamentos)</p>
+    <p class="page-subtitle">SKUs nao cadastrados no banco de dados - Selecione a marca e salve para usar nas proximas importacoes</p>
 </div>
 
 <div x-data="produtosNovosPage()" x-init="init()">
-    <!-- Export -->
-    <div class="filters-bar">
-        <div style="margin-left: auto; display: flex; gap: 8px;">
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat">
+            <span class="stat-value" x-text="data.length"></span>
+            <span class="stat-label">Produtos Novos</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value accent" x-text="pendentes"></span>
+            <span class="stat-label">Pendentes</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value success" x-text="salvos"></span>
+            <span class="stat-label">Salvos</span>
+        </div>
+
+        <div style="margin-left: auto; display: flex; gap: 12px; align-items: center;">
+            <button @click="salvarTodosSelecionados()"
+                    :disabled="!temSelecionados || salvandoTodos"
+                    class="btn-salvar-todos">
+                <i data-lucide="save" style="width: 18px; height: 18px;"></i>
+                <span x-text="salvandoTodos ? 'Salvando...' : 'Salvar Selecionados'"></span>
+            </button>
+
             <a href="/api/produtos-novos/export?formato=csv" class="btn btn-secondary btn-sm">
                 <i data-lucide="download"></i>
                 CSV
@@ -32,36 +203,60 @@
                         <th>SKU</th>
                         <th>Nome Produto</th>
                         <th class="numeric">Qtde Vendas</th>
-                        <th class="numeric">Total Itens</th>
                         <th class="numeric">Valor Total</th>
                         <th>Ciclos</th>
-                        <th>Setores</th>
+                        <th class="action-col">Acao</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-if="loading">
                         <tr>
-                            <td colspan="7" class="text-center">
+                            <td colspan="6" class="text-center">
                                 <div class="loading"><div class="spinner"></div></div>
                             </td>
                         </tr>
                     </template>
                     <template x-if="!loading && data.length === 0">
                         <tr>
-                            <td colspan="7" class="text-center text-muted">
-                                Nenhum produto novo encontrado
+                            <td colspan="6" class="text-center text-muted">
+                                Nenhum produto novo encontrado - Todos os SKUs ja estao cadastrados!
                             </td>
                         </tr>
                     </template>
                     <template x-for="item in data" :key="item.sku">
-                        <tr>
+                        <tr class="produto-row" :class="{ 'saved': produtosSalvos[item.sku] }">
                             <td class="font-mono" x-text="item.sku"></td>
                             <td x-text="item.nome"></td>
                             <td class="numeric" x-text="formatNumber(item.qtde_vendas)"></td>
-                            <td class="numeric" x-text="formatNumber(item.total_itens)"></td>
                             <td class="numeric" x-text="formatCurrency(item.valor_total)"></td>
                             <td x-text="item.ciclos"></td>
-                            <td x-text="item.setores"></td>
+                            <td class="action-col">
+                                <template x-if="!produtosSalvos[item.sku]">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <select class="marca-select"
+                                                x-model="marcasSelecionadas[item.sku]"
+                                                @change="$nextTick(() => lucide.createIcons())">
+                                            <option value="">Selecione a marca</option>
+                                            <template x-for="marca in marcas" :key="marca">
+                                                <option :value="marca" x-text="marca"></option>
+                                            </template>
+                                        </select>
+                                        <button @click="salvarProduto(item)"
+                                                :disabled="!marcasSelecionadas[item.sku] || salvando[item.sku]"
+                                                class="btn-salvar"
+                                                :class="{ 'saving': salvando[item.sku] }">
+                                            <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                                            <span x-text="salvando[item.sku] ? 'Salvando...' : 'Salvar'"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                                <template x-if="produtosSalvos[item.sku]">
+                                    <span class="saved-badge">
+                                        <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i>
+                                        Salvo como <strong x-text="produtosSalvos[item.sku]"></strong>
+                                    </span>
+                                </template>
+                            </td>
                         </tr>
                     </template>
                 </tbody>
@@ -77,22 +272,158 @@ function produtosNovosPage() {
     return {
         data: [],
         loading: false,
+        marcas: [],
+        marcasSelecionadas: {},
+        salvando: {},
+        produtosSalvos: {},
+        salvandoTodos: false,
+
+        get pendentes() {
+            return this.data.filter(p => !this.produtosSalvos[p.sku]).length;
+        },
+
+        get salvos() {
+            return Object.keys(this.produtosSalvos).length;
+        },
+
+        get temSelecionados() {
+            return this.data.some(p =>
+                !this.produtosSalvos[p.sku] && this.marcasSelecionadas[p.sku]
+            );
+        },
 
         async init() {
+            await this.loadMarcas();
             await this.loadData();
-            window.addEventListener('data-loaded', () => this.loadData());
+
+            window.addEventListener('data-loaded', () => {
+                this.produtosSalvos = {};
+                this.marcasSelecionadas = {};
+                this.loadData();
+            });
+
+            // Reinitialize icons after load
+            this.$nextTick(() => lucide.createIcons());
+        },
+
+        async loadMarcas() {
+            try {
+                const response = await fetch('/api/marcas-disponiveis');
+                this.marcas = await response.json();
+            } catch (error) {
+                console.error('Failed to load marcas:', error);
+                this.marcas = ['oBoticário', 'Eudora', 'Quem Disse Berenice', 'O.U.I', 'AuAmigos'];
+            }
         },
 
         async loadData() {
             this.loading = true;
 
             try {
-                const response = await fetch('/api/produtos-novos?limite=200');
+                const response = await fetch('/api/produtos-novos?limite=500');
                 this.data = await response.json();
+
+                // Initialize marca selection for each product
+                this.data.forEach(p => {
+                    if (!this.marcasSelecionadas[p.sku]) {
+                        this.marcasSelecionadas[p.sku] = '';
+                    }
+                });
+
+                this.$nextTick(() => lucide.createIcons());
             } catch (error) {
                 console.error('Failed to load data:', error);
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async salvarProduto(item) {
+            const marca = this.marcasSelecionadas[item.sku];
+            if (!marca) {
+                showToast('Selecione uma marca', 'error');
+                return;
+            }
+
+            this.salvando[item.sku] = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('sku', item.sku);
+                formData.append('nome', item.nome);
+                formData.append('marca', marca);
+
+                const response = await fetch('/api/produtos/cadastrar', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    this.produtosSalvos[item.sku] = marca;
+                    showToast(`Produto ${item.sku} salvo como ${marca}`, 'success');
+                    this.$nextTick(() => lucide.createIcons());
+                } else {
+                    throw new Error(result.detail || 'Erro ao salvar');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                this.salvando[item.sku] = false;
+            }
+        },
+
+        async salvarTodosSelecionados() {
+            const produtosParaSalvar = this.data.filter(p =>
+                !this.produtosSalvos[p.sku] && this.marcasSelecionadas[p.sku]
+            );
+
+            if (produtosParaSalvar.length === 0) {
+                showToast('Nenhum produto selecionado para salvar', 'error');
+                return;
+            }
+
+            this.salvandoTodos = true;
+
+            try {
+                const produtos = produtosParaSalvar.map(p => ({
+                    sku: p.sku,
+                    nome: p.nome,
+                    marca: this.marcasSelecionadas[p.sku]
+                }));
+
+                const response = await fetch('/api/produtos/cadastrar-lote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(produtos)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    // Mark saved products
+                    produtosParaSalvar.forEach(p => {
+                        if (!result.erros.some(e => e.includes(p.sku))) {
+                            this.produtosSalvos[p.sku] = this.marcasSelecionadas[p.sku];
+                        }
+                    });
+
+                    showToast(`${result.cadastrados} produtos salvos com sucesso!`, 'success');
+
+                    if (result.total_erros > 0) {
+                        console.warn('Erros ao salvar:', result.erros);
+                        showToast(`${result.total_erros} produtos com erro`, 'warning');
+                    }
+
+                    this.$nextTick(() => lucide.createIcons());
+                } else {
+                    throw new Error(result.detail || 'Erro ao salvar produtos');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                this.salvandoTodos = false;
             }
         }
     }
