@@ -48,12 +48,16 @@ def validar_colunas(df: pl.DataFrame) -> List[str]:
 
 def normalizar_valor_brasileiro(valor: str) -> str:
     """
-    Normalize Brazilian number format to standard format.
+    Normalize numeric value to standard format, auto-detecting the format.
 
-    Converts "1.234,56" to "1234.56" for proper float parsing.
+    Handles:
+    - Brazilian format: "1.234,56" -> "1234.56"
+    - Standard format: "1,234.56" -> "1234.56"
+    - Simple with comma: "95,45" -> "95.45"
+    - Simple with dot: "95.45" -> "95.45" (unchanged)
 
     Args:
-        valor: String value in Brazilian format
+        valor: String value in any format
 
     Returns:
         String value in standard format (dot as decimal separator)
@@ -63,10 +67,32 @@ def normalizar_valor_brasileiro(valor: str) -> str:
     valor = str(valor).strip()
     if not valor:
         return None
-    # Remove thousand separators (dots) and replace decimal comma with dot
-    # Brazilian: 1.234,56 -> 1234.56
-    # First remove dots (thousand separator), then replace comma with dot
-    valor = valor.replace(".", "").replace(",", ".")
+
+    has_comma = "," in valor
+    has_dot = "." in valor
+
+    if has_comma and has_dot:
+        # Both separators present - detect which is decimal
+        last_comma = valor.rfind(",")
+        last_dot = valor.rfind(".")
+
+        if last_comma > last_dot:
+            # Brazilian format: 1.234,56 (comma is decimal)
+            valor = valor.replace(".", "").replace(",", ".")
+        else:
+            # Standard format: 1,234.56 (dot is decimal)
+            valor = valor.replace(",", "")
+    elif has_comma and not has_dot:
+        # Only comma - likely Brazilian decimal (95,45)
+        # Check if it looks like a decimal (1-2 digits after comma)
+        parts = valor.split(",")
+        if len(parts) == 2 and len(parts[1]) <= 2:
+            valor = valor.replace(",", ".")
+        else:
+            # Multiple commas or too many digits - treat as thousand separator
+            valor = valor.replace(",", "")
+    # If only dot or no separators, leave as is (already standard format)
+
     return valor
 
 
