@@ -46,6 +46,30 @@ def validar_colunas(df: pl.DataFrame) -> List[str]:
     return [col for col in VENDAS_REQUIRED_COLUMNS if col not in df.columns]
 
 
+def normalizar_valor_brasileiro(valor: str) -> str:
+    """
+    Normalize Brazilian number format to standard format.
+
+    Converts "1.234,56" to "1234.56" for proper float parsing.
+
+    Args:
+        valor: String value in Brazilian format
+
+    Returns:
+        String value in standard format (dot as decimal separator)
+    """
+    if valor is None:
+        return None
+    valor = str(valor).strip()
+    if not valor:
+        return None
+    # Remove thousand separators (dots) and replace decimal comma with dot
+    # Brazilian: 1.234,56 -> 1234.56
+    # First remove dots (thousand separator), then replace comma with dot
+    valor = valor.replace(".", "").replace(",", ".")
+    return valor
+
+
 def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
     """
     Read a spreadsheet file (CSV or Excel) into a DataFrame.
@@ -112,6 +136,23 @@ def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
 
     # Normalize column names (remove whitespace)
     df = df.rename({col: col.strip() for col in df.columns})
+
+    # Normalize numeric columns with Brazilian format (comma as decimal separator)
+    numeric_columns = [
+        VENDAS_COL_VALOR,
+        VENDAS_COL_QTD_ITENS,
+        "Faturamento",
+        "ValorVenda",
+        "QuantidadePontos",
+    ]
+
+    for col in numeric_columns:
+        if col in df.columns:
+            df = df.with_columns([
+                pl.col(col)
+                  .map_elements(normalizar_valor_brasileiro, return_dtype=pl.Utf8)
+                  .alias(col)
+            ])
 
     return df
 
