@@ -110,7 +110,9 @@ def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
     Raises:
         ValueError: If file cannot be read
     """
-    if filename.lower().endswith(('.xlsx', '.xls')):
+    is_csv = not filename.lower().endswith(('.xlsx', '.xls'))
+
+    if not is_csv:
         df = pl.read_excel(io.BytesIO(file_bytes), infer_schema_length=0)
     else:
         # Try multiple encodings and separators for CSV
@@ -164,21 +166,23 @@ def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
     df = df.rename({col: col.strip() for col in df.columns})
 
     # Normalize numeric columns with Brazilian format (comma as decimal separator)
-    numeric_columns = [
-        VENDAS_COL_VALOR,
-        VENDAS_COL_QTD_ITENS,
-        "Faturamento",
-        "ValorVenda",
-        "QuantidadePontos",
-    ]
+    # Only for CSV files - Excel files already have proper number formats
+    if is_csv:
+        numeric_columns = [
+            VENDAS_COL_VALOR,
+            VENDAS_COL_QTD_ITENS,
+            "Faturamento",
+            "ValorVenda",
+            "QuantidadePontos",
+        ]
 
-    for col in numeric_columns:
-        if col in df.columns:
-            df = df.with_columns([
-                pl.col(col)
-                  .map_elements(normalizar_valor_brasileiro, return_dtype=pl.Utf8)
-                  .alias(col)
-            ])
+        for col in numeric_columns:
+            if col in df.columns:
+                df = df.with_columns([
+                    pl.col(col)
+                      .map_elements(normalizar_valor_brasileiro, return_dtype=pl.Utf8)
+                      .alias(col)
+                ])
 
     return df
 
