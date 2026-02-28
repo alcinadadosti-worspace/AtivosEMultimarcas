@@ -19,6 +19,16 @@
         </select>
     </div>
 
+    <div class="filter-group" x-show="$store.filters.gerencias.length > 0">
+        <label>Gerência</label>
+        <select class="input select" x-model="selectedGerencia" @change="applyFilters()">
+            <option value="">Todas</option>
+            <template x-for="gerencia in $store.filters.gerencias" :key="gerencia">
+                <option :value="gerencia" x-text="gerencia"></option>
+            </template>
+        </select>
+    </div>
+
     <button class="btn btn-secondary btn-sm" @click="clearFilters()">
         <i data-lucide="x"></i>
         Limpar
@@ -30,6 +40,7 @@ function filterBar() {
     return {
         selectedCiclo: '',
         selectedSetor: '',
+        selectedGerencia: '',
 
         init() {
             // Load filters on init
@@ -39,6 +50,7 @@ function filterBar() {
         applyFilters() {
             this.$store.filters.selectedCiclos = this.selectedCiclo ? [this.selectedCiclo] : [];
             this.$store.filters.selectedSetores = this.selectedSetor ? [this.selectedSetor] : [];
+            this.$store.filters.selectedGerencias = this.selectedGerencia ? [this.selectedGerencia] : [];
 
             // Dispatch event for components to refresh
             window.dispatchEvent(new CustomEvent('filters-changed'));
@@ -47,6 +59,7 @@ function filterBar() {
         clearFilters() {
             this.selectedCiclo = '';
             this.selectedSetor = '';
+            this.selectedGerencia = '';
             this.applyFilters();
         }
     }

@@ -29,6 +29,7 @@ from app.services.venda import (
     obter_ciclos_unicos,
     obter_setores_unicos,
     obter_marcas_unicas,
+    obter_gerencias_unicas,
 )
 from app.services.metricas import (
     calcular_metricas_cliente,
@@ -61,6 +62,11 @@ from app.services.categoria import (
     calcular_categoria_por_setor,
     listar_produtos_categoria,
     obter_categorias_disponiveis,
+)
+from app.services.ranking import (
+    calcular_ranking_revendedoras,
+    calcular_evolucao_revendedora,
+    calcular_comparativo_ciclos,
 )
 from app.utils.exporters import exportar_csv, exportar_excel
 
@@ -249,12 +255,13 @@ async def get_filtros(
     df_vendas = session_data.get("df_vendas")
 
     if df_vendas is None:
-        return FiltrosDisponiveis(ciclos=[], setores=[], marcas=[])
+        return FiltrosDisponiveis(ciclos=[], setores=[], marcas=[], gerencias=[])
 
     return FiltrosDisponiveis(
         ciclos=obter_ciclos_unicos(df_vendas),
         setores=obter_setores_unicos(df_vendas),
-        marcas=obter_marcas_unicas(df_vendas)
+        marcas=obter_marcas_unicas(df_vendas),
+        gerencias=obter_gerencias_unicas(df_vendas),
     )
 
 
@@ -266,6 +273,7 @@ async def get_filtros(
 async def get_metricas_gerais(
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get general dashboard metrics."""
@@ -279,9 +287,10 @@ async def get_metricas_gerais(
     # Apply filters
     ciclos_list = ciclos.split(",") if ciclos else None
     setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
 
-    df_vendas_filtrado = aplicar_filtros(df_vendas, ciclos=ciclos_list, setores=setores_list)
-    df_clientes_filtrado = aplicar_filtros(df_clientes, ciclos=ciclos_list, setores=setores_list)
+    df_vendas_filtrado = aplicar_filtros(df_vendas, ciclos=ciclos_list, setores=setores_list, gerencias=gerencias_list)
+    df_clientes_filtrado = aplicar_filtros(df_clientes, ciclos=ciclos_list, setores=setores_list, gerencias=gerencias_list)
 
     metricas = calcular_metricas_gerais(df_clientes_filtrado, df_vendas_filtrado)
     return metricas
@@ -291,6 +300,7 @@ async def get_metricas_gerais(
 async def get_vendas_por_marca(
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get sales breakdown by brand."""
@@ -302,8 +312,9 @@ async def get_vendas_por_marca(
 
     ciclos_list = ciclos.split(",") if ciclos else None
     setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
 
-    df_filtrado = aplicar_filtros(df_vendas, ciclos=ciclos_list, setores=setores_list)
+    df_filtrado = aplicar_filtros(df_vendas, ciclos=ciclos_list, setores=setores_list, gerencias=gerencias_list)
     return calcular_vendas_por_marca(df_filtrado)
 
 
@@ -396,6 +407,7 @@ async def get_dados_setor_ciclo(
 async def get_multimarcas(
     ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     limite: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     session: tuple = Depends(get_user_session),
@@ -409,11 +421,13 @@ async def get_multimarcas(
 
     ciclos_list = ciclos.split(",") if ciclos else None
     setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
 
     df_filtrado = aplicar_filtros(
         df_clientes,
         ciclos=ciclos_list,
         setores=setores_list,
+        gerencias=gerencias_list,
         apenas_multimarcas=True
     )
 
@@ -780,3 +794,101 @@ async def get_produtos_categoria(
 
     df_classificado = classificar_vendas(df_vendas)
     return listar_produtos_categoria(df_classificado, categoria, limite=limite)
+
+
+# =============================================================================
+# RANKING DE REVENDEDORAS
+# =============================================================================
+
+@api_router.get("/ranking/revendedoras")
+async def get_ranking_revendedoras(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    limite: int = Query(20, ge=1, le=100),
+    session: tuple = Depends(get_user_session),
+):
+    """Get top resellers ranking by value."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_filtrado = aplicar_filtros(
+        df_vendas,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+
+    return calcular_ranking_revendedoras(df_filtrado, limite=limite)
+
+
+@api_router.get("/ranking/revendedora/{codigo}/evolucao")
+async def get_evolucao_revendedora(
+    codigo: str,
+    session: tuple = Depends(get_user_session),
+):
+    """Get a reseller's evolution over cycles."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+
+    if df_vendas is None:
+        return []
+
+    return calcular_evolucao_revendedora(df_vendas, codigo)
+
+
+# =============================================================================
+# COMPARATIVO DE CICLOS
+# =============================================================================
+
+@api_router.get("/comparativo/ciclos")
+async def get_comparativo_ciclos(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """
+    Get comparison metrics between selected cycles.
+
+    - 1 cycle: Returns normal metrics
+    - 2+ cycles: Returns metrics with variations between cycles
+    """
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+    df_clientes = session_data.get("df_clientes")
+
+    if df_vendas is None or df_clientes is None:
+        return {"ciclos": [], "metricas": [], "total_ciclos": 0}
+
+    # Get cycles to compare
+    if ciclos:
+        ciclos_list = ciclos.split(",")
+    else:
+        # If no cycles specified, get all available
+        from app.services.venda import obter_ciclos_unicos
+        ciclos_list = obter_ciclos_unicos(df_vendas)
+
+    # Apply other filters
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_vendas_filtrado = aplicar_filtros(
+        df_vendas,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+
+    return calcular_comparativo_ciclos(df_clientes_filtrado, df_vendas_filtrado, ciclos_list)

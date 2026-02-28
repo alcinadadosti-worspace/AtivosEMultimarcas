@@ -192,6 +192,19 @@ async def page_categorias(
     })
 
 
+@app.get("/ranking", response_class=HTMLResponse)
+async def page_ranking(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
+    """Reseller ranking and comparison page."""
+    return templates.TemplateResponse("pages/ranking.html", {
+        "request": request,
+        "page": "ranking",
+        "has_data": has_data,
+    })
+
+
 # =============================================================================
 # HEALTH CHECK (root level)
 # =============================================================================

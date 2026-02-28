@@ -132,6 +132,7 @@ class FiltrosDisponiveis(BaseModel):
     ciclos: List[str]
     setores: List[str]
     marcas: List[str]
+    gerencias: List[str] = []
 
 
 class HealthCheck(BaseModel):

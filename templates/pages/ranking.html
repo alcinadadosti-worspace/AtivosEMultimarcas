@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}Ranking - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<style>
+/* Ranking Page Styles */
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.comparison-card {
+    background: linear-gradient(145deg, rgba(40, 40, 55, 0.9), rgba(25, 25, 40, 0.95));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.comparison-card.highlight {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+}
+
+.comparison-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.comparison-card-ciclo {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #a78bfa;
+    padding: 4px 10px;
+    background: rgba(139, 92, 246, 0.15);
+    border-radius: 20px;
+}
+
+.comparison-card-variation {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 8px;
+}
+
+.variation-up {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+.variation-down {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.comparison-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.comparison-metric {
+    text-align: center;
+}
+
+.comparison-metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    display: block;
+}
+
+.comparison-metric-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+/* Ranking Table */
+.ranking-section {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.ranking-section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ranking-section-title .icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a2e;
+}
+
+.ranking-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.ranking-table thead th {
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 14px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.ranking-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.ranking-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.ranking-table tbody td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    font-size: 0.875rem;
+}
+
+.rank-medal {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a2e; box-shadow: 0 0 12px rgba(251, 191, 36, 0.4); }
+.rank-2 { background: linear-gradient(135deg, #94a3b8, #64748b); color: #1a1a2e; }
+.rank-3 { background: linear-gradient(135deg, #cd7c32, #a16207); color: #1a1a2e; }
+.rank-default { background: rgba(100, 100, 120, 0.3); color: #a5b4fc; }
+
+.reseller-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.reseller-name {
+    font-weight: 600;
+    color: #f8fafc;
+}
+
+.reseller-setor {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.multimarca-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.valor-destaque {
+    font-family: 'JetBrains Mono', monospace;
+    color: #4ade80;
+    font-weight: 600;
+}
+
+/* Evolution Modal */
+.evolution-chart {
+    height: 200px;
+    margin-top: 16px;
+}
+
+.table-scroll {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.table-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+}
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">Ranking & Comparativo</h1>
+    <p class="page-subtitle">Top revendedoras e comparativo entre ciclos</p>
+</div>
+
+<div x-data="rankingPage()" x-init="init()">
+    <!-- Filters -->
+    {% include "components/filters.html" %}
+
+    <!-- Comparison Dashboard -->
+    <div class="ranking-section" x-show="comparativo.metricas && comparativo.metricas.length > 0">
+        <h3 class="ranking-section-title">
+            <span class="icon">
+                <i data-lucide="git-compare" style="width: 18px; height: 18px;"></i>
+            </span>
+            Comparativo de Ciclos
+            <span style="font-size: 0.8rem; color: #94a3b8; margin-left: auto;">
+                <span x-text="comparativo.total_ciclos"></span> ciclo(s) selecionado(s)
+            </span>
+        </h3>
+
+        <div class="comparison-grid">
+            <template x-for="(metrica, index) in comparativo.metricas" :key="metrica.ciclo">
+                <div class="comparison-card" :class="{'highlight': index === comparativo.metricas.length - 1}">
+                    <div class="comparison-card-header">
+                        <span class="comparison-card-ciclo" x-text="metrica.ciclo"></span>
+                        <template x-if="metrica.var_total_valor !== undefined">
+                            <span class="comparison-card-variation"
+                                  :class="metrica.var_total_valor >= 0 ? 'variation-up' : 'variation-down'">
+                                <span x-text="(metrica.var_total_valor >= 0 ? '+' : '') + metrica.var_total_valor.toFixed(1) + '%'"></span>
+                            </span>
+                        </template>
+                    </div>
+                    <div class="comparison-metrics">
+                        <div class="comparison-metric">
+                            <span class="comparison-metric-value" x-text="formatNumber(metrica.clientes_ativos)"></span>
+                            <span class="comparison-metric-label">Clientes</span>
+                        </div>
+                        <div class="comparison-metric">
+                            <span class="comparison-metric-value" style="color: #a78bfa;" x-text="formatNumber(metrica.multimarcas)"></span>
+                            <span class="comparison-metric-label">Multimarcas</span>
+                        </div>
+                        <div class="comparison-metric">
+                            <span class="comparison-metric-value" x-text="formatNumber(metrica.total_itens)"></span>
+                            <span class="comparison-metric-label">Itens</span>
+                        </div>
+                        <div class="comparison-metric">
+                            <span class="comparison-metric-value" style="color: #4ade80;" x-text="formatCurrencyShort(metrica.total_valor)"></span>
+                            <span class="comparison-metric-label">Valor</span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Ranking Table -->
+    <div class="ranking-section">
+        <h3 class="ranking-section-title">
+            <span class="icon">
+                <i data-lucide="trophy" style="width: 18px; height: 18px;"></i>
+            </span>
+            Top Revendedoras por Valor
+        </h3>
+
+        <template x-if="loading">
+            <div class="text-center" style="padding: 40px;">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </template>
+
+        <div class="table-scroll" x-show="!loading">
+            <table class="ranking-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Revendedora</th>
+                        <th>Marcas</th>
+                        <th style="text-align: right;">Itens</th>
+                        <th style="text-align: right;">Valor Total</th>
+                        <th style="text-align: center;">Ciclos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="ranking.length === 0 && !loading">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted" style="padding: 40px;">
+                                Nenhum dado disponivel. Faca upload de uma planilha.
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="(rev, index) in ranking" :key="'rev-' + index">
+                        <tr @click="showEvolution(rev.codigo)" style="cursor: pointer;">
+                            <td>
+                                <span class="rank-medal" :class="getRankClass(rev.posicao)" x-text="rev.posicao"></span>
+                            </td>
+                            <td>
+                                <div class="reseller-info">
+                                    <span class="reseller-name" x-text="rev.nome"></span>
+                                    <span class="reseller-setor">
+                                        <span x-text="'Setor ' + rev.setor"></span>
+                                        <template x-if="rev.gerencia">
+                                            <span x-text="' | Ger. ' + rev.gerencia"></span>
+                                        </template>
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="multimarca-badge" x-show="rev.is_multimarcas">
+                                    <span x-text="rev.qtde_marcas + ' marcas'"></span>
+                                </span>
+                                <span x-show="!rev.is_multimarcas" class="text-muted">1 marca</span>
+                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 4px;" x-text="rev.marcas"></div>
+                            </td>
+                            <td style="text-align: right; font-family: 'JetBrains Mono', monospace;" x-text="formatNumber(rev.total_itens)"></td>
+                            <td style="text-align: right;" class="valor-destaque" x-text="formatCurrency(rev.total_valor)"></td>
+                            <td style="text-align: center;">
+                                <span style="padding: 4px 10px; background: rgba(59, 130, 246, 0.2); border-radius: 12px; font-size: 0.8rem; color: #60a5fa;" x-text="rev.ciclos_ativos"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Evolution Modal -->
+    <div class="modal-overlay" x-show="showModal" @click.self="showModal = false" x-cloak
+         style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+        <div class="modal-content" style="background: #1a1a2e; border-radius: 16px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #f8fafc;">Evolucao da Revendedora</h3>
+                <button @click="showModal = false" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.5rem;">&times;</button>
+            </div>
+
+            <template x-if="loadingEvolution">
+                <div class="text-center" style="padding: 40px;">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </template>
+
+            <template x-if="!loadingEvolution && evolution.length > 0">
+                <table class="ranking-table" style="font-size: 0.85rem;">
+                    <thead>
+                        <tr>
+                            <th>Ciclo</th>
+                            <th style="text-align: right;">Itens</th>
+                            <th style="text-align: right;">Valor</th>
+                            <th style="text-align: right;">Variacao</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(ev, index) in evolution" :key="'ev-' + index">
+                            <tr>
+                                <td x-text="ev.ciclo"></td>
+                                <td style="text-align: right;" x-text="formatNumber(ev.total_itens)"></td>
+                                <td style="text-align: right;" class="valor-destaque" x-text="formatCurrency(ev.total_valor)"></td>
+                                <td style="text-align: right;">
+                                    <template x-if="ev.variacao_percentual !== null">
+                                        <span :class="ev.variacao_percentual >= 0 ? 'variation-up' : 'variation-down'"
+                                              style="padding: 4px 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;"
+                                              x-text="(ev.variacao_percentual >= 0 ? '+' : '') + ev.variacao_percentual.toFixed(1) + '%'">
+                                        </span>
+                                    </template>
+                                    <template x-if="ev.variacao_percentual === null">
+                                        <span class="text-muted">-</span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+        </div>
+    </div>
+</div>
+
+<!-- Empty State -->
+<div x-data x-show="!$store.app.hasData" class="empty-state" x-cloak>
+    <i data-lucide="trophy"></i>
+    <h3>Nenhum dado carregado</h3>
+    <p>Faca upload de uma planilha de vendas para ver o ranking</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function rankingPage() {
+    return {
+        ranking: [],
+        comparativo: { ciclos: [], metricas: [], total_ciclos: 0 },
+        evolution: [],
+        loading: false,
+        loadingEvolution: false,
+        showModal: false,
+
+        async init() {
+            if ({{ 'true' if has_data else 'false' }}) {
+                await this.loadData();
+            }
+
+            window.addEventListener('data-loaded', () => {
+                this.loadData();
+            });
+
+            window.addEventListener('filters-changed', () => {
+                this.loadData();
+            });
+        },
+
+        async loadData() {
+            this.loading = true;
+            const queryString = this.$store.filters.getQueryString();
+
+            try {
+                const [rankingRes, comparativoRes] = await Promise.all([
+                    fetch(`/api/ranking/revendedoras?${queryString}&limite=30`),
+                    fetch(`/api/comparativo/ciclos?${queryString}`)
+                ]);
+
+                this.ranking = await rankingRes.json();
+                this.comparativo = await comparativoRes.json();
+
+                this.$nextTick(() => {
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load ranking:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async showEvolution(codigo) {
+            this.showModal = true;
+            this.loadingEvolution = true;
+            this.evolution = [];
+
+            try {
+                const response = await fetch(`/api/ranking/revendedora/${encodeURIComponent(codigo)}/evolucao`);
+                this.evolution = await response.json();
+            } catch (error) {
+                console.error('Failed to load evolution:', error);
+            } finally {
+                this.loadingEvolution = false;
+            }
+        },
+
+        getRankClass(posicao) {
+            if (posicao === 1) return 'rank-1';
+            if (posicao === 2) return 'rank-2';
+            if (posicao === 3) return 'rank-3';
+            return 'rank-default';
+        },
+
+        formatCurrencyShort(value) {
+            if (value >= 1000000) {
+                return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+            } else if (value >= 1000) {
+                return 'R$ ' + (value / 1000).toFixed(1) + 'K';
+            }
+            return formatCurrency(value);
+        }
+    }
+}
+</script>
+{% endblock %}

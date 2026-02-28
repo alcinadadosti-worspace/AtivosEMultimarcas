@@ -144,8 +144,10 @@ document.addEventListener('alpine:init', () => {
         ciclos: [],
         setores: [],
         marcas: [],
+        gerencias: [],
         selectedCiclos: [],
         selectedSetores: [],
+        selectedGerencias: [],
 
         async load() {
             try {
@@ -154,6 +156,7 @@ document.addEventListener('alpine:init', () => {
                 this.ciclos = data.ciclos || [];
                 this.setores = data.setores || [];
                 this.marcas = data.marcas || [];
+                this.gerencias = data.gerencias || [];
             } catch (error) {
                 console.error('Failed to load filters:', error);
             }
@@ -166,6 +169,9 @@ document.addEventListener('alpine:init', () => {
             }
             if (this.selectedSetores.length > 0) {
                 params.set('setores', this.selectedSetores.join(','));
+            }
+            if (this.selectedGerencias.length > 0) {
+                params.set('gerencias', this.selectedGerencias.join(','));
             }
             return params.toString();
         }
