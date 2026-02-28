@@ -439,6 +439,15 @@
                     </template>
                 </select>
             </div>
+            <div class="filter-group" x-show="$store.filters.gerencias.length > 0">
+                <label>Gerencia</label>
+                <select x-model="selectedGerencia" @change="loadVendas()">
+                    <option value="">Todas</option>
+                    <template x-for="gerencia in $store.filters.gerencias" :key="gerencia">
+                        <option :value="gerencia" x-text="gerencia"></option>
+                    </template>
+                </select>
+            </div>
         </div>
 
         <div class="futuristic-table-scroll">
@@ -515,8 +524,10 @@ function iafPage() {
         loadingVendas: false,
         selectedTipo: '',
         selectedSetor: '',
+        selectedGerencia: '',
 
         async init() {
+            await this.$store.filters.load();
             await Promise.all([
                 this.loadMetricas(),
                 this.loadSetores(),
@@ -557,6 +568,7 @@ function iafPage() {
                 const params = new URLSearchParams();
                 if (this.selectedTipo) params.set('tipo', this.selectedTipo);
                 if (this.selectedSetor) params.set('setor', this.selectedSetor);
+                if (this.selectedGerencia) params.set('gerencia', this.selectedGerencia);
                 params.set('limite', 200);
 
                 const response = await fetch(`/api/iaf/vendas?${params}`);

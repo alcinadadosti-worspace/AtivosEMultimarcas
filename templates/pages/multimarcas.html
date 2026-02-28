@@ -347,6 +347,16 @@
             </select>
         </div>
 
+        <div class="filter-group" x-show="$store.filters.gerencias.length > 0">
+            <label>Gerencia</label>
+            <select class="input select" x-model="selectedGerencia" @change="loadData()">
+                <option value="">Todas</option>
+                <template x-for="gerencia in $store.filters.gerencias" :key="gerencia">
+                    <option :value="gerencia" x-text="gerencia"></option>
+                </template>
+            </select>
+        </div>
+
         <div style="margin-left: auto; display: flex; gap: 8px;">
             <a :href="exportUrl('csv')" class="btn btn-secondary btn-sm">
                 <i data-lucide="download"></i>
@@ -526,6 +536,7 @@ function multimarcasPage() {
         loadingCombos: false,
         selectedCiclo: '',
         selectedSetor: '',
+        selectedGerencia: '',
         limit: 50,
         offset: 0,
         maxFreq: 1,
@@ -549,6 +560,7 @@ function multimarcasPage() {
                 const params = new URLSearchParams();
                 if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
                 if (this.selectedSetor) params.set('setores', this.selectedSetor);
+                if (this.selectedGerencia) params.set('gerencias', this.selectedGerencia);
                 params.set('limite', this.limit);
                 params.set('offset', this.offset);
 
@@ -571,6 +583,7 @@ function multimarcasPage() {
                 const params = new URLSearchParams();
                 if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
                 if (this.selectedSetor) params.set('setores', this.selectedSetor);
+                if (this.selectedGerencia) params.set('gerencias', this.selectedGerencia);
                 params.set('limite', '20');
 
                 const response = await fetch(`/api/multimarcas/combinacoes?${params}`);
@@ -592,6 +605,7 @@ function multimarcasPage() {
             const params = new URLSearchParams();
             if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
             if (this.selectedSetor) params.set('setores', this.selectedSetor);
+            if (this.selectedGerencia) params.set('gerencias', this.selectedGerencia);
             params.set('formato', formato);
             return `/api/multimarcas/export?${params}`;
         },
