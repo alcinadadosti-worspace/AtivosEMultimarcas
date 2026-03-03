@@ -209,7 +209,7 @@ async def page_ranking(
 # HEALTH CHECK (root level)
 # =============================================================================
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     """Health check endpoint."""
     from datetime import datetime

@@ -117,7 +117,7 @@ def get_session_data():
 # HEALTH CHECK
 # =============================================================================
 
-@api_router.get("/health", response_model=HealthCheck)
+@api_router.api_route("/health", methods=["GET", "HEAD"], response_model=HealthCheck)
 async def health_check():
     """Health check endpoint for Uptime Robot."""
     return {
