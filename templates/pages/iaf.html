@@ -308,6 +308,9 @@
 </div>
 
 <div x-data="iafPage()" x-init="init()">
+    <!-- Global Filters -->
+    {% include "components/filters.html" %}
+
     <!-- Metrics Cards -->
     <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
         <div class="metric-card">
@@ -344,11 +347,11 @@
             </span>
             Porcentagem IAF por Setor (baseado em clientes ativos)
             <div style="margin-left: auto; display: flex; gap: 8px;">
-                <a href="/api/iaf/export?formato=csv&tabela=setor" class="btn btn-secondary btn-sm">
+                <a :href="exportSetorUrl('csv')" class="btn btn-secondary btn-sm">
                     <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                     CSV
                 </a>
-                <a href="/api/iaf/export?formato=xlsx&tabela=setor" class="btn btn-secondary btn-sm">
+                <a :href="exportSetorUrl('xlsx')" class="btn btn-secondary btn-sm">
                     <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                     Excel
                 </a>
@@ -430,11 +433,11 @@
             </span>
             Detalhamento de Vendas IAF
             <div style="margin-left: auto; display: flex; gap: 8px;">
-                <a :href="'/api/iaf/export?formato=csv&tabela=vendas' + (selectedTipo ? '&tipo=' + selectedTipo : '') + (selectedSetor ? '&setor=' + selectedSetor : '')" class="btn btn-secondary btn-sm">
+                <a :href="exportVendasUrl('csv')" class="btn btn-secondary btn-sm">
                     <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                     CSV
                 </a>
-                <a :href="'/api/iaf/export?formato=xlsx&tabela=vendas' + (selectedTipo ? '&tipo=' + selectedTipo : '') + (selectedSetor ? '&setor=' + selectedSetor : '')" class="btn btn-secondary btn-sm">
+                <a :href="exportVendasUrl('xlsx')" class="btn btn-secondary btn-sm">
                     <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                     Excel
                 </a>
@@ -448,24 +451,6 @@
                     <option value="">Todos</option>
                     <option value="Cabelos">Cabelos</option>
                     <option value="Make">Make</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Setor</label>
-                <select x-model="selectedSetor" @change="loadVendas()">
-                    <option value="">Todos</option>
-                    <template x-for="s in setores" :key="s.setor">
-                        <option :value="s.setor" x-text="s.setor"></option>
-                    </template>
-                </select>
-            </div>
-            <div class="filter-group" x-show="$store.filters.gerencias.length > 0">
-                <label>Gerencia</label>
-                <select x-model="selectedGerencia" @change="loadVendas()">
-                    <option value="">Todas</option>
-                    <template x-for="gerencia in $store.filters.gerencias" :key="gerencia">
-                        <option :value="gerencia" x-text="gerencia"></option>
-                    </template>
                 </select>
             </div>
         </div>
@@ -543,27 +528,36 @@ function iafPage() {
         loading: false,
         loadingVendas: false,
         selectedTipo: '',
-        selectedSetor: '',
-        selectedGerencia: '',
 
         async init() {
             await this.$store.filters.load();
+            await this.loadAll();
+
+            window.addEventListener('data-loaded', () => {
+                this.loadAll();
+            });
+
+            window.addEventListener('filters-changed', () => {
+                this.loadAll();
+            });
+        },
+
+        async loadAll() {
             await Promise.all([
                 this.loadMetricas(),
                 this.loadSetores(),
                 this.loadVendas()
             ]);
+        },
 
-            window.addEventListener('data-loaded', () => {
-                this.loadMetricas();
-                this.loadSetores();
-                this.loadVendas();
-            });
+        getBaseParams() {
+            return new URLSearchParams(this.$store.filters.getQueryString());
         },
 
         async loadMetricas() {
             try {
-                const response = await fetch('/api/iaf/metricas');
+                const params = this.getBaseParams();
+                const response = await fetch(`/api/iaf/metricas?${params.toString()}`);
                 this.metricas = await response.json();
             } catch (error) {
                 console.error('Failed to load metricas:', error);
@@ -573,7 +567,8 @@ function iafPage() {
         async loadSetores() {
             this.loading = true;
             try {
-                const response = await fetch('/api/iaf/por-setor');
+                const params = this.getBaseParams();
+                const response = await fetch(`/api/iaf/por-setor?${params.toString()}`);
                 this.setores = await response.json();
             } catch (error) {
                 console.error('Failed to load setores:', error);
@@ -585,10 +580,8 @@ function iafPage() {
         async loadVendas() {
             this.loadingVendas = true;
             try {
-                const params = new URLSearchParams();
+                const params = this.getBaseParams();
                 if (this.selectedTipo) params.set('tipo', this.selectedTipo);
-                if (this.selectedSetor) params.set('setor', this.selectedSetor);
-                if (this.selectedGerencia) params.set('gerencia', this.selectedGerencia);
                 params.set('limite', 200);
 
                 const response = await fetch(`/api/iaf/vendas?${params}`);
@@ -598,6 +591,21 @@ function iafPage() {
             } finally {
                 this.loadingVendas = false;
             }
+        },
+
+        exportSetorUrl(formato) {
+            const params = this.getBaseParams();
+            params.set('formato', formato);
+            params.set('tabela', 'setor');
+            return `/api/iaf/export?${params.toString()}`;
+        },
+
+        exportVendasUrl(formato) {
+            const params = this.getBaseParams();
+            if (this.selectedTipo) params.set('tipo', this.selectedTipo);
+            params.set('formato', formato);
+            params.set('tabela', 'vendas');
+            return `/api/iaf/export?${params.toString()}`;
         },
 
         getMarcaClass(marca) {

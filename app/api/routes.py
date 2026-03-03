@@ -855,6 +855,9 @@ async def export_produtos_novos(
 
 @api_router.get("/iaf/metricas")
 async def get_iaf_metricas(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get IAF penetration metrics."""
@@ -868,15 +871,35 @@ async def get_iaf_metricas(
     if df_iaf is None:
         df_iaf = pl.DataFrame()
 
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+    df_iaf_filtrado = aplicar_filtros(
+        df_iaf,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
     return {
-        "cabelos": calcular_percentual_iaf(df_clientes, df_iaf, "Cabelos"),
-        "make": calcular_percentual_iaf(df_clientes, df_iaf, "Make"),
-        "total": calcular_percentual_iaf(df_clientes, df_iaf, None),
+        "cabelos": calcular_percentual_iaf(df_clientes_filtrado, df_iaf_filtrado, "Cabelos"),
+        "make": calcular_percentual_iaf(df_clientes_filtrado, df_iaf_filtrado, "Make"),
+        "total": calcular_percentual_iaf(df_clientes_filtrado, df_iaf_filtrado, None),
     }
 
 
 @api_router.get("/iaf/por-setor")
 async def get_iaf_por_setor(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get IAF metrics by sector."""
@@ -890,13 +913,33 @@ async def get_iaf_por_setor(
     if df_iaf is None:
         df_iaf = pl.DataFrame()
 
-    return calcular_iaf_por_setor(df_clientes, df_iaf)
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+    df_iaf_filtrado = aplicar_filtros(
+        df_iaf,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
+    return calcular_iaf_por_setor(df_clientes_filtrado, df_iaf_filtrado)
 
 
 @api_router.get("/iaf/vendas")
 async def get_iaf_vendas(
     tipo: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     limite: int = Query(200, ge=1, le=500),
     session: tuple = Depends(get_user_session),
 ):
@@ -910,7 +953,21 @@ async def get_iaf_vendas(
     if isinstance(df_iaf, pl.DataFrame) and df_iaf.is_empty():
         return []
 
-    return listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=limite)
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    if setor:
+        setores_list = [setor]
+
+    df_iaf_filtrado = aplicar_filtros(
+        df_iaf,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
+    return listar_vendas_iaf(df_iaf_filtrado, tipo_iaf=tipo, setor=None, limite=limite)
 
 
 @api_router.get("/iaf/export")
@@ -919,6 +976,9 @@ async def export_iaf(
     tabela: str = Query("setor", pattern="^(setor|vendas|todos)$"),
     tipo: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Export IAF data to CSV or Excel."""
@@ -932,9 +992,29 @@ async def export_iaf(
     if df_iaf is None:
         df_iaf = pl.DataFrame()
 
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    if setor:
+        setores_list = [setor]
+
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+    df_iaf_filtrado = aplicar_filtros(
+        df_iaf,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
     # Get data
-    setor_data = calcular_iaf_por_setor(df_clientes, df_iaf)
-    vendas_data = listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=1000) if not df_iaf.is_empty() else []
+    setor_data = calcular_iaf_por_setor(df_clientes_filtrado, df_iaf_filtrado)
+    vendas_data = listar_vendas_iaf(df_iaf_filtrado, tipo_iaf=tipo, setor=None, limite=1000) if not df_iaf_filtrado.is_empty() else []
 
     # Format percentages for export
     setor_data_formatted = [
