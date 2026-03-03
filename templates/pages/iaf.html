@@ -309,7 +309,42 @@
 
 <div x-data="iafPage()" x-init="init()">
     <!-- Global Filters -->
-    {% include "components/filters.html" %}
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Ciclo</label>
+            <select class="input select" x-model="selectedCiclo" @change="applyFilters()">
+                <option value="">Todos</option>
+                <template x-for="ciclo in ciclos" :key="ciclo">
+                    <option :value="ciclo" x-text="ciclo"></option>
+                </template>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Setor</label>
+            <select class="input select" x-model="selectedSetor" @change="applyFilters()">
+                <option value="">Todos</option>
+                <template x-for="setorFiltro in setoresFiltro" :key="setorFiltro">
+                    <option :value="setorFiltro" x-text="setorFiltro"></option>
+                </template>
+            </select>
+        </div>
+
+        <div class="filter-group" x-show="gerencias.length > 0">
+            <label>Gerencia</label>
+            <select class="input select" x-model="selectedGerencia" @change="applyFilters()">
+                <option value="">Todas</option>
+                <template x-for="gerencia in gerencias" :key="gerencia">
+                    <option :value="gerencia" x-text="gerencia"></option>
+                </template>
+            </select>
+        </div>
+
+        <button class="btn btn-secondary btn-sm" style="margin-left: auto;" @click="clearFilters()">
+            <i data-lucide="x"></i>
+            Limpar
+        </button>
+    </div>
 
     <!-- Metrics Cards -->
     <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -525,21 +560,50 @@ function iafPage() {
         metricas: null,
         setores: [],
         vendas: [],
+        ciclos: [],
+        setoresFiltro: [],
+        gerencias: [],
         loading: false,
         loadingVendas: false,
         selectedTipo: '',
+        selectedCiclo: '',
+        selectedSetor: '',
+        selectedGerencia: '',
 
         async init() {
-            await this.$store.filters.load();
+            await this.loadFiltros();
             await this.loadAll();
 
             window.addEventListener('data-loaded', () => {
+                this.loadFiltros();
                 this.loadAll();
             });
+        },
 
-            window.addEventListener('filters-changed', () => {
-                this.loadAll();
-            });
+        async loadFiltros() {
+            try {
+                const response = await fetch('/api/filtros');
+                const data = await response.json();
+                this.ciclos = data.ciclos || [];
+                this.setoresFiltro = data.setores || [];
+                this.gerencias = data.gerencias || [];
+            } catch (error) {
+                console.error('Failed to load filtros:', error);
+                this.ciclos = [];
+                this.setoresFiltro = [];
+                this.gerencias = [];
+            }
+        },
+
+        async applyFilters() {
+            await this.loadAll();
+        },
+
+        async clearFilters() {
+            this.selectedCiclo = '';
+            this.selectedSetor = '';
+            this.selectedGerencia = '';
+            await this.loadAll();
         },
 
         async loadAll() {
@@ -551,7 +615,11 @@ function iafPage() {
         },
 
         getBaseParams() {
-            return new URLSearchParams(this.$store.filters.getQueryString());
+            const params = new URLSearchParams();
+            if (this.selectedCiclo) params.set('ciclos', this.selectedCiclo);
+            if (this.selectedSetor) params.set('setores', this.selectedSetor);
+            if (this.selectedGerencia) params.set('gerencias', this.selectedGerencia);
+            return params;
         },
 
         async loadMetricas() {
