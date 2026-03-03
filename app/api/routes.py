@@ -324,6 +324,8 @@ async def get_vendas_por_marca(
 async def get_top_setores(
     limite: int = Query(5, ge=1, le=20),
     ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get top sectors by value."""
@@ -334,14 +336,23 @@ async def get_top_setores(
         return []
 
     ciclos_list = ciclos.split(",") if ciclos else None
-    df_filtrado = aplicar_filtros(df_clientes, ciclos=ciclos_list)
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+    df_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
 
     return calcular_top_setores(df_filtrado, limite=limite)
 
 
 @api_router.get("/metricas/evolucao")
 async def get_evolucao_ciclos(
+    ciclos: Optional[str] = Query(None),
     setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get metrics evolution by cycle."""
@@ -351,14 +362,24 @@ async def get_evolucao_ciclos(
     if df_clientes is None:
         return []
 
+    ciclos_list = ciclos.split(",") if ciclos else None
     setores_list = setores.split(",") if setores else None
-    df_filtrado = aplicar_filtros(df_clientes, setores=setores_list)
+    gerencias_list = gerencias.split(",") if gerencias else None
+    df_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
 
     return calcular_evolucao_ciclos(df_filtrado)
 
 
 @api_router.get("/metricas/top10-setores")
 async def get_top10_setores(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get top 10 sectors by value with complete data."""
@@ -368,11 +389,24 @@ async def get_top10_setores(
     if df_clientes is None:
         return []
 
-    return calcular_top_setores_completo(df_clientes, limite=10)
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+    df_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
+    return calcular_top_setores_completo(df_filtrado, limite=10)
 
 
 @api_router.get("/metricas/resumo-ciclos")
 async def get_resumo_ciclos(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get summary metrics by cycle."""
@@ -383,11 +417,31 @@ async def get_resumo_ciclos(
     if df_clientes is None or df_vendas is None:
         return []
 
-    return calcular_resumo_ciclos(df_clientes, df_vendas)
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+    df_vendas_filtrado = aplicar_filtros(
+        df_vendas,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
+    return calcular_resumo_ciclos(df_clientes_filtrado, df_vendas_filtrado)
 
 
 @api_router.get("/metricas/dados-setor-ciclo")
 async def get_dados_setor_ciclo(
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
     """Get detailed data by sector and cycle including gerencia."""
@@ -398,7 +452,24 @@ async def get_dados_setor_ciclo(
     if df_clientes is None or df_vendas is None:
         return []
 
-    return calcular_dados_setor_ciclo(df_clientes, df_vendas)
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+    df_vendas_filtrado = aplicar_filtros(
+        df_vendas,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list,
+    )
+
+    return calcular_dados_setor_ciclo(df_clientes_filtrado, df_vendas_filtrado)
 
 
 @api_router.get("/dashboard/export")

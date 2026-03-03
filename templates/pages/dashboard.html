@@ -672,9 +672,9 @@ function dashboard() {
                     fetch(`/api/metricas/marcas?${queryString}`),
                     fetch(`/api/metricas/top-setores?${queryString}`),
                     fetch(`/api/metricas/evolucao?${queryString}`),
-                    fetch(`/api/metricas/top10-setores`),
-                    fetch(`/api/metricas/resumo-ciclos`),
-                    fetch(`/api/metricas/dados-setor-ciclo`)
+                    fetch(`/api/metricas/top10-setores?${queryString}`),
+                    fetch(`/api/metricas/resumo-ciclos?${queryString}`),
+                    fetch(`/api/metricas/dados-setor-ciclo?${queryString}`)
                 ]);
 
                 this.metrics = await metricsRes.json();

@@ -41,14 +41,19 @@ def calcular_metricas_cliente(df_vendas: pl.DataFrame) -> pl.DataFrame:
         - IsMultimarcas (True if 2+ brands)
         - ItensTotal, ValorTotal
     """
-    # Group by customer and cycle
-    df_clientes = df_vendas.group_by([
+    # Group by customer and cycle.
+    # Include Gerencia when available so customer-level metrics can be filtered by it.
+    group_cols = [
         VENDAS_COL_CICLO,
         "ClienteID",
         VENDAS_COL_SETOR,
         VENDAS_COL_CODIGO_REVENDEDORA,
-        VENDAS_COL_NOME_REVENDEDORA
-    ]).agg([
+        VENDAS_COL_NOME_REVENDEDORA,
+    ]
+    if VENDAS_COL_GERENCIA in df_vendas.columns:
+        group_cols.append(VENDAS_COL_GERENCIA)
+
+    df_clientes = df_vendas.group_by(group_cols).agg([
         # List of unique brands (excluding DESCONHECIDA)
         pl.col("Marca_BD")
           .filter(pl.col("Marca_BD") != MARCA_DESCONHECIDA)
@@ -272,10 +277,9 @@ def aplicar_filtros(
         df_filtrado = df_filtrado.filter(pl.col("Marca_BD").is_in(marcas))
 
     if gerencias and len(gerencias) > 0 and VENDAS_COL_GERENCIA in df_filtrado.columns:
-        # Partial search - find management containing the code
-        pattern = "|".join(gerencias)
+        gerencias_norm = [str(g).strip() for g in gerencias if str(g).strip()]
         df_filtrado = df_filtrado.filter(
-            pl.col(VENDAS_COL_GERENCIA).cast(pl.Utf8).str.contains(pattern)
+            pl.col(VENDAS_COL_GERENCIA).cast(pl.Utf8).str.strip_chars().is_in(gerencias_norm)
         )
 
     if apenas_multimarcas and "IsMultimarcas" in df_filtrado.columns:
