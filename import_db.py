@@ -74,10 +74,7 @@ def import_produtos(conn: sqlite3.Connection, filepath: Path) -> int:
 
     cursor = conn.cursor()
 
-    # Clear existing data
-    cursor.execute("DELETE FROM produtos")
-
-    imported = 0
+    imported_or_updated = 0
     skipped = 0
 
     for row in df.iter_rows(named=True):
@@ -94,18 +91,25 @@ def import_produtos(conn: sqlite3.Connection, filepath: Path) -> int:
             continue
 
         try:
+            # Upsert by normalized SKU:
+            # - keeps manually added products that are not in the spreadsheet
+            # - updates products that exist in the spreadsheet
             cursor.execute("""
                 INSERT INTO produtos (sku, sku_normalizado, nome, marca)
                 VALUES (?, ?, ?, ?)
+                ON CONFLICT(sku_normalizado) DO UPDATE SET
+                    sku = excluded.sku,
+                    nome = excluded.nome,
+                    marca = excluded.marca,
+                    updated_at = CURRENT_TIMESTAMP
             """, (sku, sku_norm, nome, marca_norm))
-            imported += 1
-        except sqlite3.IntegrityError:
-            # Duplicate SKU
+            imported_or_updated += 1
+        except sqlite3.Error:
             skipped += 1
 
     conn.commit()
-    print(f"[INFO] Imported {imported} products, skipped {skipped}")
-    return imported
+    print(f"[INFO] Imported/updated {imported_or_updated} products, skipped {skipped}")
+    return imported_or_updated
 
 
 def import_iaf(conn: sqlite3.Connection, filepath: Path, table_name: str) -> int:
