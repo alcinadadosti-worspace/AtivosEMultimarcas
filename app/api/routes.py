@@ -420,16 +420,27 @@ async def export_dashboard(
     resumo_data = calcular_resumo_ciclos(df_clientes, df_vendas)
     setor_ciclo_data = calcular_dados_setor_ciclo(df_clientes, df_vendas)
 
+    # Format percentages for export
+    resumo_data_formatted = [
+        {**item, "percent_multimarcas": f"{item['percent_multimarcas']:.2f}%"}
+        for item in resumo_data
+    ] if resumo_data else []
+
+    setor_ciclo_data_formatted = [
+        {**item, "percent_multimarcas": f"{item['percent_multimarcas']:.2f}%"}
+        for item in setor_ciclo_data
+    ] if setor_ciclo_data else []
+
     if tabela == "top10":
         df = pl.DataFrame(top10_data)
         sheet_name = "Top10Setores"
         filename = "top10_setores"
     elif tabela == "resumo":
-        df = pl.DataFrame(resumo_data)
+        df = pl.DataFrame(resumo_data_formatted)
         sheet_name = "ResumoCiclos"
         filename = "resumo_ciclos"
     elif tabela == "setor_ciclo":
-        df = pl.DataFrame(setor_ciclo_data)
+        df = pl.DataFrame(setor_ciclo_data_formatted)
         sheet_name = "DadosSetorCiclo"
         filename = "dados_setor_ciclo"
     else:
@@ -437,8 +448,8 @@ async def export_dashboard(
         if formato == "xlsx":
             dataframes = {
                 "Top10Setores": pl.DataFrame(top10_data) if top10_data else pl.DataFrame(),
-                "ResumoCiclos": pl.DataFrame(resumo_data) if resumo_data else pl.DataFrame(),
-                "DadosSetorCiclo": pl.DataFrame(setor_ciclo_data) if setor_ciclo_data else pl.DataFrame(),
+                "ResumoCiclos": pl.DataFrame(resumo_data_formatted) if resumo_data_formatted else pl.DataFrame(),
+                "DadosSetorCiclo": pl.DataFrame(setor_ciclo_data_formatted) if setor_ciclo_data_formatted else pl.DataFrame(),
             }
             content = exportar_multiplas_abas(dataframes)
             return Response(
@@ -448,7 +459,7 @@ async def export_dashboard(
             )
         else:
             # For CSV, concatenate all data or export largest table
-            df = pl.DataFrame(setor_ciclo_data) if setor_ciclo_data else pl.DataFrame()
+            df = pl.DataFrame(setor_ciclo_data_formatted) if setor_ciclo_data_formatted else pl.DataFrame()
             sheet_name = "Dashboard"
             filename = "dashboard"
 
@@ -854,8 +865,19 @@ async def export_iaf(
     setor_data = calcular_iaf_por_setor(df_clientes, df_iaf)
     vendas_data = listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=1000) if not df_iaf.is_empty() else []
 
+    # Format percentages for export
+    setor_data_formatted = [
+        {
+            **item,
+            "percent_iaf": f"{item['percent_iaf']}%",
+            "percent_cabelos": f"{item['percent_cabelos']}%",
+            "percent_make": f"{item['percent_make']}%",
+        }
+        for item in setor_data
+    ] if setor_data else []
+
     if tabela == "setor":
-        df = pl.DataFrame(setor_data) if setor_data else pl.DataFrame()
+        df = pl.DataFrame(setor_data_formatted) if setor_data_formatted else pl.DataFrame()
         sheet_name = "IAFPorSetor"
         filename = "iaf_por_setor"
     elif tabela == "vendas":
@@ -866,7 +888,7 @@ async def export_iaf(
         # Export all tables
         if formato == "xlsx":
             dataframes = {
-                "IAFPorSetor": pl.DataFrame(setor_data) if setor_data else pl.DataFrame(),
+                "IAFPorSetor": pl.DataFrame(setor_data_formatted) if setor_data_formatted else pl.DataFrame(),
                 "VendasIAF": pl.DataFrame(vendas_data) if vendas_data else pl.DataFrame(),
             }
             content = exportar_multiplas_abas(dataframes)
@@ -876,7 +898,7 @@ async def export_iaf(
                 headers={"Content-Disposition": "attachment; filename=iaf_completo.xlsx"}
             )
         else:
-            df = pl.DataFrame(setor_data) if setor_data else pl.DataFrame()
+            df = pl.DataFrame(setor_data_formatted) if setor_data_formatted else pl.DataFrame()
             sheet_name = "IAF"
             filename = "iaf"
 
@@ -991,8 +1013,18 @@ async def export_categorias(
     ciclo_data = calcular_categoria_por_ciclo(df_classificado)
     setor_data = calcular_categoria_por_setor(df_classificado)
 
+    # Format percentages for export
+    metricas_data_formatted = [
+        {
+            **item,
+            "percent_valor": f"{item['percent_valor']}%",
+            "percent_itens": f"{item['percent_itens']}%",
+        }
+        for item in metricas_data
+    ] if metricas_data else []
+
     if tabela == "metricas":
-        df = pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame()
+        df = pl.DataFrame(metricas_data_formatted) if metricas_data_formatted else pl.DataFrame()
         sheet_name = "MetricasCategorias"
         filename = "categorias_metricas"
     elif tabela == "ciclo":
@@ -1007,7 +1039,7 @@ async def export_categorias(
         # Export all tables
         if formato == "xlsx":
             dataframes = {
-                "Metricas": pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame(),
+                "Metricas": pl.DataFrame(metricas_data_formatted) if metricas_data_formatted else pl.DataFrame(),
                 "PorCiclo": pl.DataFrame(ciclo_data) if ciclo_data else pl.DataFrame(),
                 "PorSetor": pl.DataFrame(setor_data) if setor_data else pl.DataFrame(),
             }
@@ -1018,7 +1050,7 @@ async def export_categorias(
                 headers={"Content-Disposition": "attachment; filename=categorias_completo.xlsx"}
             )
         else:
-            df = pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame()
+            df = pl.DataFrame(metricas_data_formatted) if metricas_data_formatted else pl.DataFrame()
             sheet_name = "Categorias"
             filename = "categorias"
 
