@@ -329,7 +329,7 @@
     <div class="filters-bar">
         <div class="filter-group">
             <label>Ciclo</label>
-            <select class="input select" x-model="selectedCiclo" @change="loadData()">
+            <select class="input select" x-model="selectedCiclo" @change="applyFilters()">
                 <option value="">Todos</option>
                 <template x-for="ciclo in $store.filters.ciclos" :key="ciclo">
                     <option :value="ciclo" x-text="ciclo"></option>
@@ -339,7 +339,7 @@
 
         <div class="filter-group">
             <label>Setor</label>
-            <select class="input select" x-model="selectedSetor" @change="loadData()">
+            <select class="input select" x-model="selectedSetor" @change="applyFilters()">
                 <option value="">Todos</option>
                 <template x-for="setor in $store.filters.setores" :key="setor">
                     <option :value="setor" x-text="setor"></option>
@@ -349,7 +349,7 @@
 
         <div class="filter-group" x-show="$store.filters.gerencias.length > 0">
             <label>Gerencia</label>
-            <select class="input select" x-model="selectedGerencia" @change="loadData()">
+            <select class="input select" x-model="selectedGerencia" @change="applyFilters()">
                 <option value="">Todas</option>
                 <template x-for="gerencia in $store.filters.gerencias" :key="gerencia">
                     <option :value="gerencia" x-text="gerencia"></option>
@@ -487,7 +487,7 @@
                             </td>
                         </tr>
                     </template>
-                    <template x-for="item in data" :key="item.codigo + item.ciclo">
+                    <template x-for="(item, index) in data" :key="`${item.codigo || 'sem_codigo'}_${item.ciclo || 'sem_ciclo'}_${item.setor || 'sem_setor'}_${index}`">
                         <tr>
                             <td x-text="item.ciclo"></td>
                             <td x-text="item.setor"></td>
@@ -498,7 +498,7 @@
                             </td>
                             <td>
                                 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                                    <template x-for="marca in item.marcas.split(', ')" :key="marca">
+                                    <template x-for="(marca, brandIndex) in splitMarcas(item.marcas)" :key="`${marca}_${brandIndex}`">
                                         <span :class="getBrandClass(marca)" class="brand-badge" x-text="marca"></span>
                                     </template>
                                 </div>
@@ -540,21 +540,26 @@ function multimarcasPage() {
         limit: 50,
         offset: 0,
         maxFreq: 1,
+        dataRequestId: 0,
+        combosRequestId: 0,
 
         async init() {
             await this.$store.filters.load();
-            await this.loadData();
-            await this.loadCombinacoes();
+            await this.applyFilters();
 
             window.addEventListener('data-loaded', () => {
-                this.loadData();
-                this.loadCombinacoes();
+                this.applyFilters();
             });
+        },
+
+        async applyFilters() {
+            this.offset = 0;
+            await Promise.all([this.loadData(), this.loadCombinacoes()]);
         },
 
         async loadData() {
             this.loading = true;
-            this.offset = 0;
+            const requestId = ++this.dataRequestId;
 
             try {
                 const params = new URLSearchParams();
@@ -567,17 +572,28 @@ function multimarcasPage() {
                 const response = await fetch(`/api/multimarcas?${params}`);
                 const result = await response.json();
 
+                if (requestId !== this.dataRequestId) {
+                    return;
+                }
+
                 this.data = result.data || [];
                 this.total = result.total || 0;
             } catch (error) {
                 console.error('Failed to load data:', error);
+                if (requestId === this.dataRequestId) {
+                    this.data = [];
+                    this.total = 0;
+                }
             } finally {
-                this.loading = false;
+                if (requestId === this.dataRequestId) {
+                    this.loading = false;
+                }
             }
         },
 
         async loadCombinacoes() {
             this.loadingCombos = true;
+            const requestId = ++this.combosRequestId;
 
             try {
                 const params = new URLSearchParams();
@@ -587,17 +603,30 @@ function multimarcasPage() {
                 params.set('limite', '20');
 
                 const response = await fetch(`/api/multimarcas/combinacoes?${params}`);
-                this.combinacoes = await response.json();
+                const result = await response.json();
+
+                if (requestId !== this.combosRequestId) {
+                    return;
+                }
+
+                this.combinacoes = result || [];
 
                 // Calculate max frequency for bar scaling
                 if (this.combinacoes.length > 0) {
                     this.maxFreq = Math.max(...this.combinacoes.map(c => c.frequencia));
+                } else {
+                    this.maxFreq = 1;
                 }
             } catch (error) {
                 console.error('Failed to load combinations:', error);
-                this.combinacoes = [];
+                if (requestId === this.combosRequestId) {
+                    this.combinacoes = [];
+                    this.maxFreq = 1;
+                }
             } finally {
-                this.loadingCombos = false;
+                if (requestId === this.combosRequestId) {
+                    this.loadingCombos = false;
+                }
             }
         },
 
@@ -635,6 +664,11 @@ function multimarcasPage() {
 
         getFreqPercent(freq) {
             return Math.round((freq / this.maxFreq) * 100);
+        },
+
+        splitMarcas(marcas) {
+            if (!marcas || typeof marcas !== 'string') return [];
+            return marcas.split(', ').filter(Boolean);
         },
 
         async prevPage() {
