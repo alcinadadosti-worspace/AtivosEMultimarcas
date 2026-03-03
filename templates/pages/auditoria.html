@@ -209,7 +209,7 @@
     </template>
 
     <!-- Filter -->
-    <div class="filters-bar">
+    <div class="filters-bar" style="display: flex; align-items: center; gap: 16px;">
         <div class="filter-group">
             <label>Motivo</label>
             <select class="input select" x-model="selectedMotivo" @change="loadData()">
@@ -218,6 +218,16 @@
                 <option value="MATCH_COM_ZERO">Match com Zero</option>
                 <option value="MATCH_SEM_ZERO">Match sem Zero</option>
             </select>
+        </div>
+        <div style="margin-left: auto; display: flex; gap: 8px;">
+            <a :href="'/api/auditoria/export?formato=csv' + (selectedMotivo ? '&motivo=' + selectedMotivo : '')" class="btn btn-secondary btn-sm">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                CSV
+            </a>
+            <a :href="'/api/auditoria/export?formato=xlsx' + (selectedMotivo ? '&motivo=' + selectedMotivo : '')" class="btn btn-secondary btn-sm">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                Excel
+            </a>
         </div>
     </div>
 

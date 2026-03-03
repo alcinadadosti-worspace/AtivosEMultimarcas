@@ -343,6 +343,16 @@
                 <i data-lucide="pie-chart" style="width: 18px; height: 18px;"></i>
             </span>
             Porcentagem IAF por Setor (baseado em clientes ativos)
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <a href="/api/iaf/export?formato=csv&tabela=setor" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a href="/api/iaf/export?formato=xlsx&tabela=setor" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <div class="futuristic-table-scroll" style="max-height: 450px;">
@@ -419,6 +429,16 @@
                 <i data-lucide="shopping-bag" style="width: 18px; height: 18px;"></i>
             </span>
             Detalhamento de Vendas IAF
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <a :href="'/api/iaf/export?formato=csv&tabela=vendas' + (selectedTipo ? '&tipo=' + selectedTipo : '') + (selectedSetor ? '&setor=' + selectedSetor : '')" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a :href="'/api/iaf/export?formato=xlsx&tabela=vendas' + (selectedTipo ? '&tipo=' + selectedTipo : '') + (selectedSetor ? '&setor=' + selectedSetor : '')" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <div class="filter-section">

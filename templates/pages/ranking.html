@@ -235,9 +235,19 @@
                 <i data-lucide="git-compare" style="width: 18px; height: 18px;"></i>
             </span>
             Comparativo de Ciclos
-            <span style="font-size: 0.8rem; color: #94a3b8; margin-left: auto;">
+            <span style="font-size: 0.8rem; color: #94a3b8; margin-left: auto; margin-right: 12px;">
                 <span x-text="comparativo.total_ciclos"></span> ciclo(s) selecionado(s)
             </span>
+            <div style="display: flex; gap: 8px;">
+                <a :href="'/api/comparativo/export?formato=csv&' + $store.filters.getQueryString()" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a :href="'/api/comparativo/export?formato=xlsx&' + $store.filters.getQueryString()" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <div class="comparison-grid">
@@ -282,6 +292,16 @@
                 <i data-lucide="trophy" style="width: 18px; height: 18px;"></i>
             </span>
             Top Revendedoras por Valor
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <a :href="'/api/ranking/export?formato=csv&' + $store.filters.getQueryString()" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a :href="'/api/ranking/export?formato=xlsx&' + $store.filters.getQueryString()" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <template x-if="loading">

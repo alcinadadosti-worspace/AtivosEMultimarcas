@@ -316,6 +316,16 @@
                 <i data-lucide="grid-3x3" style="width: 18px; height: 18px;"></i>
             </span>
             Categorias de Produtos
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <a href="/api/categorias/export?formato=csv&tabela=todos" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a href="/api/categorias/export?formato=xlsx&tabela=todos" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <template x-if="loading">
@@ -405,6 +415,16 @@
                 <i data-lucide="calendar" style="width: 18px; height: 18px;"></i>
             </span>
             Categorias por Ciclo
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <a href="/api/categorias/export?formato=csv&tabela=ciclo" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    CSV
+                </a>
+                <a href="/api/categorias/export?formato=xlsx&tabela=ciclo" class="btn btn-secondary btn-sm">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    Excel
+                </a>
+            </div>
         </h3>
 
         <div class="futuristic-table-scroll">

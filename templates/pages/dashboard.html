@@ -75,6 +75,18 @@
     <!-- Futuristic Tables Section -->
     <div class="futuristic-tables-section">
 
+        <!-- Export Buttons -->
+        <div class="export-buttons-row" style="display: flex; gap: 12px; margin-bottom: 16px; justify-content: flex-end;">
+            <a href="/api/dashboard/export?formato=csv&tabela=todos" class="btn btn-secondary btn-sm">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                CSV
+            </a>
+            <a href="/api/dashboard/export?formato=xlsx&tabela=todos" class="btn btn-secondary btn-sm">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                Excel
+            </a>
+        </div>
+
         <!-- Top 10 Setores - Table + Chart Grid -->
         <div class="top-setores-grid">
             <!-- Table -->

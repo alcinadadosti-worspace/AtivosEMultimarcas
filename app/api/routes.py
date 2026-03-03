@@ -70,7 +70,7 @@ from app.services.ranking import (
     calcular_evolucao_revendedora,
     calcular_comparativo_ciclos,
 )
-from app.utils.exporters import exportar_csv, exportar_excel
+from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas
 
 
 # Router for API endpoints
@@ -401,6 +401,76 @@ async def get_dados_setor_ciclo(
     return calcular_dados_setor_ciclo(df_clientes, df_vendas)
 
 
+@api_router.get("/dashboard/export")
+async def export_dashboard(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    tabela: str = Query("todos", pattern="^(top10|resumo|setor_ciclo|todos)$"),
+    session: tuple = Depends(get_user_session),
+):
+    """Export dashboard tables to CSV or Excel."""
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_vendas = session_data.get("df_vendas")
+
+    if df_clientes is None or df_vendas is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    # Get data for each table
+    top10_data = calcular_top_setores_completo(df_clientes, limite=10)
+    resumo_data = calcular_resumo_ciclos(df_clientes, df_vendas)
+    setor_ciclo_data = calcular_dados_setor_ciclo(df_clientes, df_vendas)
+
+    if tabela == "top10":
+        df = pl.DataFrame(top10_data)
+        sheet_name = "Top10Setores"
+        filename = "top10_setores"
+    elif tabela == "resumo":
+        df = pl.DataFrame(resumo_data)
+        sheet_name = "ResumoCiclos"
+        filename = "resumo_ciclos"
+    elif tabela == "setor_ciclo":
+        df = pl.DataFrame(setor_ciclo_data)
+        sheet_name = "DadosSetorCiclo"
+        filename = "dados_setor_ciclo"
+    else:
+        # Export all tables
+        if formato == "xlsx":
+            dataframes = {
+                "Top10Setores": pl.DataFrame(top10_data) if top10_data else pl.DataFrame(),
+                "ResumoCiclos": pl.DataFrame(resumo_data) if resumo_data else pl.DataFrame(),
+                "DadosSetorCiclo": pl.DataFrame(setor_ciclo_data) if setor_ciclo_data else pl.DataFrame(),
+            }
+            content = exportar_multiplas_abas(dataframes)
+            return Response(
+                content=content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename=dashboard_completo.xlsx"}
+            )
+        else:
+            # For CSV, concatenate all data or export largest table
+            df = pl.DataFrame(setor_ciclo_data) if setor_ciclo_data else pl.DataFrame()
+            sheet_name = "Dashboard"
+            filename = "dashboard"
+
+    if df.is_empty():
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado para exportar")
+
+    if formato == "xlsx":
+        content = exportar_excel(df, sheet_name)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{filename}.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = f"{filename}.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 # =============================================================================
 # MULTIMARCAS
 # =============================================================================
@@ -612,6 +682,42 @@ async def get_auditoria(
     return listar_auditoria(df_vendas, motivo=motivo, limite=limite)
 
 
+@api_router.get("/auditoria/export")
+async def export_auditoria(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    motivo: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Export audit records to CSV or Excel."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+
+    if df_vendas is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    auditoria_data = listar_auditoria(df_vendas, motivo=motivo, limite=5000)
+
+    if not auditoria_data:
+        raise HTTPException(status_code=404, detail="Nenhum registro de auditoria encontrado")
+
+    df = pl.DataFrame(auditoria_data)
+
+    if formato == "xlsx":
+        content = exportar_excel(df, "Auditoria")
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "auditoria.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = "auditoria.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @api_router.get("/produtos-novos")
 async def get_produtos_novos(
     limite: int = Query(100, ge=1, le=500),
@@ -725,6 +831,74 @@ async def get_iaf_vendas(
     return listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=limite)
 
 
+@api_router.get("/iaf/export")
+async def export_iaf(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    tabela: str = Query("setor", pattern="^(setor|vendas|todos)$"),
+    tipo: Optional[str] = Query(None),
+    setor: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Export IAF data to CSV or Excel."""
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_iaf = session_data.get("df_iaf")
+
+    if df_clientes is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    if df_iaf is None:
+        df_iaf = pl.DataFrame()
+
+    # Get data
+    setor_data = calcular_iaf_por_setor(df_clientes, df_iaf)
+    vendas_data = listar_vendas_iaf(df_iaf, tipo_iaf=tipo, setor=setor, limite=1000) if not df_iaf.is_empty() else []
+
+    if tabela == "setor":
+        df = pl.DataFrame(setor_data) if setor_data else pl.DataFrame()
+        sheet_name = "IAFPorSetor"
+        filename = "iaf_por_setor"
+    elif tabela == "vendas":
+        df = pl.DataFrame(vendas_data) if vendas_data else pl.DataFrame()
+        sheet_name = "VendasIAF"
+        filename = "vendas_iaf"
+    else:
+        # Export all tables
+        if formato == "xlsx":
+            dataframes = {
+                "IAFPorSetor": pl.DataFrame(setor_data) if setor_data else pl.DataFrame(),
+                "VendasIAF": pl.DataFrame(vendas_data) if vendas_data else pl.DataFrame(),
+            }
+            content = exportar_multiplas_abas(dataframes)
+            return Response(
+                content=content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename=iaf_completo.xlsx"}
+            )
+        else:
+            df = pl.DataFrame(setor_data) if setor_data else pl.DataFrame()
+            sheet_name = "IAF"
+            filename = "iaf"
+
+    if df.is_empty():
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado para exportar")
+
+    if formato == "xlsx":
+        content = exportar_excel(df, sheet_name)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{filename}.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = f"{filename}.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 # =============================================================================
 # CATEGORIAS
 # =============================================================================
@@ -798,6 +972,75 @@ async def get_produtos_categoria(
     return listar_produtos_categoria(df_classificado, categoria, limite=limite)
 
 
+@api_router.get("/categorias/export")
+async def export_categorias(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    tabela: str = Query("metricas", pattern="^(metricas|ciclo|setor|todos)$"),
+    session: tuple = Depends(get_user_session),
+):
+    """Export category data to CSV or Excel."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+
+    if df_vendas is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    df_classificado = classificar_vendas(df_vendas)
+
+    metricas_data = calcular_metricas_categoria(df_classificado)
+    ciclo_data = calcular_categoria_por_ciclo(df_classificado)
+    setor_data = calcular_categoria_por_setor(df_classificado)
+
+    if tabela == "metricas":
+        df = pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame()
+        sheet_name = "MetricasCategorias"
+        filename = "categorias_metricas"
+    elif tabela == "ciclo":
+        df = pl.DataFrame(ciclo_data) if ciclo_data else pl.DataFrame()
+        sheet_name = "CategoriasPorCiclo"
+        filename = "categorias_por_ciclo"
+    elif tabela == "setor":
+        df = pl.DataFrame(setor_data) if setor_data else pl.DataFrame()
+        sheet_name = "CategoriasPorSetor"
+        filename = "categorias_por_setor"
+    else:
+        # Export all tables
+        if formato == "xlsx":
+            dataframes = {
+                "Metricas": pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame(),
+                "PorCiclo": pl.DataFrame(ciclo_data) if ciclo_data else pl.DataFrame(),
+                "PorSetor": pl.DataFrame(setor_data) if setor_data else pl.DataFrame(),
+            }
+            content = exportar_multiplas_abas(dataframes)
+            return Response(
+                content=content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename=categorias_completo.xlsx"}
+            )
+        else:
+            df = pl.DataFrame(metricas_data) if metricas_data else pl.DataFrame()
+            sheet_name = "Categorias"
+            filename = "categorias"
+
+    if df.is_empty():
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado para exportar")
+
+    if formato == "xlsx":
+        content = exportar_excel(df, sheet_name)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{filename}.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = f"{filename}.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 # =============================================================================
 # RANKING DE REVENDEDORAS
 # =============================================================================
@@ -844,6 +1087,56 @@ async def get_evolucao_revendedora(
         return []
 
     return calcular_evolucao_revendedora(df_vendas, codigo)
+
+
+@api_router.get("/ranking/export")
+async def export_ranking(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    limite: int = Query(100, ge=1, le=500),
+    session: tuple = Depends(get_user_session),
+):
+    """Export ranking revendedoras to CSV or Excel."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+
+    if df_vendas is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_filtrado = aplicar_filtros(
+        df_vendas,
+        ciclos=ciclos_list,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+
+    ranking_data = calcular_ranking_revendedoras(df_filtrado, limite=limite)
+
+    if not ranking_data:
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
+
+    df = pl.DataFrame(ranking_data)
+
+    if formato == "xlsx":
+        content = exportar_excel(df, "RankingRevendedoras")
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "ranking_revendedoras.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = "ranking_revendedoras.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # =============================================================================
@@ -894,6 +1187,66 @@ async def get_comparativo_ciclos(
     )
 
     return calcular_comparativo_ciclos(df_clientes_filtrado, df_vendas_filtrado, ciclos_list)
+
+
+@api_router.get("/comparativo/export")
+async def export_comparativo(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    ciclos: Optional[str] = Query(None),
+    setores: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Export cycle comparison to CSV or Excel."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+    df_clientes = session_data.get("df_clientes")
+
+    if df_vendas is None or df_clientes is None:
+        raise HTTPException(status_code=400, detail="Nenhum dado carregado")
+
+    # Get cycles to compare
+    if ciclos:
+        ciclos_list = ciclos.split(",")
+    else:
+        from app.services.venda import obter_ciclos_unicos
+        ciclos_list = obter_ciclos_unicos(df_vendas)
+
+    setores_list = setores.split(",") if setores else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_vendas_filtrado = aplicar_filtros(
+        df_vendas,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+    df_clientes_filtrado = aplicar_filtros(
+        df_clientes,
+        setores=setores_list,
+        gerencias=gerencias_list
+    )
+
+    comparativo = calcular_comparativo_ciclos(df_clientes_filtrado, df_vendas_filtrado, ciclos_list)
+
+    if not comparativo.get("metricas"):
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
+
+    df = pl.DataFrame(comparativo["metricas"])
+
+    if formato == "xlsx":
+        content = exportar_excel(df, "ComparativoCiclos")
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = "comparativo_ciclos.xlsx"
+    else:
+        content = exportar_csv(df)
+        media_type = "text/csv"
+        filename = "comparativo_ciclos.csv"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # =============================================================================
