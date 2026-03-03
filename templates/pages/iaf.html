@@ -303,15 +303,15 @@
 </style>
 
 <div class="page-header">
-    <h1 class="page-title">IAF - Premiacao</h1>
-    <p class="page-subtitle">Penetracao de produtos da premiacao (Cabelos e Make)</p>
+    <h1 class="page-title notranslate" translate="no">IAF</h1>
+    <p class="page-subtitle">Penetracao de produtos <span class="notranslate" translate="no">IAF</span> (Cabelos e Make)</p>
 </div>
 
 <div x-data="iafPage()" x-init="init()">
     <!-- Metrics Cards -->
     <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
         <div class="metric-card">
-            <span class="label">% IAF Cabelos</span>
+            <span class="label notranslate" translate="no">% IAF Cabelos</span>
             <span class="value accent" x-text="formatPercent(metricas?.cabelos?.percentual || 0)"></span>
             <span class="text-secondary text-xs">
                 <span x-text="formatNumber(metricas?.cabelos?.clientes_iaf || 0)"></span> de
@@ -319,7 +319,7 @@
             </span>
         </div>
         <div class="metric-card">
-            <span class="label">% IAF Make</span>
+            <span class="label notranslate" translate="no">% IAF Make</span>
             <span class="value success" x-text="formatPercent(metricas?.make?.percentual || 0)"></span>
             <span class="text-secondary text-xs">
                 <span x-text="formatNumber(metricas?.make?.clientes_iaf || 0)"></span> de
@@ -327,7 +327,7 @@
             </span>
         </div>
         <div class="metric-card">
-            <span class="label">% IAF Total</span>
+            <span class="label notranslate" translate="no">% IAF Total</span>
             <span class="value" x-text="formatPercent(metricas?.total?.percentual || 0)"></span>
             <span class="text-secondary text-xs">
                 <span x-text="formatNumber(metricas?.total?.clientes_iaf || 0)"></span> de
