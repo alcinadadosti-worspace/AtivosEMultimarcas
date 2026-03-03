@@ -191,6 +191,16 @@
                 </div>
                 <h3>Dados por Setor e Ciclo</h3>
                 <div class="table-glow"></div>
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <a href="/api/dashboard/export?formato=csv&tabela=setor_ciclo" class="btn btn-secondary btn-sm">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                        CSV
+                    </a>
+                    <a href="/api/dashboard/export?formato=xlsx&tabela=setor_ciclo" class="btn btn-secondary btn-sm">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                        Excel
+                    </a>
+                </div>
             </div>
             <div class="table-wrapper-futuristic scrollable horizontal-scroll">
                 <table class="futuristic-table compact">
@@ -199,7 +209,7 @@
                             <th style="min-width: 80px;">Ciclo</th>
                             <th style="min-width: 80px;">Setor</th>
                             <th style="min-width: 80px;">Gerencia</th>
-                            <th class="number-col" style="min-width: 80px;">Clientes</th>
+                            <th class="number-col" style="min-width: 100px;">Clientes Ativos</th>
                             <th class="number-col" style="min-width: 90px;">Multimarca</th>
                             <th class="number-col" style="min-width: 70px;">Itens</th>
                             <th class="number-col" style="min-width: 110px;">Valor</th>
