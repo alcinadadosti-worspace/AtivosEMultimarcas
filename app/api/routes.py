@@ -3,15 +3,17 @@ FastAPI routes for Multimarks Analytics.
 """
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 import polars as pl
+from openpyxl import Workbook, load_workbook
 
 from app.api.dependencies import get_db
-from app.config import MARCAS_GRUPO
+from app.config import DATA_DIR, MARCAS_GRUPO, MOTIVO_MATCH_EXATO
 from app.utils.normalizers import normalizar_sku
 from app.api.schemas import (
     UploadResponse,
@@ -79,6 +81,140 @@ api_router = APIRouter(prefix="/api")
 # Cookie configuration
 SESSION_COOKIE_NAME = "multimarks_session"
 SESSION_COOKIE_MAX_AGE = 60 * 60 * 24  # 24 hours
+ESTOQUE_PLANILHA_PATH = DATA_DIR / "estoqueplanilha.xlsx"
+
+
+def _find_header_indexes(header_row: List[Any]) -> Dict[str, int]:
+    """Find SKU, name and brand columns in worksheet header."""
+    indexes: Dict[str, int] = {}
+    for idx, value in enumerate(header_row, start=1):
+        col = str(value or "").strip().lower()
+        if col in ("sku", "codigo", "código", "cod", "codigoproduto") and "sku" not in indexes:
+            indexes["sku"] = idx
+        elif col in ("nome", "nomeproduto", "descricao", "descrição", "produto") and "nome" not in indexes:
+            indexes["nome"] = idx
+        elif col == "marca" and "marca" not in indexes:
+            indexes["marca"] = idx
+    return indexes
+
+
+def _upsert_produtos_na_planilha(produtos: List[Dict[str, str]]) -> None:
+    """
+    Persist products in data/estoqueplanilha.xlsx.
+
+    The spreadsheet is treated as source-of-truth backup so manually saved
+    products are not lost if the SQLite DB is rebuilt later.
+    """
+    path: Path = ESTOQUE_PLANILHA_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if path.exists():
+        wb = load_workbook(path)
+        ws = wb.active
+        header_values = [cell.value for cell in ws[1]]
+        header_idx = _find_header_indexes(header_values)
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "produtos"
+        ws.append(["sku", "nome", "marca"])
+        header_idx = {"sku": 1, "nome": 2, "marca": 3}
+
+    if not {"sku", "nome", "marca"}.issubset(header_idx):
+        raise ValueError("Planilha de estoque sem cabecalho esperado (sku, nome, marca)")
+
+    sku_col = header_idx["sku"]
+    nome_col = header_idx["nome"]
+    marca_col = header_idx["marca"]
+
+    # Build index of existing normalized SKUs in spreadsheet.
+    rows_by_sku_norm: Dict[str, int] = {}
+    for row_idx in range(2, ws.max_row + 1):
+        sku_value = ws.cell(row=row_idx, column=sku_col).value
+        sku_norm = normalizar_sku(sku_value)
+        if sku_norm:
+            rows_by_sku_norm[sku_norm] = row_idx
+
+    for produto in produtos:
+        sku = produto["sku"]
+        nome = produto["nome"]
+        marca = produto["marca"]
+        sku_norm = normalizar_sku(sku)
+        if not sku_norm:
+            continue
+
+        row_idx = rows_by_sku_norm.get(sku_norm)
+        if row_idx is None:
+            row_idx = ws.max_row + 1
+            rows_by_sku_norm[sku_norm] = row_idx
+
+        ws.cell(row=row_idx, column=sku_col, value=sku)
+        ws.cell(row=row_idx, column=nome_col, value=nome.strip())
+        ws.cell(row=row_idx, column=marca_col, value=marca)
+
+    wb.save(path)
+
+
+def _atualizar_sessao_com_produtos_cadastrados(
+    session_id: str,
+    session_data: Dict[str, Any],
+    produtos: List[Dict[str, str]],
+) -> int:
+    """
+    Update current session data so newly registered products are recognized immediately.
+
+    Returns:
+        Number of rows updated in df_vendas.
+    """
+    df_vendas = session_data.get("df_vendas")
+    if df_vendas is None or df_vendas.is_empty() or not produtos:
+        return 0
+
+    sku_para_marca: Dict[str, str] = {}
+    sku_para_nome: Dict[str, str] = {}
+    for p in produtos:
+        sku_norm = normalizar_sku(p.get("sku"))
+        if not sku_norm:
+            continue
+        sku_para_marca[sku_norm] = p.get("marca", "")
+        sku_para_nome[sku_norm] = p.get("nome", "")
+
+    if not sku_para_marca:
+        return 0
+
+    skus_norm = list(sku_para_marca.keys())
+    mapa_marca = pl.DataFrame({
+        "CodigoProduto_normalizado": skus_norm,
+        "_marca_nova": [sku_para_marca[s] for s in skus_norm],
+        "_nome_novo": [sku_para_nome[s] for s in skus_norm],
+    })
+
+    df_join = df_vendas.join(mapa_marca, on="CodigoProduto_normalizado", how="left")
+    df_vendas_atualizado = df_join.with_columns([
+        pl.when(pl.col("_marca_nova").is_not_null())
+          .then(pl.col("_marca_nova"))
+          .otherwise(pl.col("Marca_BD"))
+          .alias("Marca_BD"),
+        pl.when(pl.col("_nome_novo").is_not_null())
+          .then(pl.col("_nome_novo"))
+          .otherwise(pl.col("Nome_BD"))
+          .alias("Nome_BD"),
+        pl.when(pl.col("_marca_nova").is_not_null())
+          .then(pl.lit(MOTIVO_MATCH_EXATO))
+          .otherwise(pl.col("Motivo_Match"))
+          .alias("Motivo_Match"),
+    ]).drop(["_marca_nova", "_nome_novo"])
+
+    linhas_atualizadas = len(
+        df_vendas.filter(pl.col("CodigoProduto_normalizado").is_in(skus_norm))
+    )
+
+    # Keep session metrics consistent with the updated brand matches.
+    df_clientes_atualizado = calcular_metricas_cliente(df_vendas_atualizado)
+    set_session_value(session_id, "df_vendas", df_vendas_atualizado)
+    set_session_value(session_id, "df_clientes", df_clientes_atualizado)
+
+    return linhas_atualizadas
 
 
 def get_user_session(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
@@ -1448,6 +1584,7 @@ async def cadastrar_produto(
     nome: str = Form(...),
     marca: str = Form(...),
     conn: sqlite3.Connection = Depends(get_db),
+    session: tuple = Depends(get_user_session),
 ):
     """
     Register a new product in the database.
@@ -1486,6 +1623,8 @@ async def cadastrar_produto(
 
     # Insert product
     try:
+        session_id, session_data = session
+
         cursor.execute(
             """
             INSERT INTO produtos (sku, sku_normalizado, nome, marca)
@@ -1493,7 +1632,17 @@ async def cadastrar_produto(
             """,
             (sku, sku_normalizado, nome.strip(), marca)
         )
+        _upsert_produtos_na_planilha([{
+            "sku": sku,
+            "nome": nome.strip(),
+            "marca": marca,
+        }])
         conn.commit()
+        linhas_sessao_atualizadas = _atualizar_sessao_com_produtos_cadastrados(
+            session_id,
+            session_data,
+            [{"sku": sku, "nome": nome.strip(), "marca": marca}],
+        )
 
         return {
             "success": True,
@@ -1503,9 +1652,12 @@ async def cadastrar_produto(
                 "sku_normalizado": sku_normalizado,
                 "nome": nome.strip(),
                 "marca": marca
-            }
+            },
+            "sessao_atualizada": linhas_sessao_atualizadas > 0,
+            "linhas_sessao_atualizadas": linhas_sessao_atualizadas,
         }
     except Exception as e:
+        conn.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao cadastrar: {str(e)}")
 
 
@@ -1513,6 +1665,7 @@ async def cadastrar_produto(
 async def cadastrar_produtos_lote(
     produtos: List[Dict[str, str]],
     conn: sqlite3.Connection = Depends(get_db),
+    session: tuple = Depends(get_user_session),
 ):
     """
     Register multiple products at once.
@@ -1526,6 +1679,8 @@ async def cadastrar_produtos_lote(
     cursor = conn.cursor()
     cadastrados = 0
     erros = []
+
+    produtos_para_planilha: List[Dict[str, str]] = []
 
     for p in produtos:
         sku = p.get("sku", "")
@@ -1559,14 +1714,33 @@ async def cadastrar_produtos_lote(
                 (sku, sku_normalizado, nome.strip(), marca)
             )
             cadastrados += 1
+            produtos_para_planilha.append({
+                "sku": sku,
+                "nome": nome.strip(),
+                "marca": marca,
+            })
         except Exception as e:
             erros.append(f"SKU {sku}: {str(e)}")
 
-    conn.commit()
+    try:
+        if produtos_para_planilha:
+            _upsert_produtos_na_planilha(produtos_para_planilha)
+        conn.commit()
+        session_id, session_data = session
+        linhas_sessao_atualizadas = _atualizar_sessao_com_produtos_cadastrados(
+            session_id,
+            session_data,
+            produtos_para_planilha,
+        )
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar lote na planilha BD: {str(e)}")
 
     return {
         "success": True,
         "cadastrados": cadastrados,
         "erros": erros,
-        "total_erros": len(erros)
+        "total_erros": len(erros),
+        "sessao_atualizada": linhas_sessao_atualizadas > 0,
+        "linhas_sessao_atualizadas": linhas_sessao_atualizadas,
     }
