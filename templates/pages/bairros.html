@@ -310,19 +310,13 @@
                                 <tr x-show="expandidoKey === b.bairro+'|'+b.cidade" style="background:rgba(10,10,25,.6);">
                                     <td colspan="7" class="accordion-panel" style="padding:0;">
 
-                                        <!-- Loading -->
-                                        <div x-show="expandidoLoading" style="padding:24px; text-align:center; color:var(--text-muted);">
-                                            <span class="loading-spinner" style="border-top-color:#a78bfa;"></span>
-                                            <span style="margin-left:8px; font-size:.85rem;">Carregando...</span>
-                                        </div>
+                                        <div class="accordion-inner">
 
-                                        <div x-show="!expandidoLoading && expandidoDetalhe" class="accordion-inner">
-
-                                            <!-- Ruas -->
+                                            <!-- Ruas (pre-loaded, instant) -->
                                             <p class="accordion-subtitle">
                                                 <i data-lucide="navigation" style="width:13px;height:13px;"></i>
                                                 Ruas do bairro
-                                                <span x-text="'(' + (expandidoDetalhe?.ruas?.length || 0) + ' ruas)'"
+                                                <span x-text="'(' + (b.ruas?.length || 0) + ' ruas)'"
                                                       style="font-weight:400; color:var(--text-muted);"></span>
                                             </p>
                                             <div style="overflow-x:auto; margin-bottom:24px;">
@@ -336,10 +330,10 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        <template x-if="!expandidoDetalhe?.ruas?.length">
-                                                            <tr><td colspan="4" class="empty-msg" style="padding:16px;">Sem dados de rua.</td></tr>
+                                                        <template x-if="!b.ruas?.length">
+                                                            <tr><td colspan="4" class="empty-msg" style="padding:14px;">Sem dados de rua.</td></tr>
                                                         </template>
-                                                        <template x-for="r in (expandidoDetalhe?.ruas || [])" :key="r.rua">
+                                                        <template x-for="r in (b.ruas || [])" :key="r.rua">
                                                             <tr>
                                                                 <td x-text="r.rua" style="font-size:.82rem;"></td>
                                                                 <td class="num-cell" x-text="r.total"></td>
@@ -351,17 +345,26 @@
                                                 </table>
                                             </div>
 
-                                            <!-- Clientes -->
+                                            <!-- Clientes (lazy, cached after first load) -->
                                             <p class="accordion-subtitle">
                                                 <i data-lucide="user" style="width:13px;height:13px;"></i>
                                                 Clientes do bairro
-                                                <span x-text="'(' + (expandidoDetalhe?.clientes?.length || 0) + ' clientes)'"
-                                                      style="font-weight:400; color:var(--text-muted);"></span>
+                                                <template x-if="expandidoClientes !== null">
+                                                    <span x-text="'(' + expandidoClientes.length + ' clientes)'"
+                                                          style="font-weight:400; color:var(--text-muted);"></span>
+                                                </template>
                                                 <a :href="exportClientesBairro(b)" class="btn-sm" style="margin-left:auto;">
                                                     <i data-lucide="download" style="width:11px;height:11px;"></i>Exportar
                                                 </a>
                                             </p>
-                                            <div style="overflow-x:auto;">
+
+                                            <!-- Clients loading spinner -->
+                                            <div x-show="expandidoLoading" style="padding:16px; text-align:center; color:var(--text-muted); font-size:.84rem;">
+                                                <span class="loading-spinner" style="border-top-color:#a78bfa;"></span>
+                                                <span style="margin-left:8px;">Carregando clientes...</span>
+                                            </div>
+
+                                            <div x-show="!expandidoLoading" style="overflow-x:auto;">
                                                 <table class="accordion-table">
                                                     <thead>
                                                         <tr>
@@ -375,10 +378,10 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        <template x-if="!expandidoDetalhe?.clientes?.length">
-                                                            <tr><td colspan="7" class="empty-msg" style="padding:16px;">Nenhum cliente.</td></tr>
+                                                        <template x-if="!expandidoClientes?.length && !expandidoLoading">
+                                                            <tr><td colspan="7" class="empty-msg" style="padding:14px;">Nenhum cliente.</td></tr>
                                                         </template>
-                                                        <template x-for="c in (expandidoDetalhe?.clientes || [])" :key="c.cpf + c.nome">
+                                                        <template x-for="c in (expandidoClientes || [])" :key="c.cpf + c.nome">
                                                             <tr>
                                                                 <td x-text="c.nome" style="font-weight:500; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.81rem;"></td>
                                                                 <td x-text="c.rua" style="color:var(--text-muted); font-size:.79rem; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></td>
@@ -448,8 +451,9 @@ function bairrosPage() {
 
         // Accordion
         expandidoKey: '',
-        expandidoDetalhe: null,
+        expandidoClientes: null,   // clients for the open bairro
         expandidoLoading: false,
+        _clientesCache: {},        // key -> clientes[] — avoids re-fetching
 
         // Filters
         filtros: { unidade: '', situacao: '', cidade: '' },
@@ -543,9 +547,10 @@ function bairrosPage() {
                 const res = await fetch('/api/geo/bairros?' + this._buildParams());
                 const data = await res.json();
                 this.bairros = data.bairros || [];
-                // Close accordion when data reloads
+                // Streets are already embedded — clear accordion & cache
                 this.expandidoKey = '';
-                this.expandidoDetalhe = null;
+                this.expandidoClientes = null;
+                this._clientesCache = {};
             } catch (e) { console.error(e); }
         },
 
@@ -587,20 +592,35 @@ function bairrosPage() {
         // ── Accordion ────────────────────────────────────────────────
         async toggleExpand(b) {
             const key = b.bairro + '|' + b.cidade;
+
+            // Close if already open
             if (this.expandidoKey === key) {
                 this.expandidoKey = '';
-                this.expandidoDetalhe = null;
+                this.expandidoClientes = null;
                 return;
             }
+
+            // Streets are pre-loaded in b.ruas — open immediately
             this.expandidoKey = key;
-            this.expandidoDetalhe = null;
+            this.expandidoClientes = null;
+
+            // Return cached clients if available
+            if (this._clientesCache[key]) {
+                this.expandidoClientes = this._clientesCache[key];
+                this.$nextTick(() => lucide.createIcons());
+                return;
+            }
+
+            // Fetch clients asynchronously (streets already visible)
             this.expandidoLoading = true;
             try {
                 const params = new URLSearchParams({ bairro: b.bairro });
                 if (this.filtros.unidade)  params.set('unidade',  this.filtros.unidade);
                 if (this.filtros.situacao) params.set('situacao', this.filtros.situacao);
-                const res = await fetch('/api/geo/bairro/detalhe?' + params);
-                this.expandidoDetalhe = await res.json();
+                const res = await fetch('/api/geo/clientes?' + params + '&ordenar_por=ciclos_desc&limite=300');
+                const data = await res.json();
+                this.expandidoClientes = data.clientes || [];
+                this._clientesCache[key] = this.expandidoClientes;
             } catch (e) { console.error(e); }
             finally {
                 this.expandidoLoading = false;

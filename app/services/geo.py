@@ -138,9 +138,15 @@ def calcular_metricas_bairro(
     cidade: Optional[str] = None,
     situacao: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Aggregate client metrics grouped by neighborhood."""
+    """
+    Aggregate client metrics grouped by neighborhood.
+
+    Each bairro item includes a pre-computed 'ruas' list so the frontend can
+    show street-level detail instantly without a second API call.
+    """
     df = _aplicar_filtros(df, unidade=unidade, cidade=cidade, situacao=situacao)
 
+    # ── Bairro-level aggregation ──────────────────────────────────────────────
     result = (
         df.group_by([GEO_COL_BAIRRO_RESID, GEO_COL_CIDADE_RESID])
         .agg(
@@ -157,6 +163,33 @@ def calcular_metricas_bairro(
         .sort("total", descending=True)
     )
 
+    # ── Street-level aggregation (single query for all bairros) ───────────────
+    ruas_index: Dict[str, List[Dict[str, Any]]] = {}
+    if GEO_COL_RUA_RESID in df.columns:
+        ruas_df = (
+            df.group_by([GEO_COL_BAIRRO_RESID, GEO_COL_RUA_RESID])
+            .agg(
+                [
+                    pl.len().alias("total"),
+                    pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO").sum().alias("ativos"),
+                ]
+            )
+            .with_columns((pl.col("total") - pl.col("ativos")).alias("inativos"))
+            .sort("total", descending=True)
+        )
+        for row in ruas_df.iter_rows(named=True):
+            key = row[GEO_COL_BAIRRO_RESID] or "Não informado"
+            if key not in ruas_index:
+                ruas_index[key] = []
+            ruas_index[key].append(
+                {
+                    "rua": row[GEO_COL_RUA_RESID] or "Não informado",
+                    "total": int(row["total"]),
+                    "ativos": int(row["ativos"]),
+                    "inativos": int(row["inativos"]),
+                }
+            )
+
     return [
         {
             "bairro": row[GEO_COL_BAIRRO_RESID] or "Não informado",
@@ -165,6 +198,7 @@ def calcular_metricas_bairro(
             "ativos": int(row["ativos"]),
             "inativos": int(row["inativos"]),
             "media_ciclos_inativos": round(row["media_ciclos_inativos"] or 0.0, 1),
+            "ruas": ruas_index.get(row[GEO_COL_BAIRRO_RESID] or "Não informado", []),
         }
         for row in result.iter_rows(named=True)
     ]
