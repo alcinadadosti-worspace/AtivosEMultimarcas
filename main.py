@@ -96,7 +96,7 @@ def get_user_has_data(session_id: str = Cookie(None, alias=SESSION_COOKIE_NAME))
 @app.get("/", response_class=HTMLResponse)
 async def page_home(request: Request):
     """Home page - redirects to dashboard."""
-    return templates.TemplateResponse(request, {"page": "dashboard"}, name="pages/dashboard.html")
+    return templates.TemplateResponse(name="pages/dashboard.html", context={"request": request, "page": "dashboard"})
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -105,7 +105,7 @@ async def page_dashboard(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Dashboard page with overview metrics."""
-    return templates.TemplateResponse(request, {"page": "dashboard", "has_data": has_data}, name="pages/dashboard.html")
+    return templates.TemplateResponse(name="pages/dashboard.html", context={"request": request, "page": "dashboard", "has_data": has_data})
 
 
 @app.get("/multimarcas", response_class=HTMLResponse)
@@ -114,7 +114,7 @@ async def page_multimarcas(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Multi-brand customers page."""
-    return templates.TemplateResponse(request, {"page": "multimarcas", "has_data": has_data}, name="pages/multimarcas.html")
+    return templates.TemplateResponse(name="pages/multimarcas.html", context={"request": request, "page": "multimarcas", "has_data": has_data})
 
 
 @app.get("/produtos-novos", response_class=HTMLResponse)
@@ -123,7 +123,7 @@ async def page_produtos_novos(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Unregistered products page."""
-    return templates.TemplateResponse(request, {"page": "produtos_novos", "has_data": has_data}, name="pages/produtos_novos.html")
+    return templates.TemplateResponse(name="pages/produtos_novos.html", context={"request": request, "page": "produtos_novos", "has_data": has_data})
 
 
 @app.get("/auditoria", response_class=HTMLResponse)
@@ -132,7 +132,7 @@ async def page_auditoria(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Audit page for SKU matching issues."""
-    return templates.TemplateResponse(request, {"page": "auditoria", "has_data": has_data}, name="pages/auditoria.html")
+    return templates.TemplateResponse(name="pages/auditoria.html", context={"request": request, "page": "auditoria", "has_data": has_data})
 
 
 @app.get("/cliente", response_class=HTMLResponse)
@@ -141,7 +141,7 @@ async def page_cliente(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Customer detail page."""
-    return templates.TemplateResponse(request, {"page": "cliente", "has_data": has_data}, name="pages/cliente.html")
+    return templates.TemplateResponse(name="pages/cliente.html", context={"request": request, "page": "cliente", "has_data": has_data})
 
 
 @app.get("/iaf", response_class=HTMLResponse)
@@ -150,7 +150,7 @@ async def page_iaf(
     has_data: bool = Depends(get_user_has_data),
 ):
     """IAF premium tracking page."""
-    return templates.TemplateResponse(request, {"page": "iaf", "has_data": has_data}, name="pages/iaf.html")
+    return templates.TemplateResponse(name="pages/iaf.html", context={"request": request, "page": "iaf", "has_data": has_data})
 
 
 @app.get("/categorias", response_class=HTMLResponse)
@@ -159,7 +159,7 @@ async def page_categorias(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Category analytics page."""
-    return templates.TemplateResponse(request, {"page": "categorias", "has_data": has_data}, name="pages/categorias.html")
+    return templates.TemplateResponse(name="pages/categorias.html", context={"request": request, "page": "categorias", "has_data": has_data})
 
 
 @app.get("/ranking", response_class=HTMLResponse)
@@ -168,7 +168,7 @@ async def page_ranking(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Reseller ranking and comparison page."""
-    return templates.TemplateResponse(request, {"page": "ranking", "has_data": has_data}, name="pages/ranking.html")
+    return templates.TemplateResponse(name="pages/ranking.html", context={"request": request, "page": "ranking", "has_data": has_data})
 
 
 # =============================================================================
