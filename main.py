@@ -70,6 +70,7 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 # Templates
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.cache = None  # Disable cache to avoid unhashable dict key bug in Jinja2
 
 # Add custom filters to Jinja2
 templates.env.filters["moeda"] = formatar_moeda
