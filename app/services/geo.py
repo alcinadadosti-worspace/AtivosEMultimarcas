@@ -163,33 +163,6 @@ def calcular_metricas_bairro(
         .sort("total", descending=True)
     )
 
-    # ── Street-level aggregation (single query for all bairros) ───────────────
-    ruas_index: Dict[str, List[Dict[str, Any]]] = {}
-    if GEO_COL_RUA_RESID in df.columns:
-        ruas_df = (
-            df.group_by([GEO_COL_BAIRRO_RESID, GEO_COL_RUA_RESID])
-            .agg(
-                [
-                    pl.len().alias("total"),
-                    pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO").sum().alias("ativos"),
-                ]
-            )
-            .with_columns((pl.col("total") - pl.col("ativos")).alias("inativos"))
-            .sort("total", descending=True)
-        )
-        for row in ruas_df.iter_rows(named=True):
-            key = row[GEO_COL_BAIRRO_RESID] or "Não informado"
-            if key not in ruas_index:
-                ruas_index[key] = []
-            ruas_index[key].append(
-                {
-                    "rua": row[GEO_COL_RUA_RESID] or "Não informado",
-                    "total": int(row["total"]),
-                    "ativos": int(row["ativos"]),
-                    "inativos": int(row["inativos"]),
-                }
-            )
-
     return [
         {
             "bairro": row[GEO_COL_BAIRRO_RESID] or "Não informado",
@@ -198,7 +171,6 @@ def calcular_metricas_bairro(
             "ativos": int(row["ativos"]),
             "inativos": int(row["inativos"]),
             "media_ciclos_inativos": round(row["media_ciclos_inativos"] or 0.0, 1),
-            "ruas": ruas_index.get(row[GEO_COL_BAIRRO_RESID] or "Não informado", []),
         }
         for row in result.iter_rows(named=True)
     ]
@@ -247,8 +219,8 @@ def calcular_detalhe_bairro(
             for row in ruas_df.iter_rows(named=True)
         ]
 
-    # Individual clients sorted by inactivity cycles desc
-    df_sorted = df.sort(GEO_COL_CICLOS_INATIVIDADE, descending=True)
+    # Individual clients sorted by inactivity cycles desc (capped at 150)
+    df_sorted = df.sort(GEO_COL_CICLOS_INATIVIDADE, descending=True).head(150)
     clientes = [
         {
             "nome": row.get(GEO_COL_NOME, ""),
