@@ -1,7 +1,13 @@
 """
 FastAPI routes for Multimarks Analytics.
 """
+import base64
+import json as _json
+import os
 import sqlite3
+import threading
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -153,6 +159,70 @@ def _upsert_produtos_na_planilha(produtos: List[Dict[str, str]]) -> None:
         ws.cell(row=row_idx, column=marca_col, value=marca)
 
     wb.save(path)
+
+
+def _backup_para_github() -> None:
+    """
+    Push estoqueplanilha.xlsx to GitHub via Contents API so it survives Render deploys.
+
+    Requires env vars:
+      GITHUB_TOKEN  — personal access token with repo write access
+      GITHUB_REPO   — owner/repo (e.g. "usuario/meu-repo")
+      GITHUB_BRANCH — branch to commit to (default: "main")
+      GITHUB_ESTOQUE_PATH — path of the file inside the repo (default: "data/estoqueplanilha.xlsx")
+
+    Silent no-op when env vars are missing or on any error.
+    """
+    token = os.environ.get("GITHUB_TOKEN", "")
+    repo = os.environ.get("GITHUB_REPO", "")
+    branch = os.environ.get("GITHUB_BRANCH", "main")
+    file_path_in_repo = os.environ.get("GITHUB_ESTOQUE_PATH", "data/estoqueplanilha.xlsx")
+
+    if not token or not repo:
+        return
+
+    path = ESTOQUE_PLANILHA_PATH
+    if not path.exists():
+        return
+
+    try:
+        with open(path, "rb") as f:
+            content_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        api_url = f"https://api.github.com/repos/{repo}/contents/{file_path_in_repo}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+        }
+
+        # Get current SHA (required for updates)
+        sha = None
+        try:
+            req = urllib.request.Request(api_url, headers=headers)
+            with urllib.request.urlopen(req) as resp:
+                sha = _json.loads(resp.read()).get("sha")
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                return  # unexpected error, abort
+
+        body: Dict[str, str] = {
+            "message": "backup: atualizar estoqueplanilha.xlsx",
+            "content": content_b64,
+            "branch": branch,
+        }
+        if sha:
+            body["sha"] = sha
+
+        req = urllib.request.Request(
+            api_url,
+            data=_json.dumps(body).encode("utf-8"),
+            headers=headers,
+            method="PUT",
+        )
+        urllib.request.urlopen(req)
+    except Exception:
+        pass  # fire-and-forget — never break the user flow
 
 
 def _atualizar_sessao_com_produtos_cadastrados(
@@ -1637,6 +1707,7 @@ async def cadastrar_produto(
             "nome": nome.strip(),
             "marca": marca,
         }])
+        threading.Thread(target=_backup_para_github, daemon=True).start()
         conn.commit()
         linhas_sessao_atualizadas = _atualizar_sessao_com_produtos_cadastrados(
             session_id,
@@ -1725,6 +1796,7 @@ async def cadastrar_produtos_lote(
     try:
         if produtos_para_planilha:
             _upsert_produtos_na_planilha(produtos_para_planilha)
+            threading.Thread(target=_backup_para_github, daemon=True).start()
         conn.commit()
         session_id, session_data = session
         linhas_sessao_atualizadas = _atualizar_sessao_com_produtos_cadastrados(
