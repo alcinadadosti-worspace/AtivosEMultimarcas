@@ -79,6 +79,14 @@ from app.services.ranking import (
     calcular_comparativo_ciclos,
 )
 from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas
+from app.services.geo import (
+    processar_planilha_clientes,
+    calcular_metricas_bairro,
+    calcular_metricas_cidade,
+    listar_clientes_geo,
+    obter_cidades_geo,
+    obter_bairros_geo,
+)
 
 
 # Router for API endpoints
@@ -1816,3 +1824,232 @@ async def cadastrar_produtos_lote(
         "sessao_atualizada": linhas_sessao_atualizadas > 0,
         "linhas_sessao_atualizadas": linhas_sessao_atualizadas,
     }
+
+
+# =============================================================================
+# GEOGRAPHIC ANALYSIS – UPLOAD
+# =============================================================================
+
+@api_router.post("/upload-clientes")
+async def upload_clientes(
+    file: UploadFile = File(...),
+    session: tuple = Depends(get_user_session),
+):
+    """
+    Upload and process the clients spreadsheet for geographic analysis.
+
+    Stores the processed DataFrame in the session as 'df_geo'.
+    Does NOT clear the existing vendas session data.
+    """
+    session_id, _ = session
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
+
+    if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Formato inválido. Use CSV ou Excel (.xlsx, .xls)",
+        )
+
+    try:
+        content = await file.read()
+        resultado = processar_planilha_clientes(content, file.filename)
+        set_session_value(session_id, "df_geo", resultado["df"])
+        set_session_value(session_id, "df_geo_stats", resultado["estatisticas"])
+
+        response_data = {
+            "success": True,
+            "message": "Planilha de clientes processada com sucesso",
+            "estatisticas": resultado["estatisticas"],
+            "avisos": resultado["avisos"],
+        }
+        return create_response_with_session(response_data, session_id)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
+
+
+# =============================================================================
+# GEOGRAPHIC ANALYSIS – ENDPOINTS
+# =============================================================================
+
+@api_router.get("/geo/status")
+async def geo_status(session: tuple = Depends(get_user_session)):
+    """Check whether the clients geographic spreadsheet has been loaded."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    stats = session_data.get("df_geo_stats") or {}
+    return {
+        "has_data": df_geo is not None and len(df_geo) > 0,
+        "estatisticas": stats,
+    }
+
+
+@api_router.get("/geo/bairros")
+async def get_geo_bairros(
+    unidade: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Return client metrics grouped by neighborhood."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        return {"bairros": []}
+    return {
+        "bairros": calcular_metricas_bairro(
+            df_geo,
+            unidade=unidade or None,
+            cidade=cidade or None,
+            situacao=situacao or None,
+        )
+    }
+
+
+@api_router.get("/geo/cidades")
+async def get_geo_cidades(
+    unidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Return client counts per city (used to color the heat map)."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        return {"cidades": []}
+    return {
+        "cidades": calcular_metricas_cidade(df_geo, unidade=unidade or None)
+    }
+
+
+@api_router.get("/geo/clientes")
+async def get_geo_clientes(
+    unidade: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    bairro: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
+    ordenar_por: str = Query("ciclos_desc"),
+    session: tuple = Depends(get_user_session),
+):
+    """Return individual clients with geographic and inactivity data."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        return {"clientes": []}
+    return {
+        "clientes": listar_clientes_geo(
+            df_geo,
+            unidade=unidade or None,
+            cidade=cidade or None,
+            bairro=bairro or None,
+            situacao=situacao or None,
+            ordenar_por=ordenar_por,
+        )
+    }
+
+
+@api_router.get("/geo/filtros")
+async def get_geo_filtros(
+    unidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Return available cities and neighborhoods for filter dropdowns."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        return {"cidades": [], "bairros": []}
+
+    from app.services.geo import _aplicar_filtros
+    df_filtered = _aplicar_filtros(df_geo, unidade=unidade or None)
+    return {
+        "cidades": obter_cidades_geo(df_filtered),
+        "bairros": obter_bairros_geo(df_filtered),
+    }
+
+
+@api_router.get("/geo/export/bairros")
+async def export_geo_bairros(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    unidade: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Export neighborhood analysis as CSV or Excel."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        raise HTTPException(status_code=400, detail="Sem dados para exportar")
+
+    rows = calcular_metricas_bairro(
+        df_geo,
+        unidade=unidade or None,
+        cidade=cidade or None,
+        situacao=situacao or None,
+    )
+    df_export = pl.DataFrame(rows)
+
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=analise_bairros.csv"},
+        )
+    else:
+        return Response(
+            content=exportar_excel(df_export, "Bairros"),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=analise_bairros.xlsx"},
+        )
+
+
+@api_router.post("/geo/clear")
+async def clear_geo(session: tuple = Depends(get_user_session)):
+    """Remove the geographic clients data from the session."""
+    session_id, _ = session
+    set_session_value(session_id, "df_geo", None)
+    set_session_value(session_id, "df_geo_stats", None)
+    return create_response_with_session({"success": True}, session_id)
+
+
+@api_router.get("/geo/export/clientes")
+async def export_geo_clientes(
+    formato: str = Query("csv", pattern="^(csv|xlsx)$"),
+    unidade: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    bairro: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Export clients list as CSV or Excel."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        raise HTTPException(status_code=400, detail="Sem dados para exportar")
+
+    rows = listar_clientes_geo(
+        df_geo,
+        unidade=unidade or None,
+        cidade=cidade or None,
+        bairro=bairro or None,
+        situacao=situacao or None,
+        ordenar_por="ciclos_desc",
+        limite=10000,
+    )
+    df_export = pl.DataFrame(rows)
+
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=clientes_geografico.csv"},
+        )
+    else:
+        return Response(
+            content=exportar_excel(df_export, "Clientes"),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=clientes_geografico.xlsx"},
+        )

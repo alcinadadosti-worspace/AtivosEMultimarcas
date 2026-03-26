@@ -89,3 +89,34 @@ MARCA_ALIASES = {
 MARCAS_GRUPO = ["oBoticário", "Eudora", "Quem Disse Berenice", "O.U.I", "AuAmigos"]
 
 MARCA_DESCONHECIDA = "DESCONHECIDA"
+
+# =============================================================================
+# GEOGRAPHIC / CLIENTS SPREADSHEET COLUMNS
+# =============================================================================
+GEO_COL_NOME = "Nome"
+GEO_COL_CPF = "CPF/CNPJ"
+GEO_COL_SITUACAO = "Situacao"
+GEO_COL_CICLOS_INATIVIDADE = "CiclosInatividade"
+GEO_COL_PAPEL = "Papel"
+GEO_COL_COD_ESTRUTURA = "CodigoEstruturaComercial"
+GEO_COL_ESTRUTURA = "EstruturaComercial"
+GEO_COL_COD_ESTRUTURA_PAI = "CodigoEstruturaComercialPai"
+GEO_COL_TELEFONE = "TelCelular"
+GEO_COL_RUA_RESID = "RuaResidencial"
+GEO_COL_CEP_RESID = "CEPResidencial"
+GEO_COL_BAIRRO_RESID = "BairroResidencial"
+GEO_COL_CIDADE_RESID = "CidadeResidencial"
+GEO_COL_RUA_ENTREGA = "RuaEntrega"
+GEO_COL_BAIRRO_ENTREGA = "BairroEntrega"
+GEO_COL_CIDADE_ENTREGA = "CidadeEntrega"
+GEO_COL_ESTADO_ENTREGA = "EstadoEntrega"
+
+GEO_REQUIRED_COLUMNS = [
+    GEO_COL_NOME,
+    GEO_COL_SITUACAO,
+    GEO_COL_BAIRRO_RESID,
+    GEO_COL_CIDADE_RESID,
+]
+
+GEO_UNIDADE_MATRIZ = "1048"   # Unidade Matriz Penedo
+GEO_UNIDADE_FILIAL = "1515"   # Filial Palmeira dos Índios

@@ -1,0 +1,932 @@
+{% extends "base.html" %}
+
+{% block title %}Bairros — Multimarks Analytics{% endblock %}
+
+{% block head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+/* ── Page layout ─────────────────────────────────────── */
+.page-header {
+    margin-bottom: 28px;
+}
+.page-header h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+}
+.page-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* ── Upload card ─────────────────────────────────────── */
+.upload-card {
+    background: linear-gradient(145deg, rgba(40,40,55,0.9), rgba(25,25,40,0.95));
+    border: 2px dashed rgba(139,92,246,0.4);
+    border-radius: 16px;
+    padding: 48px 32px;
+    text-align: center;
+    max-width: 560px;
+    margin: 40px auto;
+    transition: border-color 0.2s;
+}
+.upload-card:hover { border-color: rgba(139,92,246,0.7); }
+.upload-card .upload-icon {
+    width: 64px;
+    height: 64px;
+    background: rgba(139,92,246,0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    color: #a78bfa;
+}
+.upload-card h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 8px; }
+.upload-card p  { color: var(--text-muted); font-size: 0.87rem; margin: 0 0 24px; }
+.upload-input-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(139,92,246,0.15);
+    border: 1px solid rgba(139,92,246,0.4);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #a78bfa;
+    transition: background 0.2s;
+}
+.file-label:hover { background: rgba(139,92,246,0.25); }
+.file-name-display {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.upload-progress {
+    margin-top: 16px;
+    font-size: 0.85rem;
+    color: #a78bfa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.upload-avisos {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #fbbf24;
+    text-align: left;
+}
+
+/* ── Summary stats ───────────────────────────────────── */
+.geo-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.geo-stat {
+    background: linear-gradient(145deg, rgba(40,40,55,0.9), rgba(25,25,40,0.95));
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 12px;
+    padding: 18px 20px;
+    text-align: center;
+}
+.geo-stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #a78bfa;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+.geo-stat-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Filters ─────────────────────────────────────────── */
+.geo-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+    background: rgba(25,25,40,0.7);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 14px 16px;
+    align-items: center;
+}
+.geo-filters select,
+.geo-filters input[type="text"] {
+    background: rgba(15,15,30,0.8);
+    border: 1px solid rgba(139,92,246,0.3);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    min-width: 180px;
+}
+.geo-filters select:focus,
+.geo-filters input[type="text"]:focus {
+    outline: none;
+    border-color: rgba(139,92,246,0.7);
+}
+.geo-filters label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+.filter-group { display: flex; align-items: center; gap: 6px; }
+
+/* ── Map container ───────────────────────────────────── */
+.map-section {
+    background: linear-gradient(145deg, rgba(40,40,55,0.9), rgba(25,25,40,0.95));
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+.map-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(139,92,246,0.15);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+#mapa-alagoas {
+    height: 440px;
+    background: #0f0f1e;
+}
+.map-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(139,92,246,0.1);
+}
+.legend-bar {
+    height: 10px;
+    width: 140px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #1a1a3e, #4c1d95, #7c3aed, #a78bfa);
+}
+
+/* ── Tables ──────────────────────────────────────────── */
+.futuristic-section {
+    background: linear-gradient(145deg, rgba(40,40,55,0.9), rgba(25,25,40,0.95));
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+.futuristic-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(139,92,246,0.15);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+}
+.futuristic-table-scroll { overflow-x: auto; }
+.futuristic-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.futuristic-table th {
+    padding: 12px 16px;
+    text-align: left;
+    background: rgba(15,15,30,0.5);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(139,92,246,0.15);
+    white-space: nowrap;
+}
+.futuristic-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid rgba(139,92,246,0.07);
+    color: var(--text-primary);
+}
+.futuristic-table tr:hover td { background: rgba(139,92,246,0.06); cursor: pointer; }
+.futuristic-table tr.selected-row td { background: rgba(139,92,246,0.15); }
+.num-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.badge-ativo   { background: rgba(34,197,94,0.2);  color:#4ade80; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:600; }
+.badge-inativo { background: rgba(239,68,68,0.15); color:#f87171; padding:2px 8px; border-radius:20px; font-size:0.75rem; font-weight:600; }
+.badge-diff    { background: rgba(251,191,36,0.2);  color:#fbbf24; padding:2px 6px; border-radius:20px; font-size:0.72rem; font-weight:600; cursor:help; }
+.ciclos-high { color: #f87171; font-weight: 600; }
+.ciclos-mid  { color: #fbbf24; font-weight: 600; }
+.bar-container { display:flex; align-items:center; gap:8px; }
+.bar-bg { flex:1; height:6px; background:rgba(255,255,255,0.07); border-radius:3px; min-width:60px; }
+.bar-fill { height:6px; border-radius:3px; background:linear-gradient(to right,#4c1d95,#a78bfa); }
+.export-row { display:flex; gap:8px; margin-left:auto; }
+.btn-sm {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:5px 12px; border-radius:7px; font-size:0.78rem; font-weight:500;
+    border:1px solid rgba(139,92,246,0.35); background:rgba(139,92,246,0.1);
+    color:#a78bfa; text-decoration:none; cursor:pointer; transition:background 0.2s;
+}
+.btn-sm:hover { background:rgba(139,92,246,0.2); }
+.btn-upload {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 22px; border-radius:9px; font-size:0.9rem; font-weight:600;
+    border:none; background:linear-gradient(135deg,#7c3aed,#4c1d95);
+    color:#fff; cursor:pointer; transition:opacity 0.2s;
+}
+.btn-upload:hover { opacity:0.88; }
+.btn-upload:disabled { opacity:0.5; cursor:not-allowed; }
+.loading-spinner {
+    display:inline-block; width:14px; height:14px;
+    border:2px solid rgba(255,255,255,0.3);
+    border-top-color:#fff; border-radius:50%;
+    animation:spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty-msg {
+    text-align:center; padding:40px; color:var(--text-muted); font-size:0.88rem;
+}
+.clear-btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 14px; border-radius:8px; font-size:0.82rem; font-weight:500;
+    border:1px solid rgba(239,68,68,0.35); background:rgba(239,68,68,0.08);
+    color:#f87171; cursor:pointer; transition:background 0.2s; margin-left:auto;
+}
+.clear-btn:hover { background:rgba(239,68,68,0.15); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="bairrosPage()" x-init="init()" style="padding:24px; max-width:1400px;">
+
+    <!-- Page header -->
+    <div class="page-header" style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h2 style="display:flex; align-items:center; gap:10px;">
+                <i data-lucide="map-pin" style="color:#a78bfa; width:26px; height:26px;"></i>
+                Análise Geográfica
+            </h2>
+            <p>Distribuição de clientes por bairros e cidades de Alagoas</p>
+        </div>
+        <template x-if="hasData">
+            <button @click="limparDados()" class="clear-btn">
+                <i data-lucide="trash-2"></i>
+                Remover planilha
+            </button>
+        </template>
+    </div>
+
+    <!-- ── UPLOAD CARD (shown when no data) ───────────────────────── -->
+    <div x-show="!hasData && !loading" class="upload-card">
+        <div class="upload-icon">
+            <i data-lucide="users" style="width:28px; height:28px;"></i>
+        </div>
+        <h3>Carregar planilha de clientes</h3>
+        <p>
+            Selecione o arquivo exportado do sistema com os dados de clientes.<br>
+            Aceita <strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong>.
+        </p>
+
+        <div class="upload-input-row">
+            <label class="file-label">
+                <i data-lucide="file-spreadsheet" style="width:15px; height:15px;"></i>
+                Escolher arquivo
+                <input type="file" accept=".csv,.xlsx,.xls" style="display:none"
+                       @change="onFileSelected($event)">
+            </label>
+            <span class="file-name-display" x-text="fileName || 'Nenhum arquivo selecionado'"></span>
+        </div>
+
+        <div style="margin-top:20px;">
+            <button class="btn-upload"
+                    :disabled="!selectedFile || uploading"
+                    @click="uploadFile()">
+                <template x-if="uploading">
+                    <span class="loading-spinner"></span>
+                </template>
+                <i x-show="!uploading" data-lucide="upload" style="width:16px; height:16px;"></i>
+                <span x-text="uploading ? 'Processando...' : 'Carregar e analisar'"></span>
+            </button>
+        </div>
+
+        <div x-show="avisos.length > 0" class="upload-avisos">
+            <template x-for="a in avisos" :key="a">
+                <div>⚠ <span x-text="a"></span></div>
+            </template>
+        </div>
+    </div>
+
+    <!-- ── LOADING indicator ──────────────────────────────────────── -->
+    <div x-show="loading" style="text-align:center; padding:60px; color:var(--text-muted);">
+        <span class="loading-spinner" style="width:24px; height:24px; border-width:3px; border-top-color:#a78bfa;"></span>
+        <p style="margin-top:12px; font-size:0.9rem;">Carregando dados...</p>
+    </div>
+
+    <!-- ── ANALYSIS (shown when data is loaded) ───────────────────── -->
+    <template x-if="hasData && !loading">
+        <div>
+
+            <!-- Summary stats -->
+            <div class="geo-stats">
+                <div class="geo-stat">
+                    <span class="geo-stat-value" x-text="stats.total?.toLocaleString('pt-BR') || '–'"></span>
+                    <span class="geo-stat-label">Total Clientes</span>
+                </div>
+                <div class="geo-stat">
+                    <span class="geo-stat-value" style="color:#4ade80;"
+                          x-text="stats.ativos?.toLocaleString('pt-BR') || '–'"></span>
+                    <span class="geo-stat-label">Ativos</span>
+                </div>
+                <div class="geo-stat">
+                    <span class="geo-stat-value" style="color:#f87171;"
+                          x-text="stats.inativos?.toLocaleString('pt-BR') || '–'"></span>
+                    <span class="geo-stat-label">Inativos</span>
+                </div>
+                <div class="geo-stat">
+                    <span class="geo-stat-value" x-text="stats.bairros || '–'"></span>
+                    <span class="geo-stat-label">Bairros</span>
+                </div>
+                <div class="geo-stat">
+                    <span class="geo-stat-value" x-text="stats.cidades || '–'"></span>
+                    <span class="geo-stat-label">Cidades</span>
+                </div>
+                <div class="geo-stat">
+                    <span class="geo-stat-value" style="color:#fbbf24;"
+                          x-text="stats.com_endereco_diferente?.toLocaleString('pt-BR') || '–'"></span>
+                    <span class="geo-stat-label">End. Diferente</span>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="geo-filters">
+                <div class="filter-group">
+                    <label>Unidade:</label>
+                    <select x-model="filtros.unidade" @change="aplicarFiltros()">
+                        <option value="">Todas</option>
+                        <option value="1048">Matriz Penedo (1048)</option>
+                        <option value="1515">Filial Palmeira dos Índios (1515)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Situação:</label>
+                    <select x-model="filtros.situacao" @change="aplicarFiltros()">
+                        <option value="">Todos</option>
+                        <option value="ATIVO">Ativos</option>
+                        <option value="INATIVO">Inativos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Cidade:</label>
+                    <select x-model="filtros.cidade" @change="aplicarFiltros()">
+                        <option value="">Todas</option>
+                        <template x-for="c in cidades" :key="c">
+                            <option :value="c" x-text="c"></option>
+                        </template>
+                    </select>
+                </div>
+                <button @click="limparFiltros()" class="btn-sm" style="margin-left:auto;">
+                    <i data-lucide="x-circle" style="width:13px; height:13px;"></i>
+                    Limpar filtros
+                </button>
+            </div>
+
+            <!-- ── Heat Map ──────────────────────────────────────────── -->
+            <div class="map-section">
+                <div class="map-section-header">
+                    <i data-lucide="map" style="color:#a78bfa; width:18px; height:18px;"></i>
+                    Mapa de Calor — Alagoas
+                    <span style="margin-left:auto; font-size:0.78rem; font-weight:400; color:var(--text-muted);">
+                        clientes por município
+                    </span>
+                </div>
+                <div id="mapa-alagoas"></div>
+                <div class="map-legend">
+                    <span>Poucos</span>
+                    <div class="legend-bar"></div>
+                    <span>Muitos</span>
+                    <span style="margin-left:auto;">
+                        Clique em um município para filtrar por cidade
+                    </span>
+                </div>
+            </div>
+
+            <!-- ── Bairros table ─────────────────────────────────────── -->
+            <div class="futuristic-section">
+                <h3 class="futuristic-section-title">
+                    <i data-lucide="bar-chart-3" style="color:#a78bfa; width:18px; height:18px;"></i>
+                    Análise por Bairro
+                    <span x-text="'(' + bairros.length + ' bairros)'"
+                          style="font-size:0.8rem; font-weight:400; color:var(--text-muted); margin-left:4px;"></span>
+                    <div class="export-row">
+                        <a :href="exportUrl('bairros','csv')" class="btn-sm">
+                            <i data-lucide="download" style="width:12px; height:12px;"></i>CSV
+                        </a>
+                        <a :href="exportUrl('bairros','xlsx')" class="btn-sm">
+                            <i data-lucide="download" style="width:12px; height:12px;"></i>Excel
+                        </a>
+                    </div>
+                </h3>
+
+                <div class="futuristic-table-scroll">
+                    <table class="futuristic-table">
+                        <thead>
+                            <tr>
+                                <th>Bairro</th>
+                                <th>Cidade</th>
+                                <th class="num-cell">Total</th>
+                                <th class="num-cell">Ativos</th>
+                                <th class="num-cell">Inativos</th>
+                                <th class="num-cell">Méd. Ciclos Inativos</th>
+                                <th style="min-width:100px;">Distribuição</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-if="bairros.length === 0">
+                                <tr><td colspan="7" class="empty-msg">Nenhum bairro encontrado.</td></tr>
+                            </template>
+                            <template x-for="b in bairros" :key="b.bairro + b.cidade">
+                                <tr :class="bairroSelecionado === b.bairro ? 'selected-row' : ''"
+                                    @click="selecionarBairro(b.bairro)">
+                                    <td x-text="b.bairro"></td>
+                                    <td x-text="b.cidade" style="color:var(--text-muted);"></td>
+                                    <td class="num-cell" x-text="b.total.toLocaleString('pt-BR')"></td>
+                                    <td class="num-cell" style="color:#4ade80;" x-text="b.ativos.toLocaleString('pt-BR')"></td>
+                                    <td class="num-cell" style="color:#f87171;" x-text="b.inativos.toLocaleString('pt-BR')"></td>
+                                    <td class="num-cell"
+                                        :class="b.media_ciclos_inativos >= 4 ? 'ciclos-high' : b.media_ciclos_inativos >= 2 ? 'ciclos-mid' : ''"
+                                        x-text="b.media_ciclos_inativos.toFixed(1)"></td>
+                                    <td>
+                                        <div class="bar-container">
+                                            <div class="bar-bg">
+                                                <div class="bar-fill"
+                                                     :style="'width:' + Math.round(b.total / maxBairroTotal * 100) + '%'"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── Clients table ─────────────────────────────────────── -->
+            <div class="futuristic-section">
+                <h3 class="futuristic-section-title">
+                    <i data-lucide="users" style="color:#a78bfa; width:18px; height:18px;"></i>
+                    Lista de Clientes
+                    <span x-text="bairroSelecionado ? '— Bairro: ' + bairroSelecionado : ''"
+                          style="font-size:0.82rem; font-weight:400; color:#a78bfa; margin-left:6px;"></span>
+                    <template x-if="bairroSelecionado">
+                        <button @click="limparBairroFiltro()" class="btn-sm" style="font-size:0.75rem;">
+                            <i data-lucide="x" style="width:11px; height:11px;"></i>
+                            ver todos
+                        </button>
+                    </template>
+                    <div class="export-row">
+                        <select x-model="ordenarPor" @change="carregarClientes()"
+                                style="background:rgba(15,15,30,0.8); border:1px solid rgba(139,92,246,0.3);
+                                       border-radius:7px; color:var(--text-primary); padding:5px 10px; font-size:0.8rem;">
+                            <option value="ciclos_desc">Mais ciclos inativos</option>
+                            <option value="ciclos_asc">Menos ciclos inativos</option>
+                            <option value="nome">Nome A-Z</option>
+                        </select>
+                        <a :href="exportUrl('clientes','csv')" class="btn-sm">
+                            <i data-lucide="download" style="width:12px; height:12px;"></i>CSV
+                        </a>
+                        <a :href="exportUrl('clientes','xlsx')" class="btn-sm">
+                            <i data-lucide="download" style="width:12px; height:12px;"></i>Excel
+                        </a>
+                    </div>
+                </h3>
+
+                <div class="futuristic-table-scroll">
+                    <table class="futuristic-table">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Bairro</th>
+                                <th>Cidade</th>
+                                <th>Situação</th>
+                                <th class="num-cell">Ciclos Inativo</th>
+                                <th>Papel</th>
+                                <th>Estrutura</th>
+                                <th>Unidade</th>
+                                <th>Telefone</th>
+                                <th>End.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-if="clientes.length === 0">
+                                <tr><td colspan="10" class="empty-msg">Nenhum cliente encontrado.</td></tr>
+                            </template>
+                            <template x-for="c in clientes" :key="c.cpf + c.nome">
+                                <tr>
+                                    <td x-text="c.nome" style="font-weight:500; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></td>
+                                    <td x-text="c.bairro" style="color:var(--text-muted);"></td>
+                                    <td x-text="c.cidade" style="color:var(--text-muted);"></td>
+                                    <td>
+                                        <span :class="c.ativo ? 'badge-ativo' : 'badge-inativo'"
+                                              x-text="c.ativo ? 'Ativo' : 'Inativo'"></span>
+                                    </td>
+                                    <td class="num-cell"
+                                        :class="c.ciclos_inatividade >= 4 ? 'ciclos-high' : c.ciclos_inatividade >= 2 ? 'ciclos-mid' : ''"
+                                        x-text="c.ciclos_inatividade"></td>
+                                    <td x-text="c.papel" style="color:var(--text-muted); font-size:0.8rem;"></td>
+                                    <td x-text="c.estrutura" style="color:var(--text-muted); font-size:0.8rem;"></td>
+                                    <td x-text="unidadeLabel(c.unidade)" style="font-size:0.8rem;"></td>
+                                    <td x-text="c.telefone" style="font-family: monospace; font-size:0.82rem; color:var(--text-muted);"></td>
+                                    <td>
+                                        <template x-if="c.endereco_diferente">
+                                            <span class="badge-diff"
+                                                  :title="'Mora em: ' + c.bairro + '/' + c.cidade + ' — Retira em: ' + c.bairro_entrega + '/' + c.cidade_entrega">
+                                                ↔ diff
+                                            </span>
+                                        </template>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </template>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+function bairrosPage() {
+    return {
+        // State
+        hasData: false,
+        loading: true,
+        uploading: false,
+        selectedFile: null,
+        fileName: '',
+        avisos: [],
+
+        // Data
+        stats: {},
+        bairros: [],
+        clientes: [],
+        cidades: [],
+        bairroSelecionado: '',
+
+        // Filters
+        filtros: { unidade: '', situacao: '', cidade: '' },
+        ordenarPor: 'ciclos_desc',
+
+        // Map
+        _map: null,
+        _geojsonLayer: null,
+        _cidadesData: [],
+
+        // ── Init ────────────────────────────────────────────────────
+        async init() {
+            await this.verificarStatus();
+            this.$nextTick(() => lucide.createIcons());
+        },
+
+        async verificarStatus() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/geo/status');
+                const data = await res.json();
+                this.hasData = data.has_data;
+                this.stats = data.estatisticas || {};
+                if (this.hasData) {
+                    await this.carregarTudo();
+                }
+            } catch (e) {
+                console.error('Erro ao verificar status geo:', e);
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        async carregarTudo() {
+            await Promise.all([
+                this.carregarFiltros(),
+                this.carregarBairros(),
+                this.carregarClientes(),
+                this.carregarCidades(),
+            ]);
+            this.$nextTick(() => this.iniciarMapa());
+        },
+
+        // ── Upload ──────────────────────────────────────────────────
+        onFileSelected(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.selectedFile = file;
+                this.fileName = file.name;
+            }
+        },
+
+        async uploadFile() {
+            if (!this.selectedFile || this.uploading) return;
+            this.uploading = true;
+            this.avisos = [];
+            try {
+                const form = new FormData();
+                form.append('file', this.selectedFile);
+                const res = await fetch('/api/upload-clientes', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) {
+                    showToast(data.detail || 'Erro ao processar arquivo', 'error');
+                    return;
+                }
+                this.stats = data.estatisticas || {};
+                this.avisos = data.avisos || [];
+                this.hasData = true;
+                showToast('Planilha carregada com sucesso!', 'success');
+                await this.carregarTudo();
+            } catch (e) {
+                showToast('Erro ao enviar arquivo', 'error');
+            } finally {
+                this.uploading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        // ── Data loading ─────────────────────────────────────────────
+        async carregarFiltros() {
+            try {
+                const params = new URLSearchParams({ unidade: this.filtros.unidade });
+                const res = await fetch('/api/geo/filtros?' + params);
+                const data = await res.json();
+                this.cidades = data.cidades || [];
+            } catch (e) { console.error(e); }
+        },
+
+        async carregarBairros() {
+            try {
+                const params = this._buildParams();
+                const res = await fetch('/api/geo/bairros?' + params);
+                const data = await res.json();
+                this.bairros = data.bairros || [];
+            } catch (e) { console.error(e); }
+        },
+
+        async carregarClientes() {
+            try {
+                const params = this._buildParams();
+                params.set('ordenar_por', this.ordenarPor);
+                if (this.bairroSelecionado) params.set('bairro', this.bairroSelecionado);
+                const res = await fetch('/api/geo/clientes?' + params);
+                const data = await res.json();
+                this.clientes = data.clientes || [];
+            } catch (e) { console.error(e); }
+        },
+
+        async carregarCidades() {
+            try {
+                const params = new URLSearchParams({ unidade: this.filtros.unidade });
+                const res = await fetch('/api/geo/cidades?' + params);
+                const data = await res.json();
+                this._cidadesData = data.cidades || [];
+                if (this._map && this._geojsonLayer) this._atualizarChoropleth();
+            } catch (e) { console.error(e); }
+        },
+
+        // ── Filters ──────────────────────────────────────────────────
+        async aplicarFiltros() {
+            this.bairroSelecionado = '';
+            await Promise.all([
+                this.carregarFiltros(),
+                this.carregarBairros(),
+                this.carregarClientes(),
+                this.carregarCidades(),
+            ]);
+            this.$nextTick(() => lucide.createIcons());
+        },
+
+        limparFiltros() {
+            this.filtros = { unidade: '', situacao: '', cidade: '' };
+            this.bairroSelecionado = '';
+            this.aplicarFiltros();
+        },
+
+        selecionarBairro(bairro) {
+            this.bairroSelecionado = this.bairroSelecionado === bairro ? '' : bairro;
+            this.carregarClientes();
+        },
+
+        limparBairroFiltro() {
+            this.bairroSelecionado = '';
+            this.carregarClientes();
+        },
+
+        // ── Map ──────────────────────────────────────────────────────
+        iniciarMapa() {
+            if (this._map) return;
+
+            this._map = L.map('mapa-alagoas', {
+                center: [-9.57, -36.78],
+                zoom: 8,
+                zoomControl: true,
+            });
+
+            // Dark tile layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                maxZoom: 18,
+            }).addTo(this._map);
+
+            this._carregarGeoJson();
+        },
+
+        async _carregarGeoJson() {
+            try {
+                // Fetch Alagoas municipalities GeoJSON and names in parallel
+                const [geoRes, nomesRes] = await Promise.all([
+                    fetch('https://servicodados.ibge.gov.br/api/v3/malhas/estados/27?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=municipio'),
+                    fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/27/municipios'),
+                ]);
+                const geojson = await geoRes.json();
+                const municipios = await nomesRes.json();
+
+                // Build codarea -> nome map
+                const codeToName = {};
+                for (const m of municipios) {
+                    codeToName[String(m.id)] = m.nome;
+                }
+
+                // Attach name to each GeoJSON feature
+                for (const feature of geojson.features) {
+                    const code = String(feature.properties.codarea);
+                    feature.properties.nome = codeToName[code] || code;
+                }
+
+                this._geojsonLayer = L.geoJSON(geojson, {
+                    style: (f) => this._estiloFeature(f),
+                    onEachFeature: (feature, layer) => {
+                        const nome = feature.properties.nome;
+                        const info = this._infoForCidade(nome);
+                        layer.bindTooltip(
+                            `<strong>${nome}</strong><br>Total: ${info.total}<br>Ativos: ${info.ativos} | Inativos: ${info.inativos}`,
+                            { sticky: true, className: 'mapa-tooltip' }
+                        );
+                        layer.on('click', () => {
+                            this.filtros.cidade = nome;
+                            this.aplicarFiltros();
+                        });
+                    },
+                }).addTo(this._map);
+
+            } catch (e) {
+                console.error('Erro ao carregar GeoJSON IBGE:', e);
+            }
+        },
+
+        _atualizarChoropleth() {
+            if (!this._geojsonLayer) return;
+            this._geojsonLayer.setStyle((f) => this._estiloFeature(f));
+            this._geojsonLayer.eachLayer((layer) => {
+                const nome = layer.feature.properties.nome;
+                const info = this._infoForCidade(nome);
+                layer.setTooltipContent(
+                    `<strong>${nome}</strong><br>Total: ${info.total}<br>Ativos: ${info.ativos} | Inativos: ${info.inativos}`
+                );
+            });
+        },
+
+        _normalizar(str) {
+            return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        },
+
+        _infoForCidade(nome) {
+            const n = this._normalizar(nome);
+            const found = this._cidadesData.find(c => this._normalizar(c.cidade) === n);
+            return found || { total: 0, ativos: 0, inativos: 0 };
+        },
+
+        _estiloFeature(feature) {
+            const info = this._infoForCidade(feature.properties.nome);
+            const max = Math.max(...this._cidadesData.map(c => c.total), 1);
+            const ratio = info.total / max;
+            return {
+                fillColor: this._colorScale(ratio),
+                fillOpacity: info.total > 0 ? 0.75 : 0.15,
+                color: 'rgba(139,92,246,0.4)',
+                weight: 1,
+            };
+        },
+
+        _colorScale(ratio) {
+            // Dark purple → light purple
+            if (ratio === 0) return '#1a1a3e';
+            if (ratio < 0.1) return '#2d1b69';
+            if (ratio < 0.25) return '#4c1d95';
+            if (ratio < 0.5) return '#6d28d9';
+            if (ratio < 0.75) return '#7c3aed';
+            return '#a78bfa';
+        },
+
+        // ── Helpers ──────────────────────────────────────────────────
+        _buildParams() {
+            const p = new URLSearchParams();
+            if (this.filtros.unidade)  p.set('unidade',  this.filtros.unidade);
+            if (this.filtros.situacao) p.set('situacao', this.filtros.situacao);
+            if (this.filtros.cidade)   p.set('cidade',   this.filtros.cidade);
+            return p;
+        },
+
+        exportUrl(tipo, fmt) {
+            const params = this._buildParams();
+            params.set('formato', fmt);
+            if (tipo === 'clientes' && this.bairroSelecionado) {
+                params.set('bairro', this.bairroSelecionado);
+            }
+            return `/api/geo/export/${tipo}?` + params.toString();
+        },
+
+        get maxBairroTotal() {
+            return Math.max(...this.bairros.map(b => b.total), 1);
+        },
+
+        unidadeLabel(code) {
+            if (code === '1048') return 'Matriz Penedo';
+            if (code === '1515') return 'Filial Palmeiras';
+            return code || '–';
+        },
+
+        async limparDados() {
+            if (!confirm('Remover a planilha de clientes? Os dados geográficos serão limpos.')) return;
+            try {
+                await fetch('/api/geo/clear', { method: 'POST' });
+            } catch (_) {}
+            this.hasData = false;
+            this.bairros = [];
+            this.clientes = [];
+            this.stats = {};
+            this._cidadesData = [];
+            if (this._geojsonLayer && this._map) {
+                this._map.removeLayer(this._geojsonLayer);
+                this._geojsonLayer = null;
+            }
+        },
+    };
+}
+</script>
+
+<style>
+/* Leaflet tooltip dark theme */
+.mapa-tooltip {
+    background: rgba(20,20,40,0.95);
+    border: 1px solid rgba(139,92,246,0.4);
+    border-radius: 8px;
+    color: #e2e0ff;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.mapa-tooltip::before { display: none; }
+/* Override leaflet default background on dark theme */
+.leaflet-control-zoom a {
+    background: rgba(20,20,40,0.9) !important;
+    color: #a78bfa !important;
+    border-color: rgba(139,92,246,0.4) !important;
+}
+.leaflet-control-attribution {
+    background: rgba(10,10,20,0.7) !important;
+    color: rgba(255,255,255,0.35) !important;
+    font-size: 0.65rem;
+}
+.leaflet-control-attribution a { color: rgba(167,139,250,0.6) !important; }
+</style>
+{% endblock %}

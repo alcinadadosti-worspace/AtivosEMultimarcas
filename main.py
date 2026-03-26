@@ -171,6 +171,14 @@ async def page_ranking(
     return templates.TemplateResponse(request, "pages/ranking.html", {"page": "ranking", "has_data": has_data})
 
 
+@app.get("/bairros", response_class=HTMLResponse)
+async def page_bairros(
+    request: Request,
+):
+    """Geographic analysis page — neighborhoods, cities and heat map."""
+    return templates.TemplateResponse(request, "pages/bairros.html", {"page": "bairros"})
+
+
 # =============================================================================
 # HEALTH CHECK (root level)
 # =============================================================================
