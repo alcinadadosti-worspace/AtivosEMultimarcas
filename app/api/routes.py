@@ -82,6 +82,7 @@ from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas
 from app.services.geo import (
     processar_planilha_clientes,
     calcular_metricas_bairro,
+    calcular_detalhe_bairro,
     calcular_metricas_cidade,
     listar_clientes_geo,
     obter_cidades_geo,
@@ -2004,6 +2005,26 @@ async def export_geo_bairros(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=analise_bairros.xlsx"},
         )
+
+
+@api_router.get("/geo/bairro/detalhe")
+async def get_geo_bairro_detalhe(
+    bairro: str = Query(...),
+    unidade: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Return streets and clients for a specific neighborhood (accordion detail)."""
+    _, session_data = session
+    df_geo = session_data.get("df_geo")
+    if df_geo is None or len(df_geo) == 0:
+        return {"ruas": [], "clientes": []}
+    return calcular_detalhe_bairro(
+        df_geo,
+        bairro=bairro,
+        unidade=unidade or None,
+        situacao=situacao or None,
+    )
 
 
 @api_router.post("/geo/clear")

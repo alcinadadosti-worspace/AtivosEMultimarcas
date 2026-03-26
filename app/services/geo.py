@@ -15,6 +15,7 @@ from app.config import (
     GEO_COL_ESTRUTURA,
     GEO_COL_COD_ESTRUTURA_PAI,
     GEO_COL_TELEFONE,
+    GEO_COL_RUA_RESID,
     GEO_COL_BAIRRO_RESID,
     GEO_COL_CIDADE_RESID,
     GEO_COL_BAIRRO_ENTREGA,
@@ -24,7 +25,7 @@ from app.config import (
 from app.services.venda import ler_planilha
 
 
-# Optional columns that will be filled with "" if absent
+# Optional columns filled with "" when absent
 _OPTIONAL_COLS = [
     GEO_COL_CPF,
     GEO_COL_CICLOS_INATIVIDADE,
@@ -33,6 +34,7 @@ _OPTIONAL_COLS = [
     GEO_COL_ESTRUTURA,
     GEO_COL_COD_ESTRUTURA_PAI,
     GEO_COL_TELEFONE,
+    GEO_COL_RUA_RESID,
     GEO_COL_BAIRRO_ENTREGA,
     GEO_COL_CIDADE_ENTREGA,
 ]
@@ -87,6 +89,14 @@ def processar_planilha_clientes(content: bytes, filename: str) -> Dict[str, Any]
         pl.col(GEO_COL_SITUACAO).str.to_uppercase().alias(GEO_COL_SITUACAO)
     )
 
+    # Normalize CodigoEstruturaComercialPai: '1.048' → '1048', '1.515' → '1515'
+    if GEO_COL_COD_ESTRUTURA_PAI in df.columns:
+        df = df.with_columns(
+            pl.col(GEO_COL_COD_ESTRUTURA_PAI)
+            .str.replace_all(r"\.", "")
+            .alias(GEO_COL_COD_ESTRUTURA_PAI)
+        )
+
     # Flag clients whose delivery address differs from residential address
     df = df.with_columns(
         (
@@ -108,17 +118,13 @@ def processar_planilha_clientes(content: bytes, filename: str) -> Dict[str, Any]
     df = df.filter(pl.col(GEO_COL_BAIRRO_RESID) != "")
 
     total = len(df)
-    ativos = int(
-        df.filter(pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO")).height
-    )
+    ativos = int(df.filter(pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO")).height)
 
     estatisticas = {
         "total": total,
         "ativos": ativos,
         "inativos": total - ativos,
-        "com_endereco_diferente": int(
-            df.filter(pl.col("endereco_diferente")).height
-        ),
+        "com_endereco_diferente": int(df.filter(pl.col("endereco_diferente")).height),
         "cidades": df.select(GEO_COL_CIDADE_RESID).unique().height,
         "bairros": df.select(GEO_COL_BAIRRO_RESID).unique().height,
     }
@@ -140,19 +146,14 @@ def calcular_metricas_bairro(
         .agg(
             [
                 pl.len().alias("total"),
-                pl.col(GEO_COL_SITUACAO)
-                .str.starts_with("ATIVO")
-                .sum()
-                .alias("ativos"),
+                pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO").sum().alias("ativos"),
                 pl.col(GEO_COL_CICLOS_INATIVIDADE)
                 .filter(~pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO"))
                 .mean()
                 .alias("media_ciclos_inativos"),
             ]
         )
-        .with_columns(
-            (pl.col("total") - pl.col("ativos")).alias("inativos")
-        )
+        .with_columns((pl.col("total") - pl.col("ativos")).alias("inativos"))
         .sort("total", descending=True)
     )
 
@@ -169,6 +170,71 @@ def calcular_metricas_bairro(
     ]
 
 
+def calcular_detalhe_bairro(
+    df: pl.DataFrame,
+    bairro: str,
+    unidade: Optional[str] = None,
+    situacao: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Return streets and individual clients for a specific neighborhood.
+
+    Used to populate the accordion expansion in the bairros table.
+    """
+    df = _aplicar_filtros(df, unidade=unidade, situacao=situacao)
+    df = df.filter(
+        pl.col(GEO_COL_BAIRRO_RESID).str.to_lowercase() == bairro.strip().lower()
+    )
+
+    # Streets grouped summary
+    ruas: List[Dict[str, Any]] = []
+    if GEO_COL_RUA_RESID in df.columns:
+        ruas_df = (
+            df.group_by(GEO_COL_RUA_RESID)
+            .agg(
+                [
+                    pl.len().alias("total"),
+                    pl.col(GEO_COL_SITUACAO)
+                    .str.starts_with("ATIVO")
+                    .sum()
+                    .alias("ativos"),
+                ]
+            )
+            .with_columns((pl.col("total") - pl.col("ativos")).alias("inativos"))
+            .sort("total", descending=True)
+        )
+        ruas = [
+            {
+                "rua": row[GEO_COL_RUA_RESID] or "Não informado",
+                "total": int(row["total"]),
+                "ativos": int(row["ativos"]),
+                "inativos": int(row["inativos"]),
+            }
+            for row in ruas_df.iter_rows(named=True)
+        ]
+
+    # Individual clients sorted by inactivity cycles desc
+    df_sorted = df.sort(GEO_COL_CICLOS_INATIVIDADE, descending=True)
+    clientes = [
+        {
+            "nome": row.get(GEO_COL_NOME, ""),
+            "cpf": row.get(GEO_COL_CPF, ""),
+            "rua": row.get(GEO_COL_RUA_RESID, ""),
+            "situacao": row.get(GEO_COL_SITUACAO, ""),
+            "ativo": str(row.get(GEO_COL_SITUACAO, "")).startswith("ATIVO"),
+            "ciclos_inatividade": int(row.get(GEO_COL_CICLOS_INATIVIDADE, 0) or 0),
+            "papel": row.get(GEO_COL_PAPEL, ""),
+            "telefone": row.get(GEO_COL_TELEFONE, ""),
+            "endereco_diferente": bool(row.get("endereco_diferente", False)),
+            "bairro_entrega": row.get(GEO_COL_BAIRRO_ENTREGA, ""),
+            "cidade_entrega": row.get(GEO_COL_CIDADE_ENTREGA, ""),
+        }
+        for row in df_sorted.iter_rows(named=True)
+    ]
+
+    return {"ruas": ruas, "clientes": clientes}
+
+
 def calcular_metricas_cidade(
     df: pl.DataFrame,
     unidade: Optional[str] = None,
@@ -181,15 +247,10 @@ def calcular_metricas_cidade(
         .agg(
             [
                 pl.len().alias("total"),
-                pl.col(GEO_COL_SITUACAO)
-                .str.starts_with("ATIVO")
-                .sum()
-                .alias("ativos"),
+                pl.col(GEO_COL_SITUACAO).str.starts_with("ATIVO").sum().alias("ativos"),
             ]
         )
-        .with_columns(
-            (pl.col("total") - pl.col("ativos")).alias("inativos")
-        )
+        .with_columns((pl.col("total") - pl.col("ativos")).alias("inativos"))
         .sort("total", descending=True)
     )
 
@@ -218,8 +279,7 @@ def listar_clientes_geo(
 
     if bairro:
         df = df.filter(
-            pl.col(GEO_COL_BAIRRO_RESID).str.to_lowercase()
-            == bairro.strip().lower()
+            pl.col(GEO_COL_BAIRRO_RESID).str.to_lowercase() == bairro.strip().lower()
         )
 
     if ordenar_por == "ciclos_desc":
@@ -235,6 +295,7 @@ def listar_clientes_geo(
         {
             "nome": row.get(GEO_COL_NOME, ""),
             "cpf": row.get(GEO_COL_CPF, ""),
+            "rua": row.get(GEO_COL_RUA_RESID, ""),
             "situacao": row.get(GEO_COL_SITUACAO, ""),
             "ativo": str(row.get(GEO_COL_SITUACAO, "")).startswith("ATIVO"),
             "ciclos_inatividade": int(row.get(GEO_COL_CICLOS_INATIVIDADE, 0) or 0),
@@ -295,8 +356,7 @@ def _aplicar_filtros(
         df = df.filter(pl.col(GEO_COL_COD_ESTRUTURA_PAI) == str(unidade))
     if cidade:
         df = df.filter(
-            pl.col(GEO_COL_CIDADE_RESID).str.to_lowercase()
-            == cidade.strip().lower()
+            pl.col(GEO_COL_CIDADE_RESID).str.to_lowercase() == cidade.strip().lower()
         )
     if situacao:
         if situacao.upper() == "ATIVO":
