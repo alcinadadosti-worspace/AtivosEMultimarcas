@@ -628,12 +628,22 @@ function bairrosPage() {
                 this.hasData = data.has_data;
                 this.stats = data.estatisticas || {};
                 if (this.hasData) {
-                    await this.carregarTudo();
+                    await Promise.all([
+                        this.carregarFiltros(),
+                        this.carregarBairros(),
+                        this.carregarClientes(),
+                        this.carregarCidades(),
+                    ]);
                 }
             } catch (e) {
                 console.error('Erro ao verificar status geo:', e);
             } finally {
                 this.loading = false;
+                // loading=false makes the map div appear in the DOM;
+                // wait for Alpine to process the reactive update, then init map.
+                if (this.hasData) {
+                    this.$nextTick(() => this.iniciarMapa());
+                }
                 this.$nextTick(() => lucide.createIcons());
             }
         },
@@ -645,6 +655,8 @@ function bairrosPage() {
                 this.carregarClientes(),
                 this.carregarCidades(),
             ]);
+            // The map div is already visible here (hasData=true, loading=false).
+            // Use $nextTick so Alpine finishes any pending DOM work first.
             this.$nextTick(() => this.iniciarMapa());
         },
 
@@ -754,6 +766,12 @@ function bairrosPage() {
         // ── Map ──────────────────────────────────────────────────────
         iniciarMapa() {
             if (this._map) return;
+
+            // If the div doesn't exist yet (x-if not rendered), retry
+            if (!document.getElementById('mapa-alagoas')) {
+                setTimeout(() => this.iniciarMapa(), 150);
+                return;
+            }
 
             this._map = L.map('mapa-alagoas', {
                 center: [-9.57, -36.78],
