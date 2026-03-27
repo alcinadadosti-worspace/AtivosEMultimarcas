@@ -219,8 +219,8 @@ def calcular_detalhe_bairro(
             for row in ruas_df.iter_rows(named=True)
         ]
 
-    # Individual clients sorted by inactivity cycles desc (capped at 150)
-    df_sorted = df.sort(GEO_COL_CICLOS_INATIVIDADE, descending=True).head(150)
+    # Individual clients sorted by inactivity cycles desc
+    df_sorted = df.sort(GEO_COL_CICLOS_INATIVIDADE, descending=True)
     clientes = [
         {
             "nome": row.get(GEO_COL_NOME, ""),
