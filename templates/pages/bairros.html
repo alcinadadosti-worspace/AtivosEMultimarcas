@@ -84,6 +84,12 @@
 .clear-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:8px; font-size:.81rem; font-weight:500; border:1px solid rgba(239,68,68,.35); background:rgba(239,68,68,.08); color:#f87171; cursor:pointer; transition:background .2s; }
 .clear-btn:hover { background:rgba(239,68,68,.15); }
 
+/* Tabs */
+.page-tabs { display:flex; gap:4px; margin-bottom:20px; background:rgba(15,15,30,.6); border:1px solid rgba(139,92,246,.2); border-radius:12px; padding:5px; }
+.page-tab { flex:1; padding:9px 18px; border-radius:8px; border:none; background:transparent; color:var(--text-muted); font-size:.87rem; font-weight:500; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:7px; }
+.page-tab:hover { color:var(--text-primary); background:rgba(139,92,246,.1); }
+.page-tab.active { background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(76,29,149,.3)); color:#a78bfa; border:1px solid rgba(139,92,246,.35); }
+
 /* Misc */
 .loading-spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
@@ -168,6 +174,22 @@
                     <span class="geo-stat-label">End. Diferente</span>
                 </div>
             </div>
+
+            <!-- Tab navigation -->
+            <div class="page-tabs">
+                <button class="page-tab" :class="abaAtiva==='mapa' ? 'active' : ''" @click="abaAtiva='mapa'">
+                    <i data-lucide="map-pin" style="width:15px;height:15px;"></i>
+                    Mapa &amp; Bairros
+                </button>
+                <button class="page-tab" :class="abaAtiva==='penetracao' ? 'active' : ''" @click="abaAtiva='penetracao'">
+                    <i data-lucide="target" style="width:15px;height:15px;"></i>
+                    Penetração de Mercado
+                    <span x-show="_popLoading" class="loading-spinner" style="width:10px;height:10px;border-top-color:#a78bfa;"></span>
+                </button>
+            </div>
+
+            <!-- ══ ABA: Mapa & Bairros ══ -->
+            <div x-show="abaAtiva === 'mapa'">
 
             <!-- Filters -->
             <div class="geo-filters">
@@ -328,6 +350,11 @@
                 </div>
             </div>
 
+            </div><!-- /aba mapa -->
+
+            <!-- ══ ABA: Penetração de Mercado ══ -->
+            <div x-show="abaAtiva === 'penetracao'">
+
             <!-- ── Penetração de Mercado ───────────────────────────────── -->
             <div class="futuristic-section">
                 <div class="futuristic-section-title">
@@ -458,6 +485,8 @@
                 </div>
             </div>
 
+            </div><!-- /aba penetracao -->
+
         </div>
     </template>
 
@@ -500,6 +529,9 @@ function bairrosPage() {
         expandidoKey: '',
         expandidoLoading: false,
         _detalheCache: {},  // key -> HTML string — instant on re-open
+
+        // Tabs
+        abaAtiva: 'mapa',
 
         // Filters
         filtros: { unidade: '', situacao: '', cidade: '' },
