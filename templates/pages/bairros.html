@@ -369,14 +369,67 @@
                     </span>
                 </div>
 
+                <!-- Filters -->
+                <div class="geo-filters" style="border-radius:0; border-left:none; border-right:none; border-top:none;">
+                    <div class="filter-group">
+                        <label>Unidade:</label>
+                        <select x-model="penetFiltros.unidade">
+                            <option value="">Todas</option>
+                            <option value="1048">Matriz Penedo</option>
+                            <option value="1515">Filial Palmeira dos Índios</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Ação:</label>
+                        <select x-model="penetFiltros.acao">
+                            <option value="">Todas</option>
+                            <option value="Atacar">↑ Atacar</option>
+                            <option value="Crescer">↗ Crescer</option>
+                            <option value="Consolidado">✓ Consolidado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Buscar cidade:</label>
+                        <input type="text" x-model="penetFiltros.buscaCidade" placeholder="Nome da cidade..." style="width:160px;">
+                    </div>
+                    <div class="filter-group" style="margin-left:auto; gap:4px;">
+                        <span style="font-size:.76rem; color:var(--text-muted);">Ordenar:</span>
+                        <button @click="penetSortC.campo='penetracao'; penetSortC.dir = penetSortC.campo==='penetracao' ? (penetSortC.dir==='asc'?'desc':'asc') : 'asc'"
+                                :class="penetSortC.campo==='penetracao' ? 'sort-btn active' : 'sort-btn'">
+                            Penetração <span x-show="penetSortC.campo==='penetracao'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetSortC.campo==='clientes' ? penetSortC.dir=(penetSortC.dir==='desc'?'asc':'desc') : (penetSortC.campo='clientes', penetSortC.dir='desc')"
+                                :class="penetSortC.campo==='clientes' ? 'sort-btn active' : 'sort-btn'">
+                            Clientes <span x-show="penetSortC.campo==='clientes'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetSortC.campo==='cidade' ? penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc') : (penetSortC.campo='cidade', penetSortC.dir='asc')"
+                                :class="penetSortC.campo==='cidade' ? 'sort-btn active' : 'sort-btn'">
+                            A–Z <span x-show="penetSortC.campo==='cidade'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetFiltros.unidade=''; penetFiltros.acao=''; penetFiltros.buscaCidade=''; penetSortC={campo:'penetracao',dir:'asc'}"
+                                class="btn-sm" style="margin-left:4px;">
+                            <i data-lucide="x-circle" style="width:11px;height:11px;"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+
                 <div class="futuristic-table-scroll">
                     <table class="futuristic-table">
                         <thead>
                             <tr>
-                                <th>Cidade</th>
-                                <th class="num-cell">Clientes</th>
+                                <th @click="penetSortC.campo==='cidade'?penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc'):(penetSortC.campo='cidade',penetSortC.dir='asc')"
+                                    :class="penetSortC.campo==='cidade'?'sort-active':''">
+                                    Cidade <span x-show="penetSortC.campo==='cidade'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                                </th>
+                                <th class="num-cell" @click="penetSortC.campo==='total'?penetSortC.dir=(penetSortC.dir==='desc'?'asc':'desc'):(penetSortC.campo='total',penetSortC.dir='desc')"
+                                    :class="penetSortC.campo==='total'?'sort-active':''">
+                                    Clientes <span x-show="penetSortC.campo==='total'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                                </th>
                                 <th class="num-cell">População IBGE 2022</th>
-                                <th class="num-cell">Clientes / 10k hab</th>
+                                <th class="num-cell" @click="penetSortC.campo==='penetracao'?penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc'):(penetSortC.campo='penetracao',penetSortC.dir='asc')"
+                                    :class="penetSortC.campo==='penetracao'?'sort-active':''">
+                                    Clientes / 10k hab <span x-show="penetSortC.campo==='penetracao'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                                </th>
                                 <th style="min-width:140px;">Penetração</th>
                                 <th>Ação Sugerida</th>
                             </tr>
@@ -422,7 +475,7 @@
             </div>
 
             <!-- ── Penetração por Bairro ───────────────────────────────── -->
-            <div class="futuristic-section" x-show="penetracaoBairros.length > 0">
+            <div class="futuristic-section" x-show="bairros.length > 0">
                 <div class="futuristic-section-title">
                     <i data-lucide="map-pin" style="color:#a78bfa; width:17px; height:17px;"></i>
                     Penetração por Bairro
@@ -435,15 +488,72 @@
                     </span>
                 </div>
 
+                <!-- Filters -->
+                <div class="geo-filters" style="border-radius:0; border-left:none; border-right:none; border-top:none;">
+                    <div class="filter-group">
+                        <label>Cidade:</label>
+                        <select x-model="penetFiltros.cidade">
+                            <option value="">Todas</option>
+                            <template x-for="c in cidadesPenetracao" :key="c">
+                                <option :value="c" x-text="c"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Ação:</label>
+                        <select x-model="penetFiltros.acao">
+                            <option value="">Todas</option>
+                            <option value="Atacar">↑ Atacar</option>
+                            <option value="Crescer">↗ Crescer</option>
+                            <option value="Consolidado">✓ Consolidado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Buscar bairro:</label>
+                        <input type="text" x-model="penetFiltros.buscaBairro" placeholder="Nome do bairro..." style="width:160px;">
+                    </div>
+                    <div class="filter-group" style="margin-left:auto; gap:4px;">
+                        <span style="font-size:.76rem; color:var(--text-muted);">Ordenar:</span>
+                        <button @click="penetSortB.campo==='penetracao'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='penetracao',penetSortB.dir='asc')"
+                                :class="penetSortB.campo==='penetracao' ? 'sort-btn active' : 'sort-btn'">
+                            Penetração <span x-show="penetSortB.campo==='penetracao'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetSortB.campo==='total'?penetSortB.dir=(penetSortB.dir==='desc'?'asc':'desc'):(penetSortB.campo='total',penetSortB.dir='desc')"
+                                :class="penetSortB.campo==='total' ? 'sort-btn active' : 'sort-btn'">
+                            Clientes <span x-show="penetSortB.campo==='total'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetSortB.campo==='bairro'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='bairro',penetSortB.dir='asc')"
+                                :class="penetSortB.campo==='bairro' ? 'sort-btn active' : 'sort-btn'">
+                            A–Z <span x-show="penetSortB.campo==='bairro'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                        </button>
+                        <button @click="penetFiltros.cidade=''; penetFiltros.acao=''; penetFiltros.buscaBairro=''; penetSortB={campo:'penetracao',dir:'asc'}"
+                                class="btn-sm" style="margin-left:4px;">
+                            <i data-lucide="x-circle" style="width:11px;height:11px;"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+
                 <div class="futuristic-table-scroll">
                     <table class="futuristic-table">
                         <thead>
                             <tr>
-                                <th>Bairro</th>
-                                <th>Cidade</th>
-                                <th class="num-cell">Clientes</th>
+                                <th @click="penetSortB.campo==='bairro'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='bairro',penetSortB.dir='asc')"
+                                    :class="penetSortB.campo==='bairro'?'sort-active':''">
+                                    Bairro <span x-show="penetSortB.campo==='bairro'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                                </th>
+                                <th @click="penetSortB.campo==='cidade'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='cidade',penetSortB.dir='asc')"
+                                    :class="penetSortB.campo==='cidade'?'sort-active':''">
+                                    Cidade <span x-show="penetSortB.campo==='cidade'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                                </th>
+                                <th class="num-cell" @click="penetSortB.campo==='total'?penetSortB.dir=(penetSortB.dir==='desc'?'asc':'desc'):(penetSortB.campo='total',penetSortB.dir='desc')"
+                                    :class="penetSortB.campo==='total'?'sort-active':''">
+                                    Clientes <span x-show="penetSortB.campo==='total'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                                </th>
                                 <th class="num-cell">Pop. Estimada¹</th>
-                                <th class="num-cell">Clientes / 10k hab</th>
+                                <th class="num-cell" @click="penetSortB.campo==='penetracao'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='penetracao',penetSortB.dir='asc')"
+                                    :class="penetSortB.campo==='penetracao'?'sort-active':''">
+                                    Clientes / 10k hab <span x-show="penetSortB.campo==='penetracao'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
+                                </th>
                                 <th style="min-width:120px;">Penetração</th>
                                 <th>Ação Sugerida</th>
                             </tr>
@@ -533,6 +643,11 @@ function bairrosPage() {
         // Tabs
         abaAtiva: 'mapa',
 
+        // Penetration tab local filters (client-side, no re-fetch needed)
+        penetFiltros: { unidade: '', situacao: '', acao: '', cidade: '', buscaCidade: '', buscaBairro: '' },
+        penetSortC: { campo: 'penetracao', dir: 'asc' },
+        penetSortB: { campo: 'penetracao', dir: 'asc' },
+
         // Filters
         filtros: { unidade: '', situacao: '', cidade: '' },
 
@@ -555,44 +670,62 @@ function bairrosPage() {
         },
         get penetracaoData() {
             if (!this._cidadesData.length) return [];
-            const vals = this._cidadesData
-                .map(c => {
-                    const pop = this._popIBGE(c.cidade);
-                    return pop > 0 ? c.total / pop * 10000 : null;
-                }).filter(v => v !== null);
+
+            // Apply unidade/situacao server-side via aplicarFiltros; here apply local filters
+            let source = this._cidadesData;
+            if (this.penetFiltros.unidade)
+                source = source.filter(c => c.unidade === this.penetFiltros.unidade);
+            if (this.penetFiltros.buscaCidade)
+                source = source.filter(c => this._normalizar(c.cidade).includes(this._normalizar(this.penetFiltros.buscaCidade)));
+
+            const vals = source.map(c => {
+                const pop = this._popIBGE(c.cidade);
+                return pop > 0 ? c.total / pop * 10000 : null;
+            }).filter(v => v !== null);
             const maxPen = Math.max(...vals, 1);
-            return [...this._cidadesData]
-                .map(c => {
-                    const pop = this._popIBGE(c.cidade);
-                    const pen = pop > 0 ? c.total / pop * 10000 : null;
-                    const pctBar = pen !== null ? Math.round(pen / maxPen * 100) : 0;
-                    let status, cor;
-                    if (pen === null)  { status = 'Sem dado';      cor = 'var(--text-muted)'; }
-                    else if (pen < 10) { status = '↑ Atacar';      cor = '#f87171'; }
-                    else if (pen < 30) { status = '↗ Crescer';     cor = '#fbbf24'; }
-                    else               { status = '✓ Consolidado'; cor = '#4ade80'; }
-                    return { ...c, populacao: pop || null, penetracao: pen, pctBar, status, cor };
-                })
-                .sort((a, b) => {
-                    if (a.penetracao === null) return 1;
-                    if (b.penetracao === null) return -1;
-                    return a.penetracao - b.penetracao;
-                });
+
+            let rows = source.map(c => {
+                const pop = this._popIBGE(c.cidade);
+                const pen = pop > 0 ? c.total / pop * 10000 : null;
+                const pctBar = pen !== null ? Math.round(pen / maxPen * 100) : 0;
+                let status, cor;
+                if (pen === null)  { status = 'Sem dado';      cor = 'var(--text-muted)'; }
+                else if (pen < 10) { status = '↑ Atacar';      cor = '#f87171'; }
+                else if (pen < 30) { status = '↗ Crescer';     cor = '#fbbf24'; }
+                else               { status = '✓ Consolidado'; cor = '#4ade80'; }
+                return { ...c, populacao: pop || null, penetracao: pen, pctBar, status, cor };
+            });
+
+            if (this.penetFiltros.acao) rows = rows.filter(r => r.status.includes(this.penetFiltros.acao));
+
+            const { campo, dir } = this.penetSortC;
+            const d = dir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                if (campo === 'cidade') return d * (a.cidade || '').localeCompare(b.cidade || '');
+                const av = a[campo] ?? (dir === 'asc' ? Infinity : -Infinity);
+                const bv = b[campo] ?? (dir === 'asc' ? Infinity : -Infinity);
+                return d * (av - bv);
+            });
+            return rows;
         },
 
         get penetracaoBairros() {
-            // One entry per bairro with estimated population.
-            // Estimate: city_pop / number_of_bairros_in_that_city (uniform distribution).
-            // Clearly labelled as estimate in the UI.
             if (!this.bairros.length) return [];
 
-            // Count bairros per city from current list
+            // Apply local filters
+            let source = this.bairros;
+            if (this.penetFiltros.cidade)
+                source = source.filter(b => this._normalizar(b.cidade) === this._normalizar(this.penetFiltros.cidade));
+            if (this.penetFiltros.buscaBairro)
+                source = source.filter(b => this._normalizar(b.bairro).includes(this._normalizar(this.penetFiltros.buscaBairro)));
+
+            // Count bairros per city (from filtered source for proportion)
             const bairrosPorCidade = {};
             for (const b of this.bairros) {
                 bairrosPorCidade[b.cidade] = (bairrosPorCidade[b.cidade] || 0) + 1;
             }
 
-            const items = this.bairros.map(b => {
+            let rows = source.map(b => {
                 const cityPop  = this._popIBGE(b.cidade);
                 const nBairros = bairrosPorCidade[b.cidade] || 1;
                 const estPop   = cityPop > 0 ? Math.round(cityPop / nBairros) : 0;
@@ -605,11 +738,23 @@ function bairrosPage() {
                 return { ...b, estPop, penetracao: pen, status, cor };
             });
 
-            return items.sort((a, b) => {
-                if (a.penetracao === null) return 1;
-                if (b.penetracao === null) return -1;
-                return a.penetracao - b.penetracao;
+            if (this.penetFiltros.acao) rows = rows.filter(r => r.status.includes(this.penetFiltros.acao));
+
+            const { campo, dir } = this.penetSortB;
+            const d = dir === 'asc' ? 1 : -1;
+            rows.sort((a, b) => {
+                if (campo === 'bairro') return d * (a.bairro || '').localeCompare(b.bairro || '');
+                if (campo === 'cidade') return d * (a.cidade || '').localeCompare(b.cidade || '');
+                const av = a[campo] ?? (dir === 'asc' ? Infinity : -Infinity);
+                const bv = b[campo] ?? (dir === 'asc' ? Infinity : -Infinity);
+                return d * (av - bv);
             });
+            return rows;
+        },
+
+        get cidadesPenetracao() {
+            // Unique city list for the bairros filter dropdown
+            return [...new Set(this.bairros.map(b => b.cidade))].sort();
         },
 
         // ── Init ─────────────────────────────────────────────────────
