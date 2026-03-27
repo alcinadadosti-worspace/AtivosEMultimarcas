@@ -4,17 +4,19 @@ Multimarks Analytics - Main Application
 FastAPI application for sales analysis and multi-brand customer tracking
 for Grupo Boticario.
 """
+import json
 import os
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import polars as pl
 from fastapi import Cookie, FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-from app.config import DATABASE_PATH, DATA_DIR
+from app.config import DATABASE_PATH, DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH
 from app.api.routes import api_router, SESSION_COOKIE_NAME
 from app.api.dependencies import get_db
 from app.services.session import get_session
@@ -46,6 +48,23 @@ async def lifespan(app: FastAPI):
         conn.close()
     else:
         print("[WARN] Database not found. Run import_db.py first.")
+
+    # Load persistent geo data (clients spreadsheet)
+    if os.path.exists(GEO_PARQUET_PATH):
+        try:
+            app.state.df_geo = pl.read_parquet(GEO_PARQUET_PATH)
+            app.state.df_geo_stats = {}
+            if os.path.exists(GEO_STATS_PATH):
+                with open(GEO_STATS_PATH, encoding="utf-8") as f:
+                    app.state.df_geo_stats = json.load(f)
+            print(f"[INFO] Geo data loaded: {len(app.state.df_geo)} clients")
+        except Exception as e:
+            print(f"[WARN] Failed to load geo data: {e}")
+            app.state.df_geo = None
+            app.state.df_geo_stats = {}
+    else:
+        app.state.df_geo = None
+        app.state.df_geo_stats = {}
 
     yield
 

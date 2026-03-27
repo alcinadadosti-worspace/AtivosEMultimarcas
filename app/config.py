@@ -120,3 +120,7 @@ GEO_REQUIRED_COLUMNS = [
 
 GEO_UNIDADE_MATRIZ = "1048"   # Unidade Matriz Penedo
 GEO_UNIDADE_FILIAL = "1515"   # Filial Palmeira dos Índios
+
+# Persistent geo data (survives server restarts)
+GEO_PARQUET_PATH = str(DATA_DIR / "clientes_geo.parquet")
+GEO_STATS_PATH   = str(DATA_DIR / "clientes_geo_stats.json")

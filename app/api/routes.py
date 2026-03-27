@@ -12,14 +12,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 import polars as pl
 from openpyxl import Workbook, load_workbook
 
 from app.api.dependencies import get_db
-from app.config import DATA_DIR, MARCAS_GRUPO, MOTIVO_MATCH_EXATO
+from app.config import DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, MARCAS_GRUPO, MOTIVO_MATCH_EXATO
 from app.utils.normalizers import normalizar_sku
 from app.api.schemas import (
     UploadResponse,
@@ -1833,17 +1833,15 @@ async def cadastrar_produtos_lote(
 
 @api_router.post("/upload-clientes")
 async def upload_clientes(
+    request: Request,
     file: UploadFile = File(...),
-    session: tuple = Depends(get_user_session),
 ):
     """
     Upload and process the clients spreadsheet for geographic analysis.
 
-    Stores the processed DataFrame in the session as 'df_geo'.
-    Does NOT clear the existing vendas session data.
+    Persists the processed DataFrame to disk (Parquet) so it survives
+    server restarts.  Also stores it in app.state for instant access.
     """
-    session_id, _ = session
-
     if not file.filename:
         raise HTTPException(status_code=400, detail="Arquivo não fornecido")
 
@@ -1856,16 +1854,22 @@ async def upload_clientes(
     try:
         content = await file.read()
         resultado = processar_planilha_clientes(content, file.filename)
-        set_session_value(session_id, "df_geo", resultado["df"])
-        set_session_value(session_id, "df_geo_stats", resultado["estatisticas"])
 
-        response_data = {
+        # Persist to disk
+        resultado["df"].write_parquet(GEO_PARQUET_PATH)
+        with open(GEO_STATS_PATH, "w", encoding="utf-8") as fh:
+            _json.dump(resultado["estatisticas"], fh, ensure_ascii=False)
+
+        # Store in app-level state (shared across all sessions)
+        request.app.state.df_geo       = resultado["df"]
+        request.app.state.df_geo_stats = resultado["estatisticas"]
+
+        return {
             "success": True,
             "message": "Planilha de clientes processada com sucesso",
             "estatisticas": resultado["estatisticas"],
             "avisos": resultado["avisos"],
         }
-        return create_response_with_session(response_data, session_id)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1878,11 +1882,10 @@ async def upload_clientes(
 # =============================================================================
 
 @api_router.get("/geo/status")
-async def geo_status(session: tuple = Depends(get_user_session)):
+async def geo_status(request: Request):
     """Check whether the clients geographic spreadsheet has been loaded."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
-    stats = session_data.get("df_geo_stats") or {}
+    df_geo = getattr(request.app.state, "df_geo", None)
+    stats  = getattr(request.app.state, "df_geo_stats", {}) or {}
     return {
         "has_data": df_geo is not None and len(df_geo) > 0,
         "estatisticas": stats,
@@ -1891,14 +1894,13 @@ async def geo_status(session: tuple = Depends(get_user_session)):
 
 @api_router.get("/geo/bairros")
 async def get_geo_bairros(
+    request: Request,
     unidade: Optional[str] = Query(None),
     cidade: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Return client metrics grouped by neighborhood."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         return {"bairros": []}
     return {
@@ -1913,12 +1915,11 @@ async def get_geo_bairros(
 
 @api_router.get("/geo/cidades")
 async def get_geo_cidades(
+    request: Request,
     unidade: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Return client counts per city (used to color the heat map)."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         return {"cidades": []}
     return {
@@ -1928,16 +1929,15 @@ async def get_geo_cidades(
 
 @api_router.get("/geo/clientes")
 async def get_geo_clientes(
+    request: Request,
     unidade: Optional[str] = Query(None),
     cidade: Optional[str] = Query(None),
     bairro: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
     ordenar_por: str = Query("ciclos_desc"),
-    session: tuple = Depends(get_user_session),
 ):
     """Return individual clients with geographic and inactivity data."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         return {"clientes": []}
     return {
@@ -1954,12 +1954,11 @@ async def get_geo_clientes(
 
 @api_router.get("/geo/filtros")
 async def get_geo_filtros(
+    request: Request,
     unidade: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Return available cities and neighborhoods for filter dropdowns."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         return {"cidades": [], "bairros": []}
 
@@ -1973,15 +1972,14 @@ async def get_geo_filtros(
 
 @api_router.get("/geo/export/bairros")
 async def export_geo_bairros(
+    request: Request,
     formato: str = Query("csv", pattern="^(csv|xlsx)$"),
     unidade: Optional[str] = Query(None),
     cidade: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Export neighborhood analysis as CSV or Excel."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         raise HTTPException(status_code=400, detail="Sem dados para exportar")
 
@@ -2009,14 +2007,13 @@ async def export_geo_bairros(
 
 @api_router.get("/geo/bairro/detalhe")
 async def get_geo_bairro_detalhe(
+    request: Request,
     bairro: str = Query(...),
     unidade: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Return streets and clients for a specific neighborhood (accordion detail)."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         return {"ruas": [], "clientes": []}
     return calcular_detalhe_bairro(
@@ -2143,26 +2140,29 @@ async def geo_populacao():
 
 
 @api_router.post("/geo/clear")
-async def clear_geo(session: tuple = Depends(get_user_session)):
-    """Remove the geographic clients data from the session."""
-    session_id, _ = session
-    set_session_value(session_id, "df_geo", None)
-    set_session_value(session_id, "df_geo_stats", None)
-    return create_response_with_session({"success": True}, session_id)
+async def clear_geo(request: Request):
+    """Remove the geographic clients data from disk and app state."""
+    request.app.state.df_geo       = None
+    request.app.state.df_geo_stats = {}
+    for path in (GEO_PARQUET_PATH, GEO_STATS_PATH):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    return {"success": True}
 
 
 @api_router.get("/geo/export/clientes")
 async def export_geo_clientes(
+    request: Request,
     formato: str = Query("csv", pattern="^(csv|xlsx)$"),
     unidade: Optional[str] = Query(None),
     cidade: Optional[str] = Query(None),
     bairro: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
 ):
     """Export clients list as CSV or Excel."""
-    _, session_data = session
-    df_geo = session_data.get("df_geo")
+    df_geo = getattr(request.app.state, "df_geo", None)
     if df_geo is None or len(df_geo) == 0:
         raise HTTPException(status_code=400, detail="Sem dados para exportar")
 
