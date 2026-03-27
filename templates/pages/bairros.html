@@ -776,7 +776,8 @@ function bairrosPage() {
             this.expandidoKey = '';
             this.expandidoDetalhe = null;
             this._detalheCache = {};
-            if (this._geojsonLayer && this._map) { this._map.removeLayer(this._geojsonLayer); this._geojsonLayer = null; }
+            if (this._map) { this._map.remove(); this._map = null; }
+            this._geojsonLayer = null;
         },
     };
 }
