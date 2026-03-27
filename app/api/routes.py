@@ -2027,40 +2027,119 @@ async def get_geo_bairro_detalhe(
     )
 
 
-_populacao_cache: dict = {}  # module-level cache, populated once per process
+# IBGE Censo 2022 — população residente por município de Alagoas
+# Fonte: SIDRA tabela 9514, variável 93, período 2022
+# Embutido diretamente para evitar dependência de rede em runtime.
+_POPULACAO_AL: dict = {
+    "Água Branca": 19008,
+    "Anadia": 13966,
+    "Arapiraca": 234696,
+    "Atalaia": 37512,
+    "Barra de Santo Antônio": 16365,
+    "Barra de São Miguel": 7944,
+    "Batalha": 16448,
+    "Belo Monte": 5936,
+    "Belém": 4722,
+    "Boca da Mata": 21187,
+    "Branquinha": 9603,
+    "Cacimbinhas": 10482,
+    "Cajueiro": 16024,
+    "Campestre": 6665,
+    "Campo Alegre": 32106,
+    "Campo Grande": 8143,
+    "Canapi": 15559,
+    "Capela": 15032,
+    "Carneiros": 8999,
+    "Chã Preta": 5910,
+    "Coité do Nóia": 10810,
+    "Colônia Leopoldina": 15816,
+    "Coqueiro Seco": 5581,
+    "Coruripe": 50414,
+    "Craíbas": 25397,
+    "Delmiro Gouveia": 51318,
+    "Dois Riachos": 9805,
+    "Estrela de Alagoas": 15429,
+    "Feira Grande": 22712,
+    "Feliz Deserto": 3963,
+    "Flexeiras": 9618,
+    "Girau do Ponciano": 36102,
+    "Ibateguara": 13731,
+    "Igaci": 23995,
+    "Igreja Nova": 21372,
+    "Inhapi": 15167,
+    "Jacaré dos Homens": 5083,
+    "Jacuípe": 5352,
+    "Japaratinga": 9219,
+    "Jaramataia": 4985,
+    "Jequiá da Praia": 9470,
+    "Joaquim Gomes": 17150,
+    "Jundiá": 4092,
+    "Junqueiro": 23907,
+    "Lagoa da Canoa": 18457,
+    "Limoeiro de Anadia": 24740,
+    "Maceió": 957916,
+    "Major Isidoro": 17700,
+    "Mar Vermelho": 3155,
+    "Maragogi": 32174,
+    "Maravilha": 9534,
+    "Marechal Deodoro": 60370,
+    "Maribondo": 13679,
+    "Mata Grande": 21844,
+    "Matriz de Camaragibe": 23857,
+    "Messias": 15405,
+    "Minador do Negrão": 4845,
+    "Monteirópolis": 7184,
+    "Murici": 25187,
+    "Novo Lino": 10020,
+    "Olho d'Água Grande": 4330,
+    "Olho d'Água das Flores": 20695,
+    "Olho d'Água do Casado": 8349,
+    "Olivença": 10812,
+    "Ouro Branco": 11446,
+    "Palestina": 4325,
+    "Palmeira dos Índios": 71574,
+    "Pariconha": 10573,
+    "Paripueira": 13835,
+    "Passo de Camaragibe": 13804,
+    "Paulo Jacinto": 6576,
+    "Penedo": 58650,
+    "Piaçabuçu": 15908,
+    "Pilar": 35370,
+    "Pindoba": 2731,
+    "Piranhas": 22609,
+    "Porto Calvo": 24071,
+    "Porto Real do Colégio": 20082,
+    "Porto de Pedras": 9295,
+    "Poço das Trincheiras": 12518,
+    "Pão de Açúcar": 23823,
+    "Quebrangulo": 11080,
+    "Rio Largo": 93927,
+    "Roteiro": 6474,
+    "Santa Luzia do Norte": 6919,
+    "Santana do Ipanema": 46220,
+    "Santana do Mundaú": 11323,
+    "Satuba": 24278,
+    "Senador Rui Palmeira": 12303,
+    "São Brás": 6555,
+    "São José da Laje": 20813,
+    "São José da Tapera": 30604,
+    "São Luís do Quitunde": 30873,
+    "São Miguel dos Campos": 51990,
+    "São Miguel dos Milagres": 8482,
+    "São Sebastião": 31786,
+    "Tanque d'Arca": 5796,
+    "Taquarana": 19032,
+    "Teotônio Vilela": 38053,
+    "Traipu": 23565,
+    "União dos Palmares": 59280,
+    "Viçosa": 24092,
+}
+
 
 @api_router.get("/geo/populacao")
 async def geo_populacao():
-    """
-    Return IBGE Censo 2022 resident population for all Alagoas municipalities.
-    Fetched from SIDRA once and cached for the lifetime of the process.
-    """
-    global _populacao_cache
-    if _populacao_cache:
-        return _populacao_cache
-
-    try:
-        url = "https://apisidra.ibge.gov.br/values/t/9514/n6/all/v/93/p/2022"
-        req = urllib.request.Request(url, headers={"User-Agent": "MultimarksAnalytics/1.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            rows = _json.loads(resp.read().decode("utf-8"))
-
-        municipios: dict = {}
-        for row in rows[1:]:          # row 0 is the header
-            code = str(row.get("D1C", ""))
-            name = str(row.get("D1N", ""))
-            value = str(row.get("V", ""))
-            if code.startswith("27") and value not in ("", "...", "-"):
-                try:
-                    municipios[name] = int(value.replace(".", "").replace(",", ""))
-                except ValueError:
-                    pass
-
-        _populacao_cache = {"municipios": municipios}
-        return _populacao_cache
-
-    except Exception as exc:
-        return {"municipios": {}, "erro": str(exc)}
+    """Return IBGE Censo 2022 resident population for all Alagoas municipalities."""
+    return {"municipios": _POPULACAO_AL}
 
 
 @api_router.post("/geo/clear")
