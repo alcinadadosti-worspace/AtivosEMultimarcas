@@ -229,6 +229,7 @@ def calcular_detalhe_bairro(
             "situacao": row.get(GEO_COL_SITUACAO, ""),
             "ativo": str(row.get(GEO_COL_SITUACAO, "")).startswith("ATIVO"),
             "ciclos_inatividade": int(row.get(GEO_COL_CICLOS_INATIVIDADE, 0) or 0),
+            "cod_estrutura": row.get(GEO_COL_COD_ESTRUTURA, ""),
             "papel": row.get(GEO_COL_PAPEL, ""),
             "telefone": row.get(GEO_COL_TELEFONE, ""),
             "endereco_diferente": bool(row.get("endereco_diferente", False)),

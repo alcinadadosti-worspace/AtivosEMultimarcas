@@ -355,13 +355,13 @@
             <!-- ══ ABA: Penetração de Mercado ══ -->
             <div x-show="abaAtiva === 'penetracao'">
 
-            <!-- ── Penetração de Mercado ───────────────────────────────── -->
+            <!-- ── Penetração de Mercado (cidade → bairro → rua → cliente) ── -->
             <div class="futuristic-section">
                 <div class="futuristic-section-title">
                     <i data-lucide="target" style="color:#a78bfa; width:17px; height:17px;"></i>
                     Penetração de Mercado
                     <span style="font-size:.76rem; font-weight:400; color:var(--text-muted); margin-left:4px;">
-                        por cidade · Censo IBGE 2022 · clientes por 10 mil hab.
+                        Censo IBGE 2022 · clientes por 10 mil hab.
                     </span>
                     <span x-show="_popLoading" style="display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-size:.78rem; color:var(--text-muted);">
                         <span class="loading-spinner" style="width:11px;height:11px;border-top-color:#a78bfa;"></span>
@@ -394,19 +394,19 @@
                     </div>
                     <div class="filter-group" style="margin-left:auto; gap:4px;">
                         <span style="font-size:.76rem; color:var(--text-muted);">Ordenar:</span>
-                        <button @click="penetSortC.campo='penetracao'; penetSortC.dir = penetSortC.campo==='penetracao' ? (penetSortC.dir==='asc'?'desc':'asc') : 'asc'"
+                        <button @click="penetSortC.campo==='penetracao'?penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc'):(penetSortC.campo='penetracao',penetSortC.dir='asc')"
                                 :class="penetSortC.campo==='penetracao' ? 'sort-btn active' : 'sort-btn'">
                             Penetração <span x-show="penetSortC.campo==='penetracao'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
                         </button>
-                        <button @click="penetSortC.campo==='clientes' ? penetSortC.dir=(penetSortC.dir==='desc'?'asc':'desc') : (penetSortC.campo='clientes', penetSortC.dir='desc')"
-                                :class="penetSortC.campo==='clientes' ? 'sort-btn active' : 'sort-btn'">
-                            Clientes <span x-show="penetSortC.campo==='clientes'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
+                        <button @click="penetSortC.campo==='total'?penetSortC.dir=(penetSortC.dir==='desc'?'asc':'desc'):(penetSortC.campo='total',penetSortC.dir='desc')"
+                                :class="penetSortC.campo==='total' ? 'sort-btn active' : 'sort-btn'">
+                            Clientes <span x-show="penetSortC.campo==='total'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
                         </button>
-                        <button @click="penetSortC.campo==='cidade' ? penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc') : (penetSortC.campo='cidade', penetSortC.dir='asc')"
+                        <button @click="penetSortC.campo==='cidade'?penetSortC.dir=(penetSortC.dir==='asc'?'desc':'asc'):(penetSortC.campo='cidade',penetSortC.dir='asc')"
                                 :class="penetSortC.campo==='cidade' ? 'sort-btn active' : 'sort-btn'">
                             A–Z <span x-show="penetSortC.campo==='cidade'" x-text="penetSortC.dir==='asc'?'↑':'↓'"></span>
                         </button>
-                        <button @click="penetFiltros.unidade=''; penetFiltros.acao=''; penetFiltros.buscaCidade=''; penetSortC={campo:'penetracao',dir:'asc'}"
+                        <button @click="penetFiltros.unidade=''; penetFiltros.acao=''; penetFiltros.buscaCidade=''; penetSortC={campo:'penetracao',dir:'asc'}; penetCidadeAberta=''; _penetCidadeCache={}"
                                 class="btn-sm" style="margin-left:4px;">
                             <i data-lucide="x-circle" style="width:11px;height:11px;"></i> Limpar
                         </button>
@@ -434,10 +434,16 @@
                                 <th>Ação Sugerida</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <template x-for="c in penetracaoData" :key="c.cidade">
-                                <tr>
-                                    <td style="font-weight:500;" x-text="c.cidade"></td>
+                        <template x-for="c in penetracaoData" :key="c.cidade">
+                            <tbody>
+                                <!-- City row -->
+                                <tr class="bairro-row"
+                                    :class="penetCidadeAberta === c.cidade ? 'expanded' : ''"
+                                    @click="penetToggleCidade(c.cidade)">
+                                    <td style="font-weight:500;">
+                                        <span class="expand-icon" :class="penetCidadeAberta === c.cidade ? 'open' : ''">▶</span>
+                                        <span x-text="c.cidade" style="margin-left:6px;"></span>
+                                    </td>
                                     <td class="num-cell" x-text="c.total.toLocaleString('pt-BR')"></td>
                                     <td class="num-cell" style="color:var(--text-muted);"
                                         x-text="c.populacao ? c.populacao.toLocaleString('pt-BR') : '–'"></td>
@@ -458,10 +464,16 @@
                                               x-text="c.status"></span>
                                     </td>
                                 </tr>
-                            </template>
-                            <tr x-show="!_popLoading && !penetracaoData.length">
-                                <td colspan="6" class="empty-msg">Aguardando dados do IBGE...</td>
-                            </tr>
+                                <!-- City detail row — bairros injected via innerHTML -->
+                                <tr x-show="penetCidadeAberta === c.cidade" style="background:rgba(10,10,25,.6);">
+                                    <td colspan="6" style="padding:0;">
+                                        <div :id="'penet-cidade-' + _safeId(c.cidade)"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </template>
+                        <tbody x-show="!_popLoading && !penetracaoData.length">
+                            <tr><td colspan="6" class="empty-msg">Aguardando dados do IBGE...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -471,127 +483,7 @@
                     <span><strong style="color:#f87171;">↑ Atacar</strong> — abaixo de 10 clientes/10k hab</span>
                     <span><strong style="color:#fbbf24;">↗ Crescer</strong> — entre 10 e 30/10k</span>
                     <span><strong style="color:#4ade80;">✓ Consolidado</strong> — acima de 30/10k</span>
-                </div>
-            </div>
-
-            <!-- ── Penetração por Bairro ───────────────────────────────── -->
-            <div class="futuristic-section" x-show="bairros.length > 0">
-                <div class="futuristic-section-title">
-                    <i data-lucide="map-pin" style="color:#a78bfa; width:17px; height:17px;"></i>
-                    Penetração por Bairro
-                    <span style="font-size:.76rem; font-weight:400; color:var(--text-muted); margin-left:4px;">
-                        estimativa: população da cidade ÷ nº de bairros · clientes por 10k hab
-                    </span>
-                    <span x-show="_popLoading" style="display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-size:.78rem; color:var(--text-muted);">
-                        <span class="loading-spinner" style="width:11px;height:11px;border-top-color:#a78bfa;"></span>
-                        Carregando IBGE...
-                    </span>
-                </div>
-
-                <!-- Filters -->
-                <div class="geo-filters" style="border-radius:0; border-left:none; border-right:none; border-top:none;">
-                    <div class="filter-group">
-                        <label>Cidade:</label>
-                        <select x-model="penetFiltros.cidade">
-                            <option value="">Todas</option>
-                            <template x-for="c in cidadesPenetracao" :key="c">
-                                <option :value="c" x-text="c"></option>
-                            </template>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Ação:</label>
-                        <select x-model="penetFiltros.acao">
-                            <option value="">Todas</option>
-                            <option value="Atacar">↑ Atacar</option>
-                            <option value="Crescer">↗ Crescer</option>
-                            <option value="Consolidado">✓ Consolidado</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Buscar bairro:</label>
-                        <input type="text" x-model="penetFiltros.buscaBairro" placeholder="Nome do bairro..." style="width:160px;">
-                    </div>
-                    <div class="filter-group" style="margin-left:auto; gap:4px;">
-                        <span style="font-size:.76rem; color:var(--text-muted);">Ordenar:</span>
-                        <button @click="penetSortB.campo==='penetracao'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='penetracao',penetSortB.dir='asc')"
-                                :class="penetSortB.campo==='penetracao' ? 'sort-btn active' : 'sort-btn'">
-                            Penetração <span x-show="penetSortB.campo==='penetracao'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                        </button>
-                        <button @click="penetSortB.campo==='total'?penetSortB.dir=(penetSortB.dir==='desc'?'asc':'desc'):(penetSortB.campo='total',penetSortB.dir='desc')"
-                                :class="penetSortB.campo==='total' ? 'sort-btn active' : 'sort-btn'">
-                            Clientes <span x-show="penetSortB.campo==='total'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                        </button>
-                        <button @click="penetSortB.campo==='bairro'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='bairro',penetSortB.dir='asc')"
-                                :class="penetSortB.campo==='bairro' ? 'sort-btn active' : 'sort-btn'">
-                            A–Z <span x-show="penetSortB.campo==='bairro'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                        </button>
-                        <button @click="penetFiltros.cidade=''; penetFiltros.acao=''; penetFiltros.buscaBairro=''; penetSortB={campo:'penetracao',dir:'asc'}"
-                                class="btn-sm" style="margin-left:4px;">
-                            <i data-lucide="x-circle" style="width:11px;height:11px;"></i> Limpar
-                        </button>
-                    </div>
-                </div>
-
-                <div class="futuristic-table-scroll">
-                    <table class="futuristic-table">
-                        <thead>
-                            <tr>
-                                <th @click="penetSortB.campo==='bairro'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='bairro',penetSortB.dir='asc')"
-                                    :class="penetSortB.campo==='bairro'?'sort-active':''">
-                                    Bairro <span x-show="penetSortB.campo==='bairro'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                                </th>
-                                <th @click="penetSortB.campo==='cidade'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='cidade',penetSortB.dir='asc')"
-                                    :class="penetSortB.campo==='cidade'?'sort-active':''">
-                                    Cidade <span x-show="penetSortB.campo==='cidade'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                                </th>
-                                <th class="num-cell" @click="penetSortB.campo==='total'?penetSortB.dir=(penetSortB.dir==='desc'?'asc':'desc'):(penetSortB.campo='total',penetSortB.dir='desc')"
-                                    :class="penetSortB.campo==='total'?'sort-active':''">
-                                    Clientes <span x-show="penetSortB.campo==='total'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                                </th>
-                                <th class="num-cell">Pop. Estimada¹</th>
-                                <th class="num-cell" @click="penetSortB.campo==='penetracao'?penetSortB.dir=(penetSortB.dir==='asc'?'desc':'asc'):(penetSortB.campo='penetracao',penetSortB.dir='asc')"
-                                    :class="penetSortB.campo==='penetracao'?'sort-active':''">
-                                    Clientes / 10k hab <span x-show="penetSortB.campo==='penetracao'" x-text="penetSortB.dir==='asc'?'↑':'↓'"></span>
-                                </th>
-                                <th style="min-width:120px;">Penetração</th>
-                                <th>Ação Sugerida</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="b in penetracaoBairros" :key="b.bairro+'|'+b.cidade">
-                                <tr>
-                                    <td style="font-weight:500;" x-text="b.bairro"></td>
-                                    <td style="color:var(--text-muted); font-size:.83rem;" x-text="b.cidade"></td>
-                                    <td class="num-cell" x-text="b.total.toLocaleString('pt-BR')"></td>
-                                    <td class="num-cell" style="color:var(--text-muted); font-size:.82rem;"
-                                        x-text="b.estPop ? b.estPop.toLocaleString('pt-BR') : '–'"></td>
-                                    <td class="num-cell" style="font-weight:700;"
-                                        :style="'color:' + b.cor"
-                                        x-text="b.penetracao !== null ? b.penetracao.toFixed(1) : '–'"></td>
-                                    <td>
-                                        <div class="bar-container">
-                                            <div class="bar-bg" style="flex:1; min-width:80px;">
-                                                <template x-if="b.penetracao !== null">
-                                                    <div class="bar-fill"
-                                                         :style="'width:' + Math.min(b.penetracao / 60 * 100, 100).toFixed(0) + '%; background:' + b.cor + '44; border-right:2px solid ' + b.cor + ';'"></div>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span style="padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:600;"
-                                              :style="'background:' + b.cor + '22; color:' + b.cor + '; border:1px solid ' + b.cor + '55;'"
-                                              x-text="b.status"></span>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="padding:10px 18px; font-size:.73rem; color:var(--text-muted); border-top:1px solid rgba(139,92,246,.1);">
-                    ¹ Estimativa: população IBGE 2022 da cidade dividida pelo número de bairros cadastrados. O IBGE não disponibiliza população por bairro via API pública.
+                    <span style="margin-left:auto; font-style:italic;">¹ Pop. bairro: estimativa IBGE 2022 ÷ nº de bairros cadastrados</span>
                 </div>
             </div>
 
@@ -606,6 +498,9 @@
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// Global reference to the Alpine component (set in init)
+let _bairrosPage = null;
+
 // Toggle rua sub-accordion (called from injected innerHTML onclick)
 function toggleRua(row) {
     const detail = row.nextElementSibling;
@@ -613,6 +508,20 @@ function toggleRua(row) {
     const open   = detail.style.display === 'table-row';
     detail.style.display = open ? 'none' : 'table-row';
     if (icon) icon.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+// Toggle bairro accordion inside penetration city panel
+function penetToggleBairroRow(row, bairro, cidade) {
+    const detail = row.nextElementSibling;
+    const icon   = row.querySelector('.rua-expand-icon');
+    const open   = detail.style.display === 'table-row';
+    detail.style.display = open ? 'none' : 'table-row';
+    if (icon) icon.style.transform = open ? '' : 'rotate(90deg)';
+    if (!open && _bairrosPage) {
+        const key = bairro + '|' + cidade;
+        const cid = 'pb-' + key.replace(/[^a-zA-Z0-9]/g, '_');
+        _bairrosPage._penetCarregarBairroDetalhe(bairro, cidade, cid);
+    }
 }
 
 function bairrosPage() {
@@ -647,6 +556,10 @@ function bairrosPage() {
         penetFiltros: { unidade: '', situacao: '', acao: '', cidade: '', buscaCidade: '', buscaBairro: '' },
         penetSortC: { campo: 'penetracao', dir: 'asc' },
         penetSortB: { campo: 'penetracao', dir: 'asc' },
+
+        // Penetration hierarchical accordion
+        penetCidadeAberta: '',
+        _penetCidadeCache: {},
 
         // Filters
         filtros: { unidade: '', situacao: '', cidade: '' },
@@ -759,6 +672,7 @@ function bairrosPage() {
 
         // ── Init ─────────────────────────────────────────────────────
         async init() {
+            _bairrosPage = this;  // global ref for onclick handlers in injected HTML
             this._carregarPopulacaoIBGE();  // carrega em paralelo, não bloqueia
             await this.verificarStatus();
             this.$nextTick(() => lucide.createIcons());
@@ -833,9 +747,11 @@ function bairrosPage() {
                 const res = await fetch('/api/geo/bairros?' + this._buildParams());
                 const data = await res.json();
                 this.bairros = data.bairros || [];
-                // Reset accordion on data refresh
+                // Reset accordions on data refresh
                 this.expandidoKey = '';
                 this._detalheCache = {};
+                this.penetCidadeAberta = '';
+                this._penetCidadeCache = {};
             } catch (e) { console.error(e); }
         },
 
@@ -952,7 +868,8 @@ function bairrosPage() {
                                 ? `<span class="badge-diff" title="Retira em: ${this._esc(c.bairro_entrega)}/${this._esc(c.cidade_entrega)}">↔ diff</span>`
                                 : '';
                             return `<tr style="background:rgba(5,5,18,.85);">
-                                <td style="padding:7px 12px 7px 30px;font-size:.81rem;font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(c.nome)}</td>
+                                <td style="padding:7px 12px 7px 30px;font-size:.81rem;font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(c.nome)}</td>
+                                <td style="padding:7px 12px;font-family:monospace;font-size:.78rem;color:#a78bfa;">${this._esc(c.cod_estrutura)}</td>
                                 <td style="padding:7px 12px;"><span class="${bdg}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
                                 <td class="num-cell ${cc}" style="padding:7px 12px;">${c.ciclos_inatividade}</td>
                                 <td style="padding:7px 12px;font-size:.78rem;color:var(--text-muted);">${this._esc(c.papel)}</td>
@@ -960,7 +877,7 @@ function bairrosPage() {
                                 <td style="padding:7px 12px;">${diff}</td>
                             </tr>`;
                         }).join('')
-                        : `<tr><td colspan="6" style="padding:10px 30px;color:var(--text-muted);font-size:.81rem;font-style:italic;">Sem clientes visíveis nesta rua.</td></tr>`;
+                        : `<tr><td colspan="7" style="padding:10px 30px;color:var(--text-muted);font-size:.81rem;font-style:italic;">Sem clientes visíveis nesta rua.</td></tr>`;
 
                     return `
                     <tr class="rua-row" onclick="toggleRua(this)" style="cursor:pointer;">
@@ -977,6 +894,7 @@ function bairrosPage() {
                             <table style="width:100%;border-collapse:collapse;">
                                 <thead><tr style="background:rgba(10,10,28,.95);">
                                     <th style="padding:6px 12px 6px 30px;text-align:left;color:var(--text-muted);font-size:.69rem;text-transform:uppercase;letter-spacing:.04em;">Nome</th>
+                                    <th style="padding:6px 12px;text-align:left;color:var(--text-muted);font-size:.69rem;text-transform:uppercase;">Setor</th>
                                     <th style="padding:6px 12px;text-align:left;color:var(--text-muted);font-size:.69rem;text-transform:uppercase;">Situação</th>
                                     <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.69rem;text-transform:uppercase;">Ciclos</th>
                                     <th style="padding:6px 12px;text-align:left;color:var(--text-muted);font-size:.69rem;text-transform:uppercase;">Papel</th>
@@ -1013,6 +931,98 @@ function bairrosPage() {
                     </table>
                 </div>
             </div>`;
+        },
+
+        // ── Penetration hierarchical accordion ───────────────────────
+        penetToggleCidade(cidade) {
+            if (this.penetCidadeAberta === cidade) { this.penetCidadeAberta = ''; return; }
+            this.penetCidadeAberta = cidade;
+            this.$nextTick(() => {
+                const el = document.getElementById('penet-cidade-' + this._safeId(cidade));
+                if (!el) return;
+                if (!this._penetCidadeCache[cidade]) {
+                    this._penetCidadeCache[cidade] = this._buildCidadeBairrosHTML(cidade);
+                }
+                el.innerHTML = this._penetCidadeCache[cidade];
+                lucide.createIcons();
+            });
+        },
+
+        _buildCidadeBairrosHTML(cidade) {
+            const cityPop  = this._popIBGE(cidade);
+            const bairrosDaCidade = this.bairros
+                .filter(b => this._normalizar(b.cidade) === this._normalizar(cidade));
+            const nBairros = bairrosDaCidade.length || 1;
+
+            const rows = bairrosDaCidade
+                .map(b => {
+                    const estPop = cityPop > 0 ? Math.round(cityPop / nBairros) : 0;
+                    const pen    = estPop > 0 ? b.total / estPop * 10000 : null;
+                    let cor = 'var(--text-muted)';
+                    let status = 'Sem dado';
+                    if (pen !== null) {
+                        if (pen < 10)      { cor = '#f87171'; status = '↑ Atacar'; }
+                        else if (pen < 30) { cor = '#fbbf24'; status = '↗ Crescer'; }
+                        else               { cor = '#4ade80'; status = '✓ Consolidado'; }
+                    }
+                    const key = b.bairro + '|' + b.cidade;
+                    const cid = 'pb-' + key.replace(/[^a-zA-Z0-9]/g, '_');
+                    return `
+                    <tr class="bairro-row" onclick="penetToggleBairroRow(this,'${this._esc(b.bairro)}','${this._esc(b.cidade)}')" style="cursor:pointer;">
+                        <td style="padding:9px 14px 9px 28px;">
+                            <span class="rua-expand-icon" style="color:#a78bfa;font-size:.72rem;display:inline-block;transition:transform .2s;margin-right:6px;">▶</span>
+                            ${this._esc(b.bairro)}
+                        </td>
+                        <td class="num-cell" style="padding:9px 14px;">${b.total.toLocaleString('pt-BR')}</td>
+                        <td class="num-cell" style="padding:9px 14px;color:var(--text-muted);">${estPop ? estPop.toLocaleString('pt-BR') : '–'}</td>
+                        <td class="num-cell" style="padding:9px 14px;font-weight:700;color:${cor};">${pen !== null ? pen.toFixed(1) : '–'}</td>
+                        <td style="padding:9px 14px;">
+                            <span style="padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;background:${cor}22;color:${cor};border:1px solid ${cor}55;">${status}</span>
+                        </td>
+                    </tr>
+                    <tr class="bairro-detail-row" style="display:none;">
+                        <td colspan="5" style="padding:0;">
+                            <div id="${cid}"></div>
+                        </td>
+                    </tr>`;
+                }).join('');
+
+            return `<table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+                <thead><tr style="background:rgba(10,10,28,.7);">
+                    <th style="padding:8px 14px 8px 28px;text-align:left;color:var(--text-muted);font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Bairro</th>
+                    <th style="padding:8px 14px;text-align:right;color:var(--text-muted);font-size:.71rem;text-transform:uppercase;">Clientes</th>
+                    <th style="padding:8px 14px;text-align:right;color:var(--text-muted);font-size:.71rem;text-transform:uppercase;">Pop. Est.¹</th>
+                    <th style="padding:8px 14px;text-align:right;color:var(--text-muted);font-size:.71rem;text-transform:uppercase;">Cli/10k hab</th>
+                    <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-size:.71rem;text-transform:uppercase;">Ação</th>
+                </tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="empty-msg" style="padding:14px;">Nenhum bairro.</td></tr>'}</tbody>
+            </table>`;
+        },
+
+        async _penetCarregarBairroDetalhe(bairro, cidade, containerId) {
+            const key = bairro + '|' + cidade;
+            const el = document.getElementById(containerId);
+            if (!el) return;
+
+            if (this._detalheCache[key]) {
+                el.innerHTML = this._detalheCache[key];
+                lucide.createIcons();
+                return;
+            }
+
+            el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:.84rem;"><span class="loading-spinner" style="border-top-color:#a78bfa;"></span> <span style="margin-left:8px;">Carregando...</span></div>';
+
+            try {
+                const params = new URLSearchParams({ bairro });
+                if (this.filtros.unidade)  params.set('unidade',  this.filtros.unidade);
+                if (this.filtros.situacao) params.set('situacao', this.filtros.situacao);
+                const res  = await fetch('/api/geo/bairro/detalhe?' + params);
+                const data = await res.json();
+                const html = this._buildDetalheHTML({ bairro, cidade }, data);
+                this._detalheCache[key] = html;
+                el.innerHTML = html;
+                lucide.createIcons();
+            } catch(e) { console.error(e); }
         },
 
         // ── Population (IBGE) ────────────────────────────────────────
