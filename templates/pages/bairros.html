@@ -306,110 +306,17 @@
                                     </td>
                                 </tr>
 
-                                <!-- Accordion detail row -->
+                                <!-- Accordion detail row — content injected via innerHTML (no Alpine x-for) -->
                                 <tr x-show="expandidoKey === b.bairro+'|'+b.cidade" style="background:rgba(10,10,25,.6);">
                                     <td colspan="7" class="accordion-panel" style="padding:0;">
-
-                                        <div class="accordion-inner">
-
-                                            <!-- Loading spinner (shown while fetching) -->
-                                            <div x-show="expandidoLoading" style="padding:24px; text-align:center; color:var(--text-muted); font-size:.84rem;">
-                                                <span class="loading-spinner" style="border-top-color:#a78bfa;"></span>
-                                                <span style="margin-left:8px;">Carregando detalhes...</span>
-                                            </div>
-
-                                            <template x-if="!expandidoLoading && expandidoDetalhe">
-                                                <div>
-                                                    <!-- Ruas -->
-                                                    <p class="accordion-subtitle">
-                                                        <i data-lucide="navigation" style="width:13px;height:13px;"></i>
-                                                        Ruas do bairro
-                                                        <span x-text="'(' + expandidoDetalhe.ruas.length + ' ruas)'"
-                                                              style="font-weight:400; color:var(--text-muted);"></span>
-                                                    </p>
-                                                    <div style="overflow-x:auto; margin-bottom:24px;">
-                                                        <table class="accordion-table">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Rua</th>
-                                                                    <th class="num-cell">Total</th>
-                                                                    <th class="num-cell">Ativos</th>
-                                                                    <th class="num-cell">Inativos</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <template x-if="!expandidoDetalhe.ruas.length">
-                                                                    <tr><td colspan="4" class="empty-msg" style="padding:14px;">Sem dados de rua.</td></tr>
-                                                                </template>
-                                                                <template x-for="r in expandidoDetalhe.ruas" :key="r.rua">
-                                                                    <tr>
-                                                                        <td x-text="r.rua" style="font-size:.82rem;"></td>
-                                                                        <td class="num-cell" x-text="r.total"></td>
-                                                                        <td class="num-cell" style="color:#4ade80;" x-text="r.ativos"></td>
-                                                                        <td class="num-cell" style="color:#f87171;" x-text="r.inativos"></td>
-                                                                    </tr>
-                                                                </template>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-
-                                                    <!-- Clientes -->
-                                                    <p class="accordion-subtitle">
-                                                        <i data-lucide="user" style="width:13px;height:13px;"></i>
-                                                        Clientes do bairro
-                                                        <span x-text="'(' + expandidoDetalhe.clientes.length + ' clientes)'"
-                                                              style="font-weight:400; color:var(--text-muted);"></span>
-                                                        <a :href="exportClientesBairro(b)" class="btn-sm" style="margin-left:auto;">
-                                                            <i data-lucide="download" style="width:11px;height:11px;"></i>Exportar
-                                                        </a>
-                                                    </p>
-                                                    <div style="overflow-x:auto;">
-                                                        <table class="accordion-table">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Nome</th>
-                                                                    <th>Rua</th>
-                                                                    <th>Situação</th>
-                                                                    <th class="num-cell">Ciclos Inativo</th>
-                                                                    <th>Papel</th>
-                                                                    <th>Telefone</th>
-                                                                    <th>End.</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <template x-if="!expandidoDetalhe.clientes.length">
-                                                                    <tr><td colspan="7" class="empty-msg" style="padding:14px;">Nenhum cliente.</td></tr>
-                                                                </template>
-                                                                <template x-for="c in expandidoDetalhe.clientes" :key="c.cpf + c.nome">
-                                                                    <tr>
-                                                                        <td x-text="c.nome" style="font-weight:500; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.81rem;"></td>
-                                                                        <td x-text="c.rua" style="color:var(--text-muted); font-size:.79rem; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></td>
-                                                                        <td>
-                                                                            <span :class="c.ativo ? 'badge-ativo' : 'badge-inativo'"
-                                                                                  x-text="c.ativo ? 'Ativo' : 'Inativo'"></span>
-                                                                        </td>
-                                                                        <td class="num-cell"
-                                                                            :class="c.ciclos_inatividade >= 4 ? 'ciclos-high' : c.ciclos_inatividade >= 2 ? 'ciclos-mid' : ''"
-                                                                            x-text="c.ciclos_inatividade"></td>
-                                                                        <td x-text="c.papel" style="font-size:.78rem; color:var(--text-muted);"></td>
-                                                                        <td x-text="c.telefone" style="font-family:monospace; font-size:.79rem; color:var(--text-muted);"></td>
-                                                                        <td>
-                                                                            <template x-if="c.endereco_diferente">
-                                                                                <span class="badge-diff"
-                                                                                      :title="'Retira em: '+c.bairro_entrega+'/'+c.cidade_entrega">
-                                                                                    ↔ diff
-                                                                                </span>
-                                                                            </template>
-                                                                        </td>
-                                                                    </tr>
-                                                                </template>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </template>
-
+                                        <!-- Spinner (only while loading this bairro) -->
+                                        <div x-show="expandidoLoading && expandidoKey === b.bairro+'|'+b.cidade"
+                                             style="padding:24px; text-align:center; color:var(--text-muted); font-size:.84rem;">
+                                            <span class="loading-spinner" style="border-top-color:#a78bfa;"></span>
+                                            <span style="margin-left:8px;">Carregando detalhes...</span>
                                         </div>
+                                        <!-- Static HTML injected by _injetarDetalhe() -->
+                                        <div :id="'acc-' + (b.bairro+'|'+b.cidade).replace(/[^a-zA-Z0-9]/g,'_')"></div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -452,9 +359,8 @@ function bairrosPage() {
 
         // Accordion
         expandidoKey: '',
-        expandidoDetalhe: null,    // {ruas, clientes} for the open bairro
         expandidoLoading: false,
-        _detalheCache: {},         // key -> {ruas,clientes} — instant on re-open
+        _detalheCache: {},  // key -> HTML string — instant on re-open
 
         // Filters
         filtros: { unidade: '', situacao: '', cidade: '' },
@@ -550,7 +456,6 @@ function bairrosPage() {
                 this.bairros = data.bairros || [];
                 // Reset accordion on data refresh
                 this.expandidoKey = '';
-                this.expandidoDetalhe = null;
                 this._detalheCache = {};
             } catch (e) { console.error(e); }
         },
@@ -597,21 +502,19 @@ function bairrosPage() {
             // Close if already open
             if (this.expandidoKey === key) {
                 this.expandidoKey = '';
-                this.expandidoDetalhe = null;
                 return;
             }
 
-            // Return cached detail instantly if available
+            // Cached: open instantly and inject pre-built HTML
             if (this._detalheCache[key]) {
                 this.expandidoKey = key;
-                this.expandidoDetalhe = this._detalheCache[key];
-                this.$nextTick(() => lucide.createIcons());
+                await this.$nextTick();
+                this._injetarDetalhe(key, this._detalheCache[key]);
                 return;
             }
 
-            // Open row and fetch ruas + clientes from detail endpoint
+            // Open row with spinner, then fetch
             this.expandidoKey = key;
-            this.expandidoDetalhe = null;
             this.expandidoLoading = true;
             try {
                 const params = new URLSearchParams({ bairro: b.bairro });
@@ -619,13 +522,98 @@ function bairrosPage() {
                 if (this.filtros.situacao) params.set('situacao', this.filtros.situacao);
                 const res = await fetch('/api/geo/bairro/detalhe?' + params);
                 const data = await res.json();
-                this.expandidoDetalhe = { ruas: data.ruas || [], clientes: data.clientes || [] };
-                this._detalheCache[key] = this.expandidoDetalhe;
-            } catch (e) { console.error(e); }
-            finally {
+                const html = this._buildDetalheHTML(b, data);
+                this._detalheCache[key] = html;
                 this.expandidoLoading = false;
-                this.$nextTick(() => lucide.createIcons());
+                await this.$nextTick();
+                this._injetarDetalhe(key, html);
+            } catch (e) {
+                console.error(e);
+                this.expandidoLoading = false;
             }
+        },
+
+        _safeId(key) {
+            return 'acc-' + key.replace(/[^a-zA-Z0-9]/g, '_');
+        },
+
+        _injetarDetalhe(key, html) {
+            const el = document.getElementById(this._safeId(key));
+            if (el) { el.innerHTML = html; lucide.createIcons(); }
+        },
+
+        _esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        },
+
+        _buildDetalheHTML(b, data) {
+            const ruas = data.ruas || [];
+            const clientes = data.clientes || [];
+            const exportUrl = this.exportClientesBairro(b);
+
+            const ruasRows = ruas.length
+                ? ruas.map(r => `<tr>
+                    <td style="font-size:.82rem;">${this._esc(r.rua)}</td>
+                    <td class="num-cell">${r.total}</td>
+                    <td class="num-cell" style="color:#4ade80;">${r.ativos}</td>
+                    <td class="num-cell" style="color:#f87171;">${r.inativos}</td>
+                  </tr>`).join('')
+                : `<tr><td colspan="4" class="empty-msg" style="padding:14px;">Sem dados de rua.</td></tr>`;
+
+            const clientesRows = clientes.length
+                ? clientes.map(c => {
+                    const cc = c.ciclos_inatividade >= 4 ? 'ciclos-high' : c.ciclos_inatividade >= 2 ? 'ciclos-mid' : '';
+                    const badge = c.ativo ? 'badge-ativo' : 'badge-inativo';
+                    const diff = c.endereco_diferente
+                        ? `<span class="badge-diff" title="Retira em: ${this._esc(c.bairro_entrega)}/${this._esc(c.cidade_entrega)}">↔ diff</span>`
+                        : '';
+                    return `<tr>
+                        <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.81rem;">${this._esc(c.nome)}</td>
+                        <td style="color:var(--text-muted);font-size:.79rem;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(c.rua)}</td>
+                        <td><span class="${badge}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                        <td class="num-cell ${cc}">${c.ciclos_inatividade}</td>
+                        <td style="font-size:.78rem;color:var(--text-muted);">${this._esc(c.papel)}</td>
+                        <td style="font-family:monospace;font-size:.79rem;color:var(--text-muted);">${this._esc(c.telefone)}</td>
+                        <td>${diff}</td>
+                    </tr>`;
+                }).join('')
+                : `<tr><td colspan="7" class="empty-msg" style="padding:14px;">Nenhum cliente.</td></tr>`;
+
+            return `<div class="accordion-inner">
+                <p class="accordion-subtitle">
+                    <i data-lucide="navigation" style="width:13px;height:13px;"></i>
+                    Ruas do bairro
+                    <span style="font-weight:400;color:var(--text-muted);">(${ruas.length} ruas)</span>
+                </p>
+                <div style="overflow-x:auto;margin-bottom:24px;">
+                    <table class="accordion-table">
+                        <thead><tr>
+                            <th>Rua</th><th class="num-cell">Total</th>
+                            <th class="num-cell">Ativos</th><th class="num-cell">Inativos</th>
+                        </tr></thead>
+                        <tbody>${ruasRows}</tbody>
+                    </table>
+                </div>
+                <p class="accordion-subtitle">
+                    <i data-lucide="user" style="width:13px;height:13px;"></i>
+                    Clientes do bairro
+                    <span style="font-weight:400;color:var(--text-muted);">(${clientes.length} clientes)</span>
+                    <a href="${exportUrl}" class="btn-sm" style="margin-left:auto;">
+                        <i data-lucide="download" style="width:11px;height:11px;"></i>Exportar
+                    </a>
+                </p>
+                <div style="overflow-x:auto;">
+                    <table class="accordion-table">
+                        <thead><tr>
+                            <th>Nome</th><th>Rua</th><th>Situação</th>
+                            <th class="num-cell">Ciclos Inativo</th>
+                            <th>Papel</th><th>Telefone</th><th>End.</th>
+                        </tr></thead>
+                        <tbody>${clientesRows}</tbody>
+                    </table>
+                </div>
+            </div>`;
         },
 
         // ── Sort ─────────────────────────────────────────────────────
@@ -774,7 +762,6 @@ function bairrosPage() {
             this.stats = {};
             this._cidadesData = [];
             this.expandidoKey = '';
-            this.expandidoDetalhe = null;
             this._detalheCache = {};
             if (this._map) { this._map.remove(); this._map = null; }
             this._geojsonLayer = null;
