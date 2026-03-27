@@ -388,9 +388,73 @@
 
                 <div style="padding:10px 18px; font-size:.74rem; color:var(--text-muted); border-top:1px solid rgba(139,92,246,.1); display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
                     <span>Referência:</span>
-                    <span><strong style="color:#f87171;">↑ Atacar</strong> — abaixo de 10 clientes/10k hab (grande oportunidade)</span>
-                    <span><strong style="color:#fbbf24;">↗ Crescer</strong> — entre 10 e 30/10k (potencial moderado)</span>
-                    <span><strong style="color:#4ade80;">✓ Consolidado</strong> — acima de 30/10k (bem penetrado)</span>
+                    <span><strong style="color:#f87171;">↑ Atacar</strong> — abaixo de 10 clientes/10k hab</span>
+                    <span><strong style="color:#fbbf24;">↗ Crescer</strong> — entre 10 e 30/10k</span>
+                    <span><strong style="color:#4ade80;">✓ Consolidado</strong> — acima de 30/10k</span>
+                </div>
+            </div>
+
+            <!-- ── Penetração por Bairro ───────────────────────────────── -->
+            <div class="futuristic-section" x-show="penetracaoBairros.length > 0">
+                <div class="futuristic-section-title">
+                    <i data-lucide="map-pin" style="color:#a78bfa; width:17px; height:17px;"></i>
+                    Penetração por Bairro
+                    <span style="font-size:.76rem; font-weight:400; color:var(--text-muted); margin-left:4px;">
+                        estimativa: população da cidade ÷ nº de bairros · clientes por 10k hab
+                    </span>
+                    <span x-show="_popLoading" style="display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-size:.78rem; color:var(--text-muted);">
+                        <span class="loading-spinner" style="width:11px;height:11px;border-top-color:#a78bfa;"></span>
+                        Carregando IBGE...
+                    </span>
+                </div>
+
+                <div class="futuristic-table-scroll">
+                    <table class="futuristic-table">
+                        <thead>
+                            <tr>
+                                <th>Bairro</th>
+                                <th>Cidade</th>
+                                <th class="num-cell">Clientes</th>
+                                <th class="num-cell">Pop. Estimada¹</th>
+                                <th class="num-cell">Clientes / 10k hab</th>
+                                <th style="min-width:120px;">Penetração</th>
+                                <th>Ação Sugerida</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="b in penetracaoBairros" :key="b.bairro+'|'+b.cidade">
+                                <tr>
+                                    <td style="font-weight:500;" x-text="b.bairro"></td>
+                                    <td style="color:var(--text-muted); font-size:.83rem;" x-text="b.cidade"></td>
+                                    <td class="num-cell" x-text="b.total.toLocaleString('pt-BR')"></td>
+                                    <td class="num-cell" style="color:var(--text-muted); font-size:.82rem;"
+                                        x-text="b.estPop ? b.estPop.toLocaleString('pt-BR') : '–'"></td>
+                                    <td class="num-cell" style="font-weight:700;"
+                                        :style="'color:' + b.cor"
+                                        x-text="b.penetracao !== null ? b.penetracao.toFixed(1) : '–'"></td>
+                                    <td>
+                                        <div class="bar-container">
+                                            <div class="bar-bg" style="flex:1; min-width:80px;">
+                                                <template x-if="b.penetracao !== null">
+                                                    <div class="bar-fill"
+                                                         :style="'width:' + Math.min(b.penetracao / 60 * 100, 100).toFixed(0) + '%; background:' + b.cor + '44; border-right:2px solid ' + b.cor + ';'"></div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span style="padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:600;"
+                                              :style="'background:' + b.cor + '22; color:' + b.cor + '; border:1px solid ' + b.cor + '55;'"
+                                              x-text="b.status"></span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="padding:10px 18px; font-size:.73rem; color:var(--text-muted); border-top:1px solid rgba(139,92,246,.1);">
+                    ¹ Estimativa: população IBGE 2022 da cidade dividida pelo número de bairros cadastrados. O IBGE não disponibiliza população por bairro via API pública.
                 </div>
             </div>
 
@@ -461,14 +525,13 @@ function bairrosPage() {
             if (!this._cidadesData.length) return [];
             const vals = this._cidadesData
                 .map(c => {
-                    const pop = this._popData[this._normalizar(c.cidade)] || 0;
+                    const pop = this._popIBGE(c.cidade);
                     return pop > 0 ? c.total / pop * 10000 : null;
-                })
-                .filter(v => v !== null);
+                }).filter(v => v !== null);
             const maxPen = Math.max(...vals, 1);
             return [...this._cidadesData]
                 .map(c => {
-                    const pop = this._popData[this._normalizar(c.cidade)] || 0;
+                    const pop = this._popIBGE(c.cidade);
                     const pen = pop > 0 ? c.total / pop * 10000 : null;
                     const pctBar = pen !== null ? Math.round(pen / maxPen * 100) : 0;
                     let status, cor;
@@ -481,8 +544,40 @@ function bairrosPage() {
                 .sort((a, b) => {
                     if (a.penetracao === null) return 1;
                     if (b.penetracao === null) return -1;
-                    return a.penetracao - b.penetracao;  // menor penetração primeiro = maior oportunidade
+                    return a.penetracao - b.penetracao;
                 });
+        },
+
+        get penetracaoBairros() {
+            // One entry per bairro with estimated population.
+            // Estimate: city_pop / number_of_bairros_in_that_city (uniform distribution).
+            // Clearly labelled as estimate in the UI.
+            if (!this.bairros.length) return [];
+
+            // Count bairros per city from current list
+            const bairrosPorCidade = {};
+            for (const b of this.bairros) {
+                bairrosPorCidade[b.cidade] = (bairrosPorCidade[b.cidade] || 0) + 1;
+            }
+
+            const items = this.bairros.map(b => {
+                const cityPop  = this._popIBGE(b.cidade);
+                const nBairros = bairrosPorCidade[b.cidade] || 1;
+                const estPop   = cityPop > 0 ? Math.round(cityPop / nBairros) : 0;
+                const pen      = estPop > 0 ? b.total / estPop * 10000 : null;
+                let status, cor;
+                if (pen === null)  { status = 'Sem dado';      cor = 'var(--text-muted)'; }
+                else if (pen < 10) { status = '↑ Atacar';      cor = '#f87171'; }
+                else if (pen < 30) { status = '↗ Crescer';     cor = '#fbbf24'; }
+                else               { status = '✓ Consolidado'; cor = '#4ade80'; }
+                return { ...b, estPop, penetracao: pen, status, cor };
+            });
+
+            return items.sort((a, b) => {
+                if (a.penetracao === null) return 1;
+                if (b.penetracao === null) return -1;
+                return a.penetracao - b.penetracao;
+            });
         },
 
         // ── Init ─────────────────────────────────────────────────────
@@ -748,17 +843,21 @@ function bairrosPage() {
             if (Object.keys(this._popData).length) return; // já carregado
             this._popLoading = true;
             try {
-                const res = await fetch('https://apisidra.ibge.gov.br/values/t/9514/n6/all/v/93/p/2022');
-                const rows = await res.json();
+                const res = await fetch('/api/geo/populacao');
+                const data = await res.json();
+                // data.municipios = {"Penedo": 60378, "Palmeira dos Índios": 72342, ...}
                 const pop = {};
-                for (const row of rows.slice(1)) {  // primeira linha é cabeçalho
-                    if (String(row.D1C).startsWith('27') && row.V && row.V !== '...') {
-                        pop[this._normalizar(row.D1N)] = parseInt(String(row.V).replace(/\D/g,'')) || 0;
-                    }
+                for (const [nome, valor] of Object.entries(data.municipios || {})) {
+                    pop[this._normalizar(nome)] = valor;
                 }
                 this._popData = pop;
             } catch(e) { console.error('IBGE população:', e); }
             finally { this._popLoading = false; }
+        },
+
+        // Lookup population by city name (normalized matching)
+        _popIBGE(cidade) {
+            return this._popData[this._normalizar(cidade)] || 0;
         },
 
         // ── Sort ─────────────────────────────────────────────────────

@@ -2027,6 +2027,42 @@ async def get_geo_bairro_detalhe(
     )
 
 
+_populacao_cache: dict = {}  # module-level cache, populated once per process
+
+@api_router.get("/geo/populacao")
+async def geo_populacao():
+    """
+    Return IBGE Censo 2022 resident population for all Alagoas municipalities.
+    Fetched from SIDRA once and cached for the lifetime of the process.
+    """
+    global _populacao_cache
+    if _populacao_cache:
+        return _populacao_cache
+
+    try:
+        url = "https://apisidra.ibge.gov.br/values/t/9514/n6/all/v/93/p/2022"
+        req = urllib.request.Request(url, headers={"User-Agent": "MultimarksAnalytics/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            rows = _json.loads(resp.read().decode("utf-8"))
+
+        municipios: dict = {}
+        for row in rows[1:]:          # row 0 is the header
+            code = str(row.get("D1C", ""))
+            name = str(row.get("D1N", ""))
+            value = str(row.get("V", ""))
+            if code.startswith("27") and value not in ("", "...", "-"):
+                try:
+                    municipios[name] = int(value.replace(".", "").replace(",", ""))
+                except ValueError:
+                    pass
+
+        _populacao_cache = {"municipios": municipios}
+        return _populacao_cache
+
+    except Exception as exc:
+        return {"municipios": {}, "erro": str(exc)}
+
+
 @api_router.post("/geo/clear")
 async def clear_geo(session: tuple = Depends(get_user_session)):
     """Remove the geographic clients data from the session."""
