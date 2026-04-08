@@ -225,8 +225,7 @@ body {
   color: var(--text-primary);
   font-weight: 600;
   font-family: var(--font-mono);
-  overflow-wrap: break-word;
-  word-break: break-word;
+  white-space: nowrap;
 }
 
 .metric-card .value.accent {
@@ -239,7 +238,7 @@ body {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
