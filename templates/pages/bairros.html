@@ -775,11 +775,14 @@ function bairrosPage() {
             ]);
             // Map: highlight/zoom selected city, or reset view
             if (this._map && this._geojsonLayer) {
-                this._atualizarChoropleth();
-                if (this.filtros.cidade) {
-                    this._focarCidade(this.filtros.cidade);
-                } else {
-                    this._map.setView([-9.57, -36.78], 8);
+                try {
+                    if (this.filtros.cidade) {
+                        this._focarCidade(this.filtros.cidade);
+                    } else {
+                        this._map.setView([-9.57, -36.78], 8);
+                    }
+                } catch (e) {
+                    console.warn('Map navigation error (non-fatal):', e);
                 }
             }
             this.$nextTick(() => lucide.createIcons());
@@ -1108,6 +1111,9 @@ function bairrosPage() {
 
         _atualizarChoropleth() {
             if (!this._geojsonLayer) return;
+            // Close all open tooltips before updating styles to avoid
+            // Leaflet tooltip._map null pointer during zoom animation
+            this._geojsonLayer.eachLayer(l => { try { l.closeTooltip(); } catch(e) {} });
             this._geojsonLayer.setStyle(f => this._estiloFeature(f));
         },
 
