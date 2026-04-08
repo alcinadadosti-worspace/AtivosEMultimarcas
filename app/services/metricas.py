@@ -325,6 +325,42 @@ def calcular_top_setores_completo(
     ]
 
 
+def calcular_metricas_por_setor(
+    df_clientes: pl.DataFrame,
+) -> List[Dict[str, Any]]:
+    """
+    Calculate aggregated metrics per sector for goal tracking.
+
+    Returns one row per sector with receita, clientes ativos, RPA,
+    multimarcas qty and percent.
+    """
+    if df_clientes.is_empty():
+        return []
+
+    df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
+        pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
+        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
+        pl.col("ValorTotal").sum().alias("ValorTotal"),
+    ]).sort(VENDAS_COL_SETOR)
+
+    result = []
+    for row in df_setores.iter_rows(named=True):
+        clientes = int(row["ClientesAtivos"] or 0)
+        valor = float(row["ValorTotal"] or 0)
+        multimarcas = int(row["ClientesMultimarcas"] or 0)
+        rpa = round(valor / clientes, 2) if clientes > 0 else 0
+        percent_multi = round(multimarcas / clientes * 100, 1) if clientes > 0 else 0
+        result.append({
+            "setor": row[VENDAS_COL_SETOR],
+            "clientes_ativos": clientes,
+            "receita": valor,
+            "rpa": rpa,
+            "clientes_multimarcas": multimarcas,
+            "percent_multimarcas": percent_multi,
+        })
+    return result
+
+
 def calcular_resumo_ciclos(
     df_clientes: pl.DataFrame,
     df_vendas: pl.DataFrame

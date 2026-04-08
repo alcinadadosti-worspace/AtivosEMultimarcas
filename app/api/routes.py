@@ -51,6 +51,7 @@ from app.services.metricas import (
     calcular_resumo_ciclos,
     calcular_dados_setor_ciclo,
     calcular_combinacoes_marcas,
+    calcular_metricas_por_setor,
     aplicar_filtros,
     obter_detalhes_cliente,
 )
@@ -1146,6 +1147,49 @@ async def get_iaf_por_setor(
     )
 
     return calcular_iaf_por_setor(df_clientes_filtrado, df_iaf_filtrado)
+
+
+# =============================================================================
+# METAS POR SETOR
+# =============================================================================
+
+@api_router.get("/metas/por-setor")
+async def get_metas_por_setor(
+    ciclos: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Get per-sector metrics for goal tracking page."""
+    session_id, session_data = session
+    df_clientes = session_data.get("df_clientes")
+    df_vendas = session_data.get("df_vendas")
+    df_iaf = session_data.get("df_iaf")
+
+    if df_clientes is None or df_vendas is None:
+        return []
+
+    if df_iaf is None:
+        df_iaf = pl.DataFrame()
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    df_clientes_f = aplicar_filtros(df_clientes, ciclos=ciclos_list, gerencias=gerencias_list)
+    df_vendas_f = aplicar_filtros(df_vendas, ciclos=ciclos_list, gerencias=gerencias_list)
+    df_iaf_f = aplicar_filtros(df_iaf, ciclos=ciclos_list, gerencias=gerencias_list)
+
+    metricas = calcular_metricas_por_setor(df_clientes_f)
+    iaf_por_setor = calcular_iaf_por_setor(df_clientes_f, df_iaf_f)
+    iaf_dict = {item["setor"]: item for item in iaf_por_setor}
+
+    for m in metricas:
+        iaf = iaf_dict.get(m["setor"], {})
+        m["clientes_cabelos"] = iaf.get("clientes_cabelos", 0)
+        m["percent_cabelos"] = iaf.get("percent_cabelos", 0.0)
+        m["clientes_make"] = iaf.get("clientes_make", 0)
+        m["percent_make"] = iaf.get("percent_make", 0.0)
+
+    return metricas
 
 
 @api_router.get("/iaf/vendas")

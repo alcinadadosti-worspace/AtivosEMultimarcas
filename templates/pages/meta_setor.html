@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}Meta por Setor - Multimarks Analytics{% endblock %}
+
+{% block content %}
+<style>
+.meta-section {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.meta-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.8), rgba(236, 72, 153, 0.8), transparent);
+}
+
+.meta-section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.meta-section-title i {
+    color: #a78bfa;
+}
+
+/* Inputs de meta */
+.metas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.meta-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.meta-input-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #a78bfa;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.meta-input-group input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    font-family: var(--font-mono);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.meta-input-group input:focus {
+    border-color: rgba(139, 92, 246, 0.7);
+}
+
+.meta-input-group input::placeholder {
+    color: #475569;
+}
+
+/* Tabela */
+.meta-table-wrap {
+    overflow-x: auto;
+}
+
+.meta-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.82rem;
+}
+
+.meta-table thead th {
+    background: rgba(139, 92, 246, 0.1);
+    color: #a78bfa;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.meta-table tbody tr {
+    transition: background 0.15s;
+}
+
+.meta-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.06);
+}
+
+.meta-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: #e2e8f0;
+    white-space: nowrap;
+}
+
+.meta-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Status badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-bateu {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.badge-quase {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.badge-longe {
+    background: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.badge-sem-meta {
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    font-style: italic;
+}
+
+/* Célula de valor real vs meta */
+.cell-valor {
+    font-family: var(--font-mono);
+}
+
+.cell-vs {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+/* Filtros */
+.filtros-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    align-items: flex-end;
+}
+
+.filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 180px;
+}
+
+.filtro-group label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filtro-group select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    color: #f8fafc;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    outline: none;
+}
+
+.btn-aplicar {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(236, 72, 153, 0.4));
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    border-radius: 8px;
+    color: #f8fafc;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-aplicar:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(236, 72, 153, 0.6));
+}
+
+.legenda {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    align-items: center;
+}
+
+.resumo-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.resumo-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+}
+
+.resumo-card .num {
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.resumo-card .lbl {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+.num-bateu { color: #4ade80; }
+.num-quase { color: #fbbf24; }
+.num-longe { color: #f87171; }
+.num-total { color: #a78bfa; }
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #475569;
+}
+
+.empty-state p { margin-top: 8px; font-size: 0.9rem; }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">Meta por Setor</h1>
+    <p class="page-subtitle">Defina metas e acompanhe o desempenho de cada setor</p>
+</div>
+
+<div x-data="metaSetor()" x-init="init()">
+
+    <!-- Sem dados -->
+    <template x-if="!hasData">
+        <div class="meta-section">
+            <div class="empty-state">
+                <i data-lucide="upload" style="width:48px;height:48px;color:#475569;margin-bottom:12px;"></i>
+                <p>Carregue uma planilha no Dashboard para visualizar os setores.</p>
+            </div>
+        </div>
+    </template>
+
+    <template x-if="hasData">
+        <div>
+            <!-- Filtros -->
+            <div class="meta-section">
+                <div class="meta-section-title">
+                    <i data-lucide="filter" style="width:18px;height:18px;"></i>
+                    Filtros
+                </div>
+                <div class="filtros-row">
+                    <div class="filtro-group">
+                        <label>Ciclo</label>
+                        <select x-model="filtros.ciclo">
+                            <option value="">Todos os ciclos</option>
+                            <template x-for="c in opcoes.ciclos" :key="c">
+                                <option :value="c" x-text="c"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="filtro-group">
+                        <label>Gerência</label>
+                        <select x-model="filtros.gerencia">
+                            <option value="">Todas as gerências</option>
+                            <template x-for="g in opcoes.gerencias" :key="g">
+                                <option :value="g" x-text="g"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <button class="btn-aplicar" @click="buscarDados()">Aplicar</button>
+                </div>
+            </div>
+
+            <!-- Definir Metas -->
+            <div class="meta-section">
+                <div class="meta-section-title">
+                    <i data-lucide="sliders-horizontal" style="width:18px;height:18px;"></i>
+                    Definir Metas
+                </div>
+                <div class="metas-grid">
+                    <div class="meta-input-group">
+                        <label>Receita (R$)</label>
+                        <input type="number" x-model.number="metas.receita" placeholder="Ex: 5000" min="0" step="0.01" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>Clientes Ativos</label>
+                        <input type="number" x-model.number="metas.clientes_ativos" placeholder="Ex: 30" min="0" step="1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>RPA (R$)</label>
+                        <input type="number" x-model.number="metas.rpa" placeholder="Ex: 150" min="0" step="0.01" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>Multimarca Qtd</label>
+                        <input type="number" x-model.number="metas.clientes_multimarcas" placeholder="Ex: 10" min="0" step="1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>Multimarca %</label>
+                        <input type="number" x-model.number="metas.percent_multimarcas" placeholder="Ex: 30" min="0" max="100" step="0.1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>IAF Cabelo Qtd</label>
+                        <input type="number" x-model.number="metas.clientes_cabelos" placeholder="Ex: 15" min="0" step="1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>IAF Cabelo %</label>
+                        <input type="number" x-model.number="metas.percent_cabelos" placeholder="Ex: 50" min="0" max="100" step="0.1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>IAF Make Qtd</label>
+                        <input type="number" x-model.number="metas.clientes_make" placeholder="Ex: 10" min="0" step="1" @input="calcularStatus()">
+                    </div>
+                    <div class="meta-input-group">
+                        <label>IAF Make %</label>
+                        <input type="number" x-model.number="metas.percent_make" placeholder="Ex: 30" min="0" max="100" step="0.1" @input="calcularStatus()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo e tabela -->
+            <div class="meta-section">
+                <div class="meta-section-title">
+                    <i data-lucide="bar-chart-2" style="width:18px;height:18px;"></i>
+                    Desempenho por Setor
+                    <span style="margin-left:auto;font-size:0.8rem;font-weight:400;color:#64748b;" x-text="setoresFiltrados.length + ' setores'"></span>
+                </div>
+
+                <!-- Resumo contadores -->
+                <div class="resumo-cards">
+                    <div class="resumo-card">
+                        <div class="num num-total" x-text="setoresFiltrados.length"></div>
+                        <div class="lbl">Total Setores</div>
+                    </div>
+                    <div class="resumo-card">
+                        <div class="num num-bateu" x-text="contagem.bateu"></div>
+                        <div class="lbl">Bateram a Meta</div>
+                    </div>
+                    <div class="resumo-card">
+                        <div class="num num-quase" x-text="contagem.quase"></div>
+                        <div class="lbl">Quase Lá</div>
+                    </div>
+                    <div class="resumo-card">
+                        <div class="num num-longe" x-text="contagem.longe"></div>
+                        <div class="lbl">Precisa Melhorar</div>
+                    </div>
+                    <div class="resumo-card">
+                        <div class="num" style="color:#64748b;" x-text="contagem.sem_meta"></div>
+                        <div class="lbl">Sem Meta Definida</div>
+                    </div>
+                </div>
+
+                <!-- Legenda -->
+                <div class="legenda">
+                    <span style="color:#4ade80;">&#9679;</span> Bateu a Meta (≥ 100% em todos os indicadores com meta)
+                    <span style="color:#fbbf24;">&#9679;</span> Quase Lá (≥ 80%)
+                    <span style="color:#f87171;">&#9679;</span> Precisa Melhorar (&lt; 80%)
+                </div>
+
+                <!-- Loading -->
+                <template x-if="loading">
+                    <div style="text-align:center;padding:40px;color:#64748b;">Carregando...</div>
+                </template>
+
+                <!-- Tabela -->
+                <template x-if="!loading">
+                    <div class="meta-table-wrap">
+                        <table class="meta-table">
+                            <thead>
+                                <tr>
+                                    <th>Setor</th>
+                                    <th>Status</th>
+                                    <th>Receita</th>
+                                    <th>Clientes Ativos</th>
+                                    <th>RPA</th>
+                                    <th>Multi Qtd</th>
+                                    <th>Multi %</th>
+                                    <th>Cabelo Qtd</th>
+                                    <th>Cabelo %</th>
+                                    <th>Make Qtd</th>
+                                    <th>Make %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="s in setoresFiltrados" :key="s.setor">
+                                    <tr>
+                                        <td style="font-weight:600;color:#f8fafc;" x-text="s.setor"></td>
+                                        <td>
+                                            <span :class="badgeClass(s._status)" class="badge">
+                                                <span x-text="badgeIcon(s._status)"></span>
+                                                <span x-text="badgeLabel(s._status)"></span>
+                                            </span>
+                                        </td>
+                                        <!-- Receita -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.currency(s.receita)"></div>
+                                            <div class="cell-vs" x-show="metas.receita > 0" x-text="pctStr(s.receita, metas.receita)"></div>
+                                        </td>
+                                        <!-- Clientes Ativos -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.number(s.clientes_ativos)"></div>
+                                            <div class="cell-vs" x-show="metas.clientes_ativos > 0" x-text="pctStr(s.clientes_ativos, metas.clientes_ativos)"></div>
+                                        </td>
+                                        <!-- RPA -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.currency(s.rpa)"></div>
+                                            <div class="cell-vs" x-show="metas.rpa > 0" x-text="pctStr(s.rpa, metas.rpa)"></div>
+                                        </td>
+                                        <!-- Multi Qtd -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.number(s.clientes_multimarcas)"></div>
+                                            <div class="cell-vs" x-show="metas.clientes_multimarcas > 0" x-text="pctStr(s.clientes_multimarcas, metas.clientes_multimarcas)"></div>
+                                        </td>
+                                        <!-- Multi % -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.percent(s.percent_multimarcas)"></div>
+                                            <div class="cell-vs" x-show="metas.percent_multimarcas > 0" x-text="pctStr(s.percent_multimarcas, metas.percent_multimarcas)"></div>
+                                        </td>
+                                        <!-- Cabelo Qtd -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.number(s.clientes_cabelos)"></div>
+                                            <div class="cell-vs" x-show="metas.clientes_cabelos > 0" x-text="pctStr(s.clientes_cabelos, metas.clientes_cabelos)"></div>
+                                        </td>
+                                        <!-- Cabelo % -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.percent(s.percent_cabelos)"></div>
+                                            <div class="cell-vs" x-show="metas.percent_cabelos > 0" x-text="pctStr(s.percent_cabelos, metas.percent_cabelos)"></div>
+                                        </td>
+                                        <!-- Make Qtd -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.number(s.clientes_make)"></div>
+                                            <div class="cell-vs" x-show="metas.clientes_make > 0" x-text="pctStr(s.clientes_make, metas.clientes_make)"></div>
+                                        </td>
+                                        <!-- Make % -->
+                                        <td class="cell-valor">
+                                            <div x-text="fmt.percent(s.percent_make)"></div>
+                                            <div class="cell-vs" x-show="metas.percent_make > 0" x-text="pctStr(s.percent_make, metas.percent_make)"></div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function metaSetor() {
+    return {
+        hasData: {{ 'true' if has_data else 'false' }},
+        loading: false,
+        dados: [],
+        opcoes: { ciclos: [], gerencias: [] },
+        filtros: { ciclo: '', gerencia: '' },
+        metas: {
+            receita: null,
+            clientes_ativos: null,
+            rpa: null,
+            clientes_multimarcas: null,
+            percent_multimarcas: null,
+            clientes_cabelos: null,
+            percent_cabelos: null,
+            clientes_make: null,
+            percent_make: null,
+        },
+        contagem: { bateu: 0, quase: 0, longe: 0, sem_meta: 0 },
+
+        fmt: {
+            currency(v) {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+            },
+            number(v) {
+                return new Intl.NumberFormat('pt-BR').format(v || 0);
+            },
+            percent(v) {
+                return (v || 0).toFixed(1) + '%';
+            },
+        },
+
+        get setoresFiltrados() {
+            return this.dados;
+        },
+
+        async init() {
+            if (!this.hasData) return;
+            await Promise.all([this.carregarOpcoes(), this.buscarDados()]);
+        },
+
+        async carregarOpcoes() {
+            try {
+                const res = await fetch('/api/filtros');
+                const data = await res.json();
+                this.opcoes.ciclos = data.ciclos || [];
+                this.opcoes.gerencias = data.gerencias || [];
+            } catch (e) {
+                console.error('Erro ao carregar opções:', e);
+            }
+        },
+
+        async buscarDados() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams();
+                if (this.filtros.ciclo)    params.set('ciclos', this.filtros.ciclo);
+                if (this.filtros.gerencia) params.set('gerencias', this.filtros.gerencia);
+
+                const res = await fetch('/api/metas/por-setor?' + params);
+                this.dados = await res.json();
+                this.calcularStatus();
+            } catch (e) {
+                console.error('Erro ao buscar dados:', e);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        temAlgumaMetaDefinida() {
+            return Object.values(this.metas).some(v => v !== null && v !== '' && v > 0);
+        },
+
+        // Retorna a pior porcentagem atingida dentre os indicadores com meta definida
+        piorPct(setor) {
+            const pares = [
+                ['receita',              setor.receita],
+                ['clientes_ativos',      setor.clientes_ativos],
+                ['rpa',                  setor.rpa],
+                ['clientes_multimarcas', setor.clientes_multimarcas],
+                ['percent_multimarcas',  setor.percent_multimarcas],
+                ['clientes_cabelos',     setor.clientes_cabelos],
+                ['percent_cabelos',      setor.percent_cabelos],
+                ['clientes_make',        setor.clientes_make],
+                ['percent_make',         setor.percent_make],
+            ];
+
+            let pior = Infinity;
+            let temMeta = false;
+
+            for (const [chave, real] of pares) {
+                const meta = this.metas[chave];
+                if (meta !== null && meta !== '' && meta > 0) {
+                    temMeta = true;
+                    const pct = (real / meta) * 100;
+                    if (pct < pior) pior = pct;
+                }
+            }
+
+            return temMeta ? pior : null;
+        },
+
+        calcularStatus() {
+            let bateu = 0, quase = 0, longe = 0, sem_meta = 0;
+
+            this.dados = this.dados.map(s => {
+                const pct = this.piorPct(s);
+                let status;
+                if (pct === null) {
+                    status = 'sem_meta';
+                    sem_meta++;
+                } else if (pct >= 100) {
+                    status = 'bateu';
+                    bateu++;
+                } else if (pct >= 80) {
+                    status = 'quase';
+                    quase++;
+                } else {
+                    status = 'longe';
+                    longe++;
+                }
+                return { ...s, _status: status };
+            });
+
+            // Ordenar: bateu > quase > longe > sem_meta
+            const ordem = { bateu: 0, quase: 1, longe: 2, sem_meta: 3 };
+            this.dados.sort((a, b) => ordem[a._status] - ordem[b._status]);
+
+            this.contagem = { bateu, quase, longe, sem_meta };
+        },
+
+        pctStr(real, meta) {
+            if (!meta || meta <= 0) return '';
+            const pct = (real / meta) * 100;
+            return pct.toFixed(1) + '% da meta';
+        },
+
+        badgeClass(status) {
+            return {
+                'badge-bateu': status === 'bateu',
+                'badge-quase': status === 'quase',
+                'badge-longe': status === 'longe',
+                'badge-sem-meta': status === 'sem_meta',
+            };
+        },
+
+        badgeIcon(status) {
+            return { bateu: '✓', quase: '~', longe: '!', sem_meta: '—' }[status] || '';
+        },
+
+        badgeLabel(status) {
+            return {
+                bateu:   'Bateu a Meta',
+                quase:   'Quase Lá',
+                longe:   'Precisa Melhorar',
+                sem_meta: 'Sem Meta',
+            }[status] || '';
+        },
+    };
+}
+</script>
+{% endblock %}

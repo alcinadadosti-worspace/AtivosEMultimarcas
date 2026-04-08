@@ -198,6 +198,15 @@ async def page_bairros(
     return templates.TemplateResponse(request, "pages/bairros.html", {"page": "bairros"})
 
 
+@app.get("/meta-setor", response_class=HTMLResponse)
+async def page_meta_setor(
+    request: Request,
+    has_data: bool = Depends(get_user_has_data),
+):
+    """Goal tracking by sector page."""
+    return templates.TemplateResponse(request, "pages/meta_setor.html", {"page": "meta_setor", "has_data": has_data})
+
+
 # =============================================================================
 # HEALTH CHECK (root level)
 # =============================================================================
