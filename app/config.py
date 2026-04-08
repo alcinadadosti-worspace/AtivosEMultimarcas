@@ -9,7 +9,14 @@ from pathlib import Path
 # =============================================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_DIR / "produtos.db"))
+
+# Persistent directory — survives deploys via Render Disk.
+# Mount the Render Disk at /opt/render/project/src/persistent (not inside data/
+# to avoid hiding git-tracked static files like estoqueplanilha.xlsx).
+PERSISTENT_DIR = Path(os.getenv("PERSISTENT_DIR", str(BASE_DIR / "persistent")))
+PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", str(PERSISTENT_DIR / "produtos.db"))
 
 # =============================================================================
 # SALES SPREADSHEET COLUMNS
@@ -121,6 +128,6 @@ GEO_REQUIRED_COLUMNS = [
 GEO_UNIDADE_MATRIZ = "1048"   # Unidade Matriz Penedo
 GEO_UNIDADE_FILIAL = "1515"   # Filial Palmeira dos Índios
 
-# Persistent geo data (survives server restarts)
-GEO_PARQUET_PATH = str(DATA_DIR / "clientes_geo.parquet")
-GEO_STATS_PATH   = str(DATA_DIR / "clientes_geo_stats.json")
+# Persistent geo data (survives server restarts via Render Disk)
+GEO_PARQUET_PATH = str(PERSISTENT_DIR / "clientes_geo.parquet")
+GEO_STATS_PATH   = str(PERSISTENT_DIR / "clientes_geo_stats.json")
