@@ -2053,6 +2053,7 @@ async def export_geo_bairros(
 async def get_geo_bairro_detalhe(
     request: Request,
     bairro: str = Query(...),
+    cidade: Optional[str] = Query(None),
     unidade: Optional[str] = Query(None),
     situacao: Optional[str] = Query(None),
 ):
@@ -2063,6 +2064,7 @@ async def get_geo_bairro_detalhe(
     return calcular_detalhe_bairro(
         df_geo,
         bairro=bairro,
+        cidade=cidade or None,
         unidade=unidade or None,
         situacao=situacao or None,
     )
