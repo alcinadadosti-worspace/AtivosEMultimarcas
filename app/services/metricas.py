@@ -140,12 +140,15 @@ def calcular_metricas_gerais(
     total_itens = df_vendas.select(pl.col(VENDAS_COL_QTD_ITENS).cast(pl.Float64).sum()).item()
     total_valor = df_vendas.select(pl.col(VENDAS_COL_VALOR).cast(pl.Float64).sum()).item()
 
+    rpa = (float(total_valor or 0) / total_ativos) if total_ativos > 0 else 0
+
     return {
         "total_ativos": total_ativos,
         "total_multimarcas": total_multimarcas,
         "percent_multimarcas": percent_multimarcas,
         "total_itens": int(total_itens or 0),
         "total_valor": float(total_valor or 0),
+        "rpa": round(rpa, 2),
     }
 
 
