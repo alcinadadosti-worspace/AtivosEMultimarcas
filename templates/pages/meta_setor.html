@@ -39,31 +39,41 @@
 /* Inputs de meta */
 .metas-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
 }
 
 .meta-input-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 14px;
 }
 
 .meta-input-group label {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: #a78bfa;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
-.meta-input-group input {
-    background: rgba(255, 255, 255, 0.05);
+.meta-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meta-input-group input[type="number"] {
+    background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(139, 92, 246, 0.3);
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 7px;
+    padding: 6px 10px;
     color: #f8fafc;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-family: var(--font-mono);
     outline: none;
     transition: border-color 0.2s;
@@ -71,12 +81,60 @@
     box-sizing: border-box;
 }
 
-.meta-input-group input:focus {
+.meta-input-group input[type="number"]:focus {
     border-color: rgba(139, 92, 246, 0.7);
 }
 
-.meta-input-group input::placeholder {
+.meta-input-group input[type="number"]::placeholder {
     color: #475569;
+}
+
+/* Slider */
+.meta-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 99px;
+    outline: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.meta-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #a78bfa;
+    box-shadow: 0 0 6px rgba(167, 139, 250, 0.6);
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.1s;
+}
+
+.meta-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.9);
+    transform: scale(1.15);
+}
+
+.meta-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: #a78bfa;
+    box-shadow: 0 0 6px rgba(167, 139, 250, 0.6);
+    cursor: pointer;
+}
+
+.meta-valor-display {
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    color: #e2e8f0;
+    white-space: nowrap;
+    min-width: 70px;
+    text-align: right;
 }
 
 /* Tabela */
@@ -329,42 +387,124 @@
                     Definir Metas
                 </div>
                 <div class="metas-grid">
+
+                    <!-- Receita -->
                     <div class="meta-input-group">
                         <label>Receita (R$)</label>
-                        <input type="number" x-model.number="metas.receita" placeholder="Ex: 5000" min="0" step="0.01" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.receita" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.currency(metas.receita || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.receita" :step="Math.max(1, Math.round(ranges.receita / 200))"
+                               :value="metas.receita || 0"
+                               :style="sliderStyle(metas.receita, ranges.receita)"
+                               @input="metas.receita = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- Clientes Ativos -->
                     <div class="meta-input-group">
                         <label>Clientes Ativos</label>
-                        <input type="number" x-model.number="metas.clientes_ativos" placeholder="Ex: 30" min="0" step="1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.clientes_ativos" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.number(metas.clientes_ativos || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_ativos" :step="1"
+                               :value="metas.clientes_ativos || 0"
+                               :style="sliderStyle(metas.clientes_ativos, ranges.clientes_ativos)"
+                               @input="metas.clientes_ativos = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- RPA -->
                     <div class="meta-input-group">
                         <label>RPA (R$)</label>
-                        <input type="number" x-model.number="metas.rpa" placeholder="Ex: 150" min="0" step="0.01" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.rpa" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.currency(metas.rpa || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.rpa" :step="Math.max(1, Math.round(ranges.rpa / 200))"
+                               :value="metas.rpa || 0"
+                               :style="sliderStyle(metas.rpa, ranges.rpa)"
+                               @input="metas.rpa = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- Multimarca Qtd -->
                     <div class="meta-input-group">
                         <label>Multimarca Qtd</label>
-                        <input type="number" x-model.number="metas.clientes_multimarcas" placeholder="Ex: 10" min="0" step="1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.clientes_multimarcas" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.number(metas.clientes_multimarcas || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_multimarcas" :step="1"
+                               :value="metas.clientes_multimarcas || 0"
+                               :style="sliderStyle(metas.clientes_multimarcas, ranges.clientes_multimarcas)"
+                               @input="metas.clientes_multimarcas = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- Multimarca % -->
                     <div class="meta-input-group">
                         <label>Multimarca %</label>
-                        <input type="number" x-model.number="metas.percent_multimarcas" placeholder="Ex: 30" min="0" max="100" step="0.1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.percent_multimarcas" placeholder="0" min="0" max="100" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.percent(metas.percent_multimarcas || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" max="100" step="1"
+                               :value="metas.percent_multimarcas || 0"
+                               :style="sliderStyle(metas.percent_multimarcas, 100)"
+                               @input="metas.percent_multimarcas = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- IAF Cabelo Qtd -->
                     <div class="meta-input-group">
                         <label>IAF Cabelo Qtd</label>
-                        <input type="number" x-model.number="metas.clientes_cabelos" placeholder="Ex: 15" min="0" step="1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.clientes_cabelos" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.number(metas.clientes_cabelos || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_cabelos" :step="1"
+                               :value="metas.clientes_cabelos || 0"
+                               :style="sliderStyle(metas.clientes_cabelos, ranges.clientes_cabelos)"
+                               @input="metas.clientes_cabelos = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- IAF Cabelo % -->
                     <div class="meta-input-group">
                         <label>IAF Cabelo %</label>
-                        <input type="number" x-model.number="metas.percent_cabelos" placeholder="Ex: 50" min="0" max="100" step="0.1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.percent_cabelos" placeholder="0" min="0" max="100" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.percent(metas.percent_cabelos || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" max="100" step="1"
+                               :value="metas.percent_cabelos || 0"
+                               :style="sliderStyle(metas.percent_cabelos, 100)"
+                               @input="metas.percent_cabelos = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- IAF Make Qtd -->
                     <div class="meta-input-group">
                         <label>IAF Make Qtd</label>
-                        <input type="number" x-model.number="metas.clientes_make" placeholder="Ex: 10" min="0" step="1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.clientes_make" placeholder="0" min="0" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.number(metas.clientes_make || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_make" :step="1"
+                               :value="metas.clientes_make || 0"
+                               :style="sliderStyle(metas.clientes_make, ranges.clientes_make)"
+                               @input="metas.clientes_make = +$event.target.value; calcularStatus()">
                     </div>
+
+                    <!-- IAF Make % -->
                     <div class="meta-input-group">
                         <label>IAF Make %</label>
-                        <input type="number" x-model.number="metas.percent_make" placeholder="Ex: 30" min="0" max="100" step="0.1" @input="calcularStatus()">
+                        <div class="meta-input-row">
+                            <input type="number" x-model.number="metas.percent_make" placeholder="0" min="0" max="100" step="1" @input="calcularStatus()">
+                            <span class="meta-valor-display" x-text="fmt.percent(metas.percent_make || 0)"></span>
+                        </div>
+                        <input type="range" class="meta-slider" min="0" max="100" step="1"
+                               :value="metas.percent_make || 0"
+                               :style="sliderStyle(metas.percent_make, 100)"
+                               @input="metas.percent_make = +$event.target.value; calcularStatus()">
                     </div>
+
                 </div>
             </div>
 
@@ -519,6 +659,14 @@ function metaSetor() {
             percent_make: null,
         },
         contagem: { bateu: 0, quase: 0, longe: 0, sem_meta: 0 },
+        ranges: {
+            receita: 10000,
+            clientes_ativos: 100,
+            rpa: 500,
+            clientes_multimarcas: 50,
+            clientes_cabelos: 50,
+            clientes_make: 50,
+        },
 
         fmt: {
             currency(v) {
@@ -561,12 +709,30 @@ function metaSetor() {
 
                 const res = await fetch('/api/metas/por-setor?' + params);
                 this.dados = await res.json();
+                this.atualizarRanges();
                 this.calcularStatus();
             } catch (e) {
                 console.error('Erro ao buscar dados:', e);
             } finally {
                 this.loading = false;
             }
+        },
+
+        atualizarRanges() {
+            if (!this.dados.length) return;
+            const maxOf = field => Math.max(...this.dados.map(s => s[field] || 0));
+            const ceil2 = v => v <= 0 ? 100 : Math.ceil(v * 1.5 / 10) * 10;
+            this.ranges.receita              = ceil2(maxOf('receita'));
+            this.ranges.clientes_ativos      = ceil2(maxOf('clientes_ativos'));
+            this.ranges.rpa                  = ceil2(maxOf('rpa'));
+            this.ranges.clientes_multimarcas = ceil2(maxOf('clientes_multimarcas'));
+            this.ranges.clientes_cabelos     = ceil2(maxOf('clientes_cabelos'));
+            this.ranges.clientes_make        = ceil2(maxOf('clientes_make'));
+        },
+
+        sliderStyle(valor, max) {
+            const pct = max > 0 ? Math.min(100, ((valor || 0) / max) * 100) : 0;
+            return `background: linear-gradient(to right, #a78bfa ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
         },
 
         temAlgumaMetaDefinida() {
