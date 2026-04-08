@@ -38,7 +38,15 @@ async def lifespan(app: FastAPI):
     # Ensure data directory exists
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Check database
+    # Check database — run import automatically if missing (e.g. first deploy with disk)
+    if not os.path.exists(DATABASE_PATH):
+        print("[INFO] Database not found — running import_db.py...")
+        try:
+            import import_db
+            import_db.main()
+        except Exception as e:
+            print(f"[ERROR] import_db failed: {e}")
+
     if os.path.exists(DATABASE_PATH):
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
@@ -47,7 +55,7 @@ async def lifespan(app: FastAPI):
         print(f"[INFO] Database loaded: {count} products")
         conn.close()
     else:
-        print("[WARN] Database not found. Run import_db.py first.")
+        print("[WARN] Database still not found after import attempt.")
 
     # Load persistent geo data (clients spreadsheet)
     if os.path.exists(GEO_PARQUET_PATH):
