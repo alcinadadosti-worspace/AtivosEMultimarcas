@@ -179,7 +179,6 @@ def calcular_metricas_bairro(
 def calcular_detalhe_bairro(
     df: pl.DataFrame,
     bairro: str,
-    cidade: Optional[str] = None,
     unidade: Optional[str] = None,
     situacao: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -188,7 +187,7 @@ def calcular_detalhe_bairro(
 
     Used to populate the accordion expansion in the bairros table.
     """
-    df = _aplicar_filtros(df, unidade=unidade, cidade=cidade, situacao=situacao)
+    df = _aplicar_filtros(df, unidade=unidade, situacao=situacao)
     df = df.filter(
         pl.col(GEO_COL_BAIRRO_RESID).str.to_lowercase() == bairro.strip().lower()
     )

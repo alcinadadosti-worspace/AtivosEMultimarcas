@@ -813,7 +813,6 @@ function bairrosPage() {
             this.expandidoLoading = true;
             try {
                 const params = new URLSearchParams({ bairro: b.bairro });
-                if (b.cidade)              params.set('cidade',   b.cidade);
                 if (this.filtros.unidade)  params.set('unidade',  this.filtros.unidade);
                 if (this.filtros.situacao) params.set('situacao', this.filtros.situacao);
                 const res = await fetch('/api/geo/bairro/detalhe?' + params);
@@ -1015,7 +1014,6 @@ function bairrosPage() {
 
             try {
                 const params = new URLSearchParams({ bairro });
-                if (cidade)                params.set('cidade',   cidade);
                 if (this.filtros.unidade)  params.set('unidade',  this.filtros.unidade);
                 if (this.filtros.situacao) params.set('situacao', this.filtros.situacao);
                 const res  = await fetch('/api/geo/bairro/detalhe?' + params);
