@@ -575,23 +575,32 @@
                         <table class="meta-table">
                             <thead>
                                 <tr>
+                                    <th style="width:36px;"></th>
                                     <th>Setor</th>
                                     <th>Supervisora</th>
                                     <th>Status</th>
                                     <th>Receita</th>
                                     <th>Clientes Ativos</th>
                                     <th>RPA</th>
-                                    <th>Multi Qtd</th>
                                     <th>Multi %</th>
-                                    <th>Cabelo Qtd</th>
                                     <th>Cabelo %</th>
-                                    <th>Make Qtd</th>
                                     <th>Make %</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="s in dados" :key="s.setor">
                                     <tr>
+                                        <!-- Botão de impressão -->
+                                        <td style="text-align:center;padding:6px;">
+                                            <button @click="imprimirSetor(s)" title="Imprimir setor"
+                                                style="background:none;border:1px solid rgba(139,92,246,0.3);border-radius:6px;
+                                                       padding:4px 6px;cursor:pointer;color:#a78bfa;transition:all 0.2s;"
+                                                onmouseover="this.style.background='rgba(139,92,246,0.15)'"
+                                                onmouseout="this.style.background='none'">
+                                                <i data-lucide="printer" style="width:14px;height:14px;display:block;"></i>
+                                            </button>
+                                        </td>
+
                                         <td style="font-weight:600;color:#f8fafc;max-width:200px;white-space:normal;" x-text="s.setor"></td>
                                         <td style="color:#94a3b8;font-size:0.78rem;" x-text="s.supervisora || '—'"></td>
                                         <td>
@@ -634,17 +643,6 @@
                                             </template>
                                         </td>
 
-                                        <!-- Multi Qtd -->
-                                        <td class="cell-valor">
-                                            <div class="cell-real" x-text="fmt.number(s.clientes_multimarcas)"></div>
-                                            <template x-if="metaEfetiva(s, 'clientes_multimarcas') !== null">
-                                                <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_multimarcas'))"></div>
-                                                    <div :class="pctClass(s.clientes_multimarcas, metaEfetiva(s,'clientes_multimarcas'))" class="cell-pct" x-text="pctStr(s.clientes_multimarcas, metaEfetiva(s,'clientes_multimarcas'))"></div>
-                                                </div>
-                                            </template>
-                                        </td>
-
                                         <!-- Multi % -->
                                         <td class="cell-valor">
                                             <div class="cell-real" x-text="fmt.percent(s.percent_multimarcas)"></div>
@@ -656,17 +654,6 @@
                                             </template>
                                         </td>
 
-                                        <!-- Cabelo Qtd -->
-                                        <td class="cell-valor">
-                                            <div class="cell-real" x-text="fmt.number(s.clientes_cabelos)"></div>
-                                            <template x-if="metaEfetiva(s, 'clientes_cabelos') !== null">
-                                                <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_cabelos'))"></div>
-                                                    <div :class="pctClass(s.clientes_cabelos, metaEfetiva(s,'clientes_cabelos'))" class="cell-pct" x-text="pctStr(s.clientes_cabelos, metaEfetiva(s,'clientes_cabelos'))"></div>
-                                                </div>
-                                            </template>
-                                        </td>
-
                                         <!-- Cabelo % -->
                                         <td class="cell-valor">
                                             <div class="cell-real" x-text="fmt.percent(s.percent_cabelos)"></div>
@@ -674,17 +661,6 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_cabelos'))"></div>
                                                     <div :class="pctClass(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))" class="cell-pct" x-text="pctStr(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))"></div>
-                                                </div>
-                                            </template>
-                                        </td>
-
-                                        <!-- Make Qtd -->
-                                        <td class="cell-valor">
-                                            <div class="cell-real" x-text="fmt.number(s.clientes_make)"></div>
-                                            <template x-if="metaEfetiva(s, 'clientes_make') !== null">
-                                                <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_make'))"></div>
-                                                    <div :class="pctClass(s.clientes_make, metaEfetiva(s,'clientes_make'))" class="cell-pct" x-text="pctStr(s.clientes_make, metaEfetiva(s,'clientes_make'))"></div>
                                                 </div>
                                             </template>
                                         </td>
@@ -914,6 +890,125 @@ function metaSetor() {
                 longe:    'Precisa Melhorar',
                 sem_meta: 'Sem Meta',
             }[status] || '';
+        },
+
+        imprimirSetor(s) {
+            const me = this.metaEfetiva.bind(this);
+            const f  = this.fmt;
+
+            const pct = (real, meta) => meta > 0 ? ((real / meta) * 100) : null;
+            const pctFmt = (real, meta) => {
+                const p = pct(real, meta);
+                return p !== null ? p.toFixed(1) + '%' : '—';
+            };
+            const cor = (real, meta) => {
+                const p = pct(real, meta);
+                if (p === null) return '#94a3b8';
+                if (p >= 100)  return '#4ade80';
+                if (p >= 60)   return '#fbbf24';
+                return '#f87171';
+            };
+            const barra = (real, meta) => {
+                const p = pct(real, meta);
+                if (p === null) return 0;
+                return Math.min(100, p).toFixed(1);
+            };
+            const statusLabel = { bateu: 'Bateu a Meta', quase: 'Quase Lá', longe: 'Precisa Melhorar', sem_meta: 'Sem Meta' };
+            const statusCor   = { bateu: '#4ade80', quase: '#fbbf24', longe: '#f87171', sem_meta: '#64748b' };
+
+            const indicadores = [
+                { label: 'Receita',          real: f.currency(s.receita),             meta: me(s,'receita'),             metaFmt: v => f.currency(v) },
+                { label: 'Clientes Ativos',  real: f.number(s.clientes_ativos),        meta: me(s,'clientes_ativos'),     metaFmt: v => f.number(v)   },
+                { label: 'RPA',              real: f.currency(s.rpa),                  meta: me(s,'rpa'),                 metaFmt: v => f.currency(v) },
+                { label: 'Multimarca %',     real: f.percent(s.percent_multimarcas),   meta: me(s,'percent_multimarcas'), metaFmt: v => f.percent(v)  },
+                { label: 'IAF Cabelo %',     real: f.percent(s.percent_cabelos),       meta: me(s,'percent_cabelos'),     metaFmt: v => f.percent(v)  },
+                { label: 'IAF Make %',       real: f.percent(s.percent_make),          meta: me(s,'percent_make'),        metaFmt: v => f.percent(v)  },
+            ];
+
+            const cardsHtml = indicadores.map(ind => {
+                const realNum = parseFloat(ind.real.replace(/[^\d,.-]/g,'').replace(',','.')) || 0;
+                const metaVal = ind.meta;
+                const p       = metaVal ? pct(parseFloat(String(ind.real).replace(/[^\d,.-]/g,'').replace(',','.')) || 0, metaVal) : null;
+                const barPct  = metaVal ? Math.min(100, (p || 0)) : 0;
+                const c       = metaVal ? cor(0, 1) : '#64748b'; // placeholder
+
+                // Recalculate properly using the raw numeric fields
+                const realNumMap = {
+                    'Receita': s.receita, 'Clientes Ativos': s.clientes_ativos,
+                    'RPA': s.rpa, 'Multimarca %': s.percent_multimarcas,
+                    'IAF Cabelo %': s.percent_cabelos, 'IAF Make %': s.percent_make,
+                };
+                const realN  = realNumMap[ind.label] || 0;
+                const pVal   = metaVal ? pct(realN, metaVal) : null;
+                const barW   = metaVal ? Math.min(100, (pVal || 0)).toFixed(1) : 0;
+                const corVal = metaVal ? cor(realN, metaVal) : '#64748b';
+
+                return `
+                <div style="background:#1e1e2d;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;">
+                    <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">${ind.label}</div>
+                    <div style="font-size:22px;font-weight:700;color:#f8fafc;font-family:monospace;margin-bottom:4px;">${ind.real}</div>
+                    ${metaVal ? `
+                    <div style="font-size:11px;color:#64748b;margin-bottom:8px;">meta: ${ind.metaFmt(metaVal)}</div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:99px;height:6px;overflow:hidden;margin-bottom:4px;">
+                        <div style="height:100%;width:${barW}%;background:${corVal};border-radius:99px;transition:width 0.3s;"></div>
+                    </div>
+                    <div style="font-size:12px;font-weight:700;color:${corVal};">${pVal !== null ? pVal.toFixed(1) + '% da meta' : '—'}</div>
+                    ` : '<div style="font-size:11px;color:#475569;margin-top:4px;">Sem meta definida</div>'}
+                </div>`;
+            }).join('');
+
+            const data = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+            const stCor = statusCor[s._status] || '#64748b';
+            const stLbl = statusLabel[s._status] || '—';
+
+            const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Meta — ${s.setor}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0f0f1a; color:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding:32px; }
+  @media print {
+    body { background:#fff !important; color:#111 !important; padding:16px; }
+    .card { background:#f8f8f8 !important; border-color:#ddd !important; }
+    .header { background:#6d28d9 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div style="max-width:780px;margin:0 auto;">
+
+  <!-- Header -->
+  <div class="header" style="background:linear-gradient(135deg,#6d28d9,#db2777);border-radius:16px;padding:24px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Multimarks Analytics · Meta por Setor</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px;">${s.setor}</div>
+      ${s.supervisora ? `<div style="font-size:14px;color:rgba(255,255,255,0.8);">Supervisora: <strong>${s.supervisora}</strong></div>` : ''}
+    </div>
+    <div style="text-align:right;">
+      <div style="display:inline-block;background:${stCor}22;border:1px solid ${stCor}55;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:700;color:${stCor};">${stLbl}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:8px;">${data}</div>
+    </div>
+  </div>
+
+  <!-- Indicadores -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+    ${cardsHtml}
+  </div>
+
+  <div style="text-align:center;margin-top:24px;font-size:10px;color:#475569;">
+    Gerado por Multimarks Analytics · ${data}
+  </div>
+</div>
+<script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+            const win = window.open('', '_blank', 'width=860,height=700');
+            win.document.write(html);
+            win.document.close();
         },
     };
 }
