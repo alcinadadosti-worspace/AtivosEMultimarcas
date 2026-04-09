@@ -606,7 +606,7 @@
                                             <div class="cell-real" x-text="fmt.currency(s.receita)"></div>
                                             <template x-if="metaEfetiva(s, 'receita') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.currency(metaEfetiva(s, 'receita')) + fonteIcon(s, 'receita')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.currency(metaEfetiva(s, 'receita'))"></div>
                                                     <div :class="pctClass(s.receita, metaEfetiva(s,'receita'))" class="cell-pct" x-text="pctStr(s.receita, metaEfetiva(s,'receita'))"></div>
                                                 </div>
                                             </template>
@@ -617,7 +617,7 @@
                                             <div class="cell-real" x-text="fmt.number(s.clientes_ativos)"></div>
                                             <template x-if="metaEfetiva(s, 'clientes_ativos') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_ativos')) + fonteIcon(s, 'clientes_ativos')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_ativos'))"></div>
                                                     <div :class="pctClass(s.clientes_ativos, metaEfetiva(s,'clientes_ativos'))" class="cell-pct" x-text="pctStr(s.clientes_ativos, metaEfetiva(s,'clientes_ativos'))"></div>
                                                 </div>
                                             </template>
@@ -628,7 +628,7 @@
                                             <div class="cell-real" x-text="fmt.currency(s.rpa)"></div>
                                             <template x-if="metaEfetiva(s, 'rpa') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.currency(metaEfetiva(s, 'rpa')) + fonteIcon(s, 'rpa')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.currency(metaEfetiva(s, 'rpa'))"></div>
                                                     <div :class="pctClass(s.rpa, metaEfetiva(s,'rpa'))" class="cell-pct" x-text="pctStr(s.rpa, metaEfetiva(s,'rpa'))"></div>
                                                 </div>
                                             </template>
@@ -639,7 +639,7 @@
                                             <div class="cell-real" x-text="fmt.number(s.clientes_multimarcas)"></div>
                                             <template x-if="metaEfetiva(s, 'clientes_multimarcas') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_multimarcas')) + fonteIcon(s, 'clientes_multimarcas')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_multimarcas'))"></div>
                                                     <div :class="pctClass(s.clientes_multimarcas, metaEfetiva(s,'clientes_multimarcas'))" class="cell-pct" x-text="pctStr(s.clientes_multimarcas, metaEfetiva(s,'clientes_multimarcas'))"></div>
                                                 </div>
                                             </template>
@@ -650,7 +650,7 @@
                                             <div class="cell-real" x-text="fmt.percent(s.percent_multimarcas)"></div>
                                             <template x-if="metaEfetiva(s, 'percent_multimarcas') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_multimarcas')) + fonteIcon(s, 'percent_multimarcas')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_multimarcas'))"></div>
                                                     <div :class="pctClass(s.percent_multimarcas, metaEfetiva(s,'percent_multimarcas'))" class="cell-pct" x-text="pctStr(s.percent_multimarcas, metaEfetiva(s,'percent_multimarcas'))"></div>
                                                 </div>
                                             </template>
@@ -661,7 +661,7 @@
                                             <div class="cell-real" x-text="fmt.number(s.clientes_cabelos)"></div>
                                             <template x-if="metaEfetiva(s, 'clientes_cabelos') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_cabelos')) + fonteIcon(s, 'clientes_cabelos')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_cabelos'))"></div>
                                                     <div :class="pctClass(s.clientes_cabelos, metaEfetiva(s,'clientes_cabelos'))" class="cell-pct" x-text="pctStr(s.clientes_cabelos, metaEfetiva(s,'clientes_cabelos'))"></div>
                                                 </div>
                                             </template>
@@ -672,7 +672,7 @@
                                             <div class="cell-real" x-text="fmt.percent(s.percent_cabelos)"></div>
                                             <template x-if="metaEfetiva(s, 'percent_cabelos') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_cabelos')) + fonteIcon(s, 'percent_cabelos')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_cabelos'))"></div>
                                                     <div :class="pctClass(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))" class="cell-pct" x-text="pctStr(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))"></div>
                                                 </div>
                                             </template>
@@ -683,7 +683,7 @@
                                             <div class="cell-real" x-text="fmt.number(s.clientes_make)"></div>
                                             <template x-if="metaEfetiva(s, 'clientes_make') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_make')) + fonteIcon(s, 'clientes_make')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_make'))"></div>
                                                     <div :class="pctClass(s.clientes_make, metaEfetiva(s,'clientes_make'))" class="cell-pct" x-text="pctStr(s.clientes_make, metaEfetiva(s,'clientes_make'))"></div>
                                                 </div>
                                             </template>
@@ -694,7 +694,7 @@
                                             <div class="cell-real" x-text="fmt.percent(s.percent_make)"></div>
                                             <template x-if="metaEfetiva(s, 'percent_make') !== null">
                                                 <div>
-                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_make')) + fonteIcon(s, 'percent_make')"></div>
+                                                    <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_make'))"></div>
                                                     <div :class="pctClass(s.percent_make, metaEfetiva(s,'percent_make'))" class="cell-pct" x-text="pctStr(s.percent_make, metaEfetiva(s,'percent_make'))"></div>
                                                 </div>
                                             </template>

@@ -70,6 +70,10 @@ def ler_planilha_metas() -> List[Dict[str, Any]]:
     """
     Read metas.xlsx and return a list of parsed meta dicts.
 
+    Uses openpyxl so that numeric cells are returned as floats (no need to
+    parse currency strings for those columns) and accented names are read
+    correctly as Unicode strings.
+
     Returns [] if the file does not exist or cannot be read.
     Each dict has keys:
         setor, supervisora,
@@ -82,30 +86,45 @@ def ler_planilha_metas() -> List[Dict[str, Any]]:
         return []
 
     try:
-        import polars as pl
-        df = pl.read_excel(str(METAS_PATH), infer_schema_length=0)
+        from openpyxl import load_workbook
+        wb = load_workbook(str(METAS_PATH), data_only=True)
+        ws = wb.active
     except Exception as exc:
         print(f"[WARN] Could not read metas.xlsx: {exc}")
         return []
 
+    # Build column index from header row
+    headers = [str(cell.value or "").strip() for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+    col_idx = {h: i for i, h in enumerate(headers)}
+
+    def _get(row_vals: tuple, col_name: str):
+        i = col_idx.get(col_name)
+        return row_vals[i] if i is not None else None
+
     result: List[Dict[str, Any]] = []
-    for row in df.iter_rows(named=True):
-        setor = str(row.get(_COL_SETOR, "") or "").strip()
+    for row_vals in ws.iter_rows(min_row=2, values_only=True):
+        setor = str(_get(row_vals, _COL_SETOR) or "").strip()
         if not setor:
             continue
+
+        raw_receita = _get(row_vals, _COL_RECEITA)
+        raw_rpa     = _get(row_vals, _COL_RPA)
+
         result.append(
             {
                 "setor":          setor,
-                "supervisora":    str(row.get(_COL_SUPERVISORA, "") or "").strip(),
-                "receita":        _parse_brl(str(row.get(_COL_RECEITA,   "") or "")),
-                "ativo":          _parse_int(str(row.get(_COL_ATIVO,     "") or "")),
-                "rpa":            _parse_brl(str(row.get(_COL_RPA,       "") or "")),
-                "multimarca_pct": _parse_pct(str(row.get(_COL_MULTI_PCT, "") or "")),
-                "multimarca_qtd": _parse_int(str(row.get(_COL_MULTI_QTD, "") or "")),
-                "cabelo_pct":     _parse_pct(str(row.get(_COL_CABELO_PCT,"") or "")),
-                "cabelo_qtd":     _parse_int(str(row.get(_COL_CABELO_QTD,"") or "")),
-                "make_pct":       _parse_pct(str(row.get(_COL_MAKE_PCT,  "") or "")),
-                "make_qtd":       _parse_int(str(row.get(_COL_MAKE_QTD,  "") or "")),
+                "supervisora":    str(_get(row_vals, _COL_SUPERVISORA) or "").strip(),
+                # RECEITA / RPA may be strings ("R$ 50.000,00") or numbers
+                "receita":        _parse_brl(str(raw_receita)) if isinstance(raw_receita, str) else float(raw_receita or 0),
+                "ativo":          _parse_int(str(_get(row_vals, _COL_ATIVO) or 0)),
+                "rpa":            _parse_brl(str(raw_rpa)) if isinstance(raw_rpa, str) else float(raw_rpa or 0),
+                # Percentages come as floats like 0.73 → convert to 73.0
+                "multimarca_pct": _parse_pct(str(_get(row_vals, _COL_MULTI_PCT) or 0)),
+                "multimarca_qtd": _parse_int(str(_get(row_vals, _COL_MULTI_QTD) or 0)),
+                "cabelo_pct":     _parse_pct(str(_get(row_vals, _COL_CABELO_PCT) or 0)),
+                "cabelo_qtd":     _parse_int(str(_get(row_vals, _COL_CABELO_QTD) or 0)),
+                "make_pct":       _parse_pct(str(_get(row_vals, _COL_MAKE_PCT) or 0)),
+                "make_qtd":       _parse_int(str(_get(row_vals, _COL_MAKE_QTD) or 0)),
             }
         )
     return result
