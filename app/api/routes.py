@@ -66,6 +66,7 @@ from app.services.auditoria import (
     listar_auditoria,
     listar_produtos_novos,
 )
+from app.services.metas import ler_planilha_metas, encontrar_meta_setor
 from app.services.categoria import (
     classificar_vendas,
     calcular_metricas_categoria,
@@ -1182,6 +1183,8 @@ async def get_metas_por_setor(
     iaf_por_setor = calcular_iaf_por_setor(df_clientes_f, df_iaf_f)
     iaf_dict = {item["setor"]: item for item in iaf_por_setor}
 
+    metas_planilha = ler_planilha_metas()
+
     for m in metricas:
         iaf = iaf_dict.get(m["setor"], {})
         m["clientes_cabelos"] = iaf.get("clientes_cabelos", 0)
@@ -1189,7 +1192,31 @@ async def get_metas_por_setor(
         m["clientes_make"] = iaf.get("clientes_make", 0)
         m["percent_make"] = iaf.get("percent_make", 0.0)
 
+        meta_p = encontrar_meta_setor(m["setor"], metas_planilha)
+        if meta_p:
+            m["supervisora"] = meta_p["supervisora"]
+            m["meta_planilha"] = {
+                "receita":             meta_p["receita"],
+                "clientes_ativos":     meta_p["ativo"],
+                "rpa":                 meta_p["rpa"],
+                "percent_multimarcas": meta_p["multimarca_pct"],
+                "clientes_multimarcas":meta_p["multimarca_qtd"],
+                "percent_cabelos":     meta_p["cabelo_pct"],
+                "clientes_cabelos":    meta_p["cabelo_qtd"],
+                "percent_make":        meta_p["make_pct"],
+                "clientes_make":       meta_p["make_qtd"],
+            }
+        else:
+            m["supervisora"] = ""
+            m["meta_planilha"] = None
+
     return metricas
+
+
+@api_router.get("/metas/planilha")
+async def get_metas_planilha():
+    """Return the raw parsed content of metas.xlsx."""
+    return ler_planilha_metas()
 
 
 @api_router.get("/iaf/vendas")
