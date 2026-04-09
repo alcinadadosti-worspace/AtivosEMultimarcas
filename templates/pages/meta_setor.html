@@ -972,48 +972,83 @@ function metaSetor() {
             const stCor = statusCor[s._status] || '#64748b';
             const stLbl = statusLabel[s._status] || '—';
 
+            const nomeArquivo = s.setor.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
             const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <title>Meta — ${s.setor}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#0f0f1a; color:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding:32px; }
-  @media print {
-    body { background:#fff !important; color:#111 !important; padding:16px; }
-    .card { background:#f8f8f8 !important; border-color:#ddd !important; }
-    .header { background:#6d28d9 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body { background:#0f0f1a; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; padding:24px; }
+  .actions { display:flex; gap:10px; margin-bottom:20px; justify-content:flex-end; }
+  .btn-action {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 18px; border-radius:8px; font-size:13px; font-weight:600;
+    cursor:pointer; border:none; transition:opacity 0.2s;
   }
+  .btn-action:hover { opacity:0.85; }
+  .btn-print { background:linear-gradient(135deg,#6d28d9,#db2777); color:#fff; }
+  .btn-img   { background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15) !important; }
+  .btn-img:disabled { opacity:0.5; cursor:wait; }
+  @media print { .actions { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head>
 <body>
 <div style="max-width:780px;margin:0 auto;">
 
-  <!-- Header -->
-  <div class="header" style="background:linear-gradient(135deg,#6d28d9,#db2777);border-radius:16px;padding:24px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;">
-    <div>
-      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Multimarks Analytics · Meta por Setor</div>
-      <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px;">${s.setor}</div>
-      ${s.supervisora ? `<div style="font-size:14px;color:rgba(255,255,255,0.8);">Supervisora: <strong>${s.supervisora}</strong></div>` : ''}
-    </div>
-    <div style="text-align:right;">
-      <div style="display:inline-block;background:${stCor}22;border:1px solid ${stCor}55;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:700;color:${stCor};">${stLbl}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:8px;">${data}</div>
-    </div>
+  <!-- Ações -->
+  <div class="actions">
+    <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
+    <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
-  <!-- Indicadores -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
-    ${cardsHtml}
-  </div>
+  <!-- Card principal -->
+  <div id="card">
+    <div style="background:linear-gradient(135deg,#6d28d9,#db2777);border-radius:16px;padding:24px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Multimarks Analytics · Meta por Setor</div>
+        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px;">${s.setor}</div>
+        ${s.supervisora ? `<div style="font-size:14px;color:rgba(255,255,255,0.8);">Supervisora: <strong>${s.supervisora}</strong></div>` : ''}
+      </div>
+      <div style="text-align:right;">
+        <div style="display:inline-block;background:${stCor}22;border:1px solid ${stCor}55;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:700;color:${stCor};">${stLbl}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:8px;">${data}</div>
+      </div>
+    </div>
 
-  <div style="text-align:center;margin-top:24px;font-size:10px;color:#475569;">
-    Gerado por Multimarks Analytics · ${data}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+      ${cardsHtml}
+    </div>
+
+    <div style="text-align:center;margin-top:20px;font-size:10px;color:#475569;">
+      Gerado por Multimarks Analytics · ${data}
+    </div>
   </div>
 </div>
-<script>window.onload = function(){ window.print(); }<\/script>
+
+<script>
+function salvarImagem() {
+    const btn = document.getElementById('btnImg');
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+    html2canvas(document.getElementById('card'), {
+        scale: 2,
+        backgroundColor: '#0f0f1a',
+        useCORS: true,
+        logging: false,
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'meta_${nomeArquivo}.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.disabled = false;
+        btn.textContent = '📷 Salvar como PNG';
+    });
+}
+<\/script>
 </body>
 </html>`;
 
