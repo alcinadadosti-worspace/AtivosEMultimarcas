@@ -130,6 +130,13 @@ def ler_planilha_metas() -> List[Dict[str, Any]]:
     return result
 
 
+# Mapeamento explícito para setores cujo nome no app não segue o padrão de prefixo.
+# Chave: nome na planilha (uppercase). Valor: substring que deve aparecer no nome do app (uppercase).
+_ALIASES: Dict[str, str] = {
+    "VIPS": "SUPERVISORA DE RELACIONAMENTO PENEDO",
+}
+
+
 def encontrar_meta_setor(
     nome_setor_app: str,
     metas: List[Dict[str, Any]],
@@ -137,16 +144,28 @@ def encontrar_meta_setor(
     """
     Find the planilha meta row whose key matches the app's sector name.
 
-    "BRONZE 1" matches "Bronze 1 / CORURIPE / FELIZ DESERTO" because the
-    normalised app name starts with the normalised key followed by a
-    separator character (' ', '/', '-') or equals it exactly.
+    Matching rules (in order):
+    1. Alias explícito: "VIPs" → "SUPERVISORA DE RELACIONAMENTO PENEDO"
+    2. Igualdade exata (case-insensitive)
+    3. O nome no app começa com a chave seguida de ' ', '/' ou '-'
+       Ex: "BRONZE 1" → "Bronze 1 / CORURIPE / FELIZ DESERTO"
     """
     nome_norm = nome_setor_app.strip().upper()
     for meta in metas:
         chave = meta["setor"].strip().upper()
+
+        # Regra 1: alias explícito
+        alias_alvo = _ALIASES.get(chave)
+        if alias_alvo and alias_alvo in nome_norm:
+            return meta
+
+        # Regra 2: igualdade exata
         if nome_norm == chave:
             return meta
+
+        # Regra 3: prefixo
         if nome_norm.startswith(chave) and len(nome_norm) > len(chave):
             if nome_norm[len(chave)] in (" ", "/", "-"):
                 return meta
+
     return None
