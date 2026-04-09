@@ -1,12 +1,13 @@
 """
 Service for reading and matching sector goals from metas.xlsx.
 
-The spreadsheet has one row per sector (gerencia 13707 only).
-Sector names in the spreadsheet use short keys like "BRONZE 1";
-the app stores full names like "Bronze 1 / CORURIPE / FELIZ DESERTO".
-Matching is done by checking whether the app name starts with the
-spreadsheet key (case-insensitive).
+Sector names are normalized before comparison:
+- uppercase
+- trailing slashes/spaces removed
+- spaces around '/' standardized to ' / '
+- multiple spaces collapsed
 """
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -130,11 +131,20 @@ def ler_planilha_metas() -> List[Dict[str, Any]]:
     return result
 
 
-# Mapeamento explícito para setores cujo nome no app não segue o padrão de prefixo.
-# Chave: nome na planilha (uppercase). Valor: substring que deve aparecer no nome do app (uppercase).
-_ALIASES: Dict[str, str] = {
-    "VIPS": "SUPERVISORA DE RELACIONAMENTO PENEDO",
-}
+def _normalizar(nome: str) -> str:
+    """
+    Normalize a sector name for comparison.
+
+    Steps:
+    - Uppercase
+    - Strip leading/trailing whitespace and trailing slashes
+    - Standardize spacing around '/' → ' / '
+    - Collapse multiple spaces
+    """
+    nome = nome.upper().strip().rstrip("/ ").strip()
+    nome = re.sub(r"\s*/\s*", " / ", nome)
+    nome = re.sub(r"\s+", " ", nome)
+    return nome
 
 
 def encontrar_meta_setor(
@@ -144,28 +154,23 @@ def encontrar_meta_setor(
     """
     Find the planilha meta row whose key matches the app's sector name.
 
+    Both sides are normalized before comparison (see _normalizar).
     Matching rules (in order):
-    1. Alias explícito: "VIPs" → "SUPERVISORA DE RELACIONAMENTO PENEDO"
-    2. Igualdade exata (case-insensitive)
-    3. O nome no app começa com a chave seguida de ' ', '/' ou '-'
-       Ex: "BRONZE 1" → "Bronze 1 / CORURIPE / FELIZ DESERTO"
+    1. Igualdade exata após normalização
+    2. O nome normalizado do app começa com a chave normalizada
+       (fallback para quando a planilha usa nome curto)
     """
-    nome_norm = nome_setor_app.strip().upper()
+    app_norm = _normalizar(nome_setor_app)
     for meta in metas:
-        chave = meta["setor"].strip().upper()
+        chave_norm = _normalizar(meta["setor"])
 
-        # Regra 1: alias explícito
-        alias_alvo = _ALIASES.get(chave)
-        if alias_alvo and alias_alvo in nome_norm:
+        # Regra 1: igualdade exata
+        if app_norm == chave_norm:
             return meta
 
-        # Regra 2: igualdade exata
-        if nome_norm == chave:
-            return meta
-
-        # Regra 3: prefixo
-        if nome_norm.startswith(chave) and len(nome_norm) > len(chave):
-            if nome_norm[len(chave)] in (" ", "/", "-"):
+        # Regra 2: prefixo (chave mais curta que o nome do app)
+        if app_norm.startswith(chave_norm) and len(app_norm) > len(chave_norm):
+            if app_norm[len(chave_norm)] in (" ", "/", "-"):
                 return meta
 
     return None
