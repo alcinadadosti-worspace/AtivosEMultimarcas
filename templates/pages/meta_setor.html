@@ -787,12 +787,7 @@ function metaSetor() {
 
         async init() {
             if (!this.hasData) return;
-            await this.carregarOpcoes();
-            // Pré-selecionar gerência 13707 se existir nos dados
-            if (this.opcoes.gerencias.includes('13707')) {
-                this.filtros.gerencia = '13707';
-            }
-            await this.buscarDados();
+            await Promise.all([this.carregarOpcoes(), this.buscarDados()]);
         },
 
         async carregarOpcoes() {
