@@ -527,7 +527,18 @@
                 <div class="meta-section-title">
                     <i data-lucide="bar-chart-2" style="width:18px;height:18px;"></i>
                     Desempenho por Setor
-                    <span style="margin-left:auto;font-size:0.8rem;font-weight:400;color:#64748b;" x-text="dados.length + ' setores'"></span>
+                    <span style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:0.8rem;font-weight:400;color:#64748b;" x-text="dados.length + ' setores'"></span>
+                        <button @click="imprimirTodos()" title="Imprimir todos os setores"
+                            style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(139,92,246,0.3),rgba(236,72,153,0.3));
+                                   border:1px solid rgba(139,92,246,0.4);border-radius:8px;padding:5px 12px;
+                                   color:#e2e8f0;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                            onmouseover="this.style.background='linear-gradient(135deg,rgba(139,92,246,0.5),rgba(236,72,153,0.5))'"
+                            onmouseout="this.style.background='linear-gradient(135deg,rgba(139,92,246,0.3),rgba(236,72,153,0.3))'">
+                            <i data-lucide="printer" style="width:13px;height:13px;"></i>
+                            Imprimir Todos
+                        </button>
+                    </span>
                 </div>
 
                 <!-- Resumo contadores -->
@@ -1001,6 +1012,107 @@ function metaSetor() {
   <div style="text-align:center;margin-top:24px;font-size:10px;color:#475569;">
     Gerado por Multimarks Analytics · ${data}
   </div>
+</div>
+<script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+            const win = window.open('', '_blank', 'width=860,height=700');
+            win.document.write(html);
+            win.document.close();
+        },
+
+        imprimirTodos() {
+            if (!this.dados.length) return;
+
+            const gerarCard = (s) => {
+                const f   = this.fmt;
+                const me  = (campo) => this.metaEfetiva(s, campo);
+                const pct = (real, meta) => meta > 0 ? (real / meta) * 100 : null;
+                const corVal = (real, meta) => {
+                    const p = pct(real, meta);
+                    if (p === null) return '#94a3b8';
+                    if (p >= 100) return '#4ade80';
+                    if (p >= 60)  return '#fbbf24';
+                    return '#f87171';
+                };
+
+                const statusLabel = { bateu: 'Bateu a Meta', quase: 'Quase Lá', longe: 'Precisa Melhorar', sem_meta: 'Sem Meta' };
+                const statusCor   = { bateu: '#4ade80', quase: '#fbbf24', longe: '#f87171', sem_meta: '#64748b' };
+                const stCor = statusCor[s._status] || '#64748b';
+                const stLbl = statusLabel[s._status] || '—';
+
+                const indicadores = [
+                    { label: 'Receita',         realN: s.receita,             realFmt: f.currency(s.receita),           meta: me('receita'),             metaFmt: v => f.currency(v) },
+                    { label: 'Clientes Ativos', realN: s.clientes_ativos,     realFmt: f.number(s.clientes_ativos),     meta: me('clientes_ativos'),     metaFmt: v => f.number(v)   },
+                    { label: 'RPA',             realN: s.rpa,                  realFmt: f.currency(s.rpa),               meta: me('rpa'),                 metaFmt: v => f.currency(v) },
+                    { label: 'Multimarca %',    realN: s.percent_multimarcas,  realFmt: f.percent(s.percent_multimarcas),meta: me('percent_multimarcas'), metaFmt: v => f.percent(v)  },
+                    { label: 'IAF Cabelo %',    realN: s.percent_cabelos,      realFmt: f.percent(s.percent_cabelos),    meta: me('percent_cabelos'),     metaFmt: v => f.percent(v)  },
+                    { label: 'IAF Make %',      realN: s.percent_make,         realFmt: f.percent(s.percent_make),       meta: me('percent_make'),        metaFmt: v => f.percent(v)  },
+                ];
+
+                const cardsHtml = indicadores.map(ind => {
+                    const pVal = ind.meta ? pct(ind.realN, ind.meta) : null;
+                    const barW = pVal !== null ? Math.min(100, pVal).toFixed(1) : 0;
+                    const c    = ind.meta ? corVal(ind.realN, ind.meta) : '#64748b';
+                    return `
+                    <div style="background:#1e1e2d;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;">
+                        <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">${ind.label}</div>
+                        <div style="font-size:18px;font-weight:700;color:#f8fafc;font-family:monospace;margin-bottom:3px;">${ind.realFmt}</div>
+                        ${ind.meta ? `
+                        <div style="font-size:10px;color:#64748b;margin-bottom:6px;">meta: ${ind.metaFmt(ind.meta)}</div>
+                        <div style="background:rgba(255,255,255,0.06);border-radius:99px;height:5px;overflow:hidden;margin-bottom:3px;">
+                            <div style="height:100%;width:${barW}%;background:${c};border-radius:99px;"></div>
+                        </div>
+                        <div style="font-size:11px;font-weight:700;color:${c};">${pVal !== null ? pVal.toFixed(1) + '% da meta' : '—'}</div>
+                        ` : '<div style="font-size:10px;color:#475569;margin-top:4px;">Sem meta definida</div>'}
+                    </div>`;
+                }).join('');
+
+                return `
+                <div style="page-break-after:always;padding-bottom:8px;">
+                    <div style="background:linear-gradient(135deg,#6d28d9,#db2777);border-radius:14px;padding:20px 24px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Multimarks Analytics · Meta por Setor</div>
+                            <div style="font-size:19px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:3px;">${s.setor}</div>
+                            ${s.supervisora ? `<div style="font-size:13px;color:rgba(255,255,255,0.8);">Supervisora: <strong>${s.supervisora}</strong></div>` : ''}
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="display:inline-block;background:${stCor}22;border:1px solid ${stCor}55;border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;color:${stCor};">${stLbl}</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+                        ${cardsHtml}
+                    </div>
+                </div>`;
+            };
+
+            const data    = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+            const filtro  = this.filtros.gerencia ? ` · Gerência ${this.filtros.gerencia}` : '';
+            const ciclo   = this.filtros.ciclo    ? ` · Ciclo ${this.filtros.ciclo}`       : '';
+            const resumo  = `${this.dados.length} setores${filtro}${ciclo} · ${data}`;
+
+            const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Metas por Setor — ${data}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0f0f1a; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; padding:24px; }
+  @media print {
+    body { background:#fff !important; color:#111 !important; padding:12px; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div style="max-width:780px;margin:0 auto;">
+  <div style="text-align:center;margin-bottom:24px;padding:12px;background:rgba(139,92,246,0.1);border-radius:10px;border:1px solid rgba(139,92,246,0.2);">
+    <div style="font-size:16px;font-weight:800;color:#a78bfa;margin-bottom:4px;">Relatório de Metas por Setor</div>
+    <div style="font-size:11px;color:#64748b;">${resumo}</div>
+  </div>
+  ${this.dados.map(s => gerarCard(s)).join('')}
 </div>
 <script>window.onload = function(){ window.print(); }<\/script>
 </body>
