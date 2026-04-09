@@ -1132,24 +1132,56 @@ function salvarImagem() {
 <head>
 <meta charset="UTF-8">
 <title>Metas por Setor — ${data}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#0f0f1a; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; padding:24px; }
-  @media print {
-    body { background:#fff !important; color:#111 !important; padding:12px; }
-    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  }
+  .actions { display:flex; gap:10px; margin-bottom:20px; justify-content:flex-end; }
+  .btn-action { display:inline-flex; align-items:center; gap:6px; padding:8px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:opacity 0.2s; }
+  .btn-action:hover { opacity:0.85; }
+  .btn-print { background:linear-gradient(135deg,#6d28d9,#db2777); color:#fff; }
+  .btn-img   { background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15) !important; }
+  .btn-img:disabled { opacity:0.5; cursor:wait; }
+  @media print { .actions { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head>
 <body>
 <div style="max-width:780px;margin:0 auto;">
-  <div style="text-align:center;margin-bottom:24px;padding:12px;background:rgba(139,92,246,0.1);border-radius:10px;border:1px solid rgba(139,92,246,0.2);">
-    <div style="font-size:16px;font-weight:800;color:#a78bfa;margin-bottom:4px;">Relatório de Metas por Setor</div>
-    <div style="font-size:11px;color:#64748b;">${resumo}</div>
+
+  <div class="actions">
+    <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
+    <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
-  ${this.dados.map(s => gerarCard(s)).join('')}
+
+  <div id="conteudo">
+    <div style="text-align:center;margin-bottom:24px;padding:12px;background:rgba(139,92,246,0.1);border-radius:10px;border:1px solid rgba(139,92,246,0.2);">
+      <div style="font-size:16px;font-weight:800;color:#a78bfa;margin-bottom:4px;">Relatório de Metas por Setor</div>
+      <div style="font-size:11px;color:#64748b;">${resumo}</div>
+    </div>
+    ${this.dados.map(s => gerarCard(s)).join('')}
+  </div>
 </div>
-<script>window.onload = function(){ window.print(); }<\/script>
+
+<script>
+function salvarImagem() {
+    const btn = document.getElementById('btnImg');
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+    html2canvas(document.getElementById('conteudo'), {
+        scale: 2,
+        backgroundColor: '#0f0f1a',
+        useCORS: true,
+        logging: false,
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'metas_todos_setores.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        btn.disabled = false;
+        btn.textContent = '📷 Salvar como PNG';
+    });
+}
+<\/script>
 </body>
 </html>`;
 
