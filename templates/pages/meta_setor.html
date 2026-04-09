@@ -556,9 +556,9 @@
 
                 <!-- Legenda -->
                 <div class="legenda">
-                    <span style="color:#4ade80;">&#9679;</span> Bateu a Meta (≥ 100% em todos os indicadores)
-                    <span style="color:#fbbf24;">&#9679;</span> Quase Lá (≥ 80%)
-                    <span style="color:#f87171;">&#9679;</span> Precisa Melhorar (&lt; 80%)
+                    <span style="color:#4ade80;">&#9679;</span> Bateu a Meta (≥ 100% da meta)
+                    <span style="color:#fbbf24;">&#9679;</span> Quase Lá (≥ 60% da meta)
+                    <span style="color:#f87171;">&#9679;</span> Precisa Melhorar (&lt; 60% da meta)
                     &nbsp;|&nbsp;
                     <span class="fonte-badge fonte-planilha">planilha</span> meta da planilha &nbsp;
                     <span class="fonte-badge fonte-manual">override</span> meta manual
@@ -869,7 +869,7 @@ function metaSetor() {
                 let status;
                 if (pct === null)    { status = 'sem_meta'; sem_meta++; }
                 else if (pct >= 100) { status = 'bateu';    bateu++;    }
-                else if (pct >= 80)  { status = 'quase';    quase++;    }
+                else if (pct >= 60)  { status = 'quase';    quase++;    }
                 else                 { status = 'longe';    longe++;    }
                 return { ...s, _status: status };
             });
