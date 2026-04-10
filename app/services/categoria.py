@@ -22,7 +22,10 @@ CATEGORIAS = {
         "DEM ", "DEMON", "DEMONSTRAD", "DEMONSTRADOR", " CJ ", "CJ ", " FLAC", "FLAC "
     ],
     "Cabelos": [
-        "SIAGE", "SIÀGE", "MATCH"
+        "SIAGE", "SIÀGE", "MATCH",
+        "SHAMP", "SHAMPOO", "COND", "CONDICION",
+        "MASCARA CAPILAR", "MASC CAP", "LEAVE IN", "LEAVE-IN",
+        "AMACI", "CAPILAR", "CACHOS", "QUERATINA", "TRAT CAP"
     ],
     "Maquiagem": [
         "GLAM", "PO COMP", " PO ", "CORR LIQ", " CORR ", "MASC CILIO", " MASC ",
@@ -33,7 +36,7 @@ CATEGORIAS = {
         "FAC STICK", "HID LAB", "BATOM"
     ],
     "Perfumaria": [
-        " COL ", " EDP ", "EDP ", " COL"
+        " COL ", " EDP ", "EDP ", " COL", "PARFUM", "EAU", "PARFUN"
     ],
     "Barba": [
         "BARB", "BARBA"
