@@ -25,7 +25,8 @@ CATEGORIAS = {
         "SIAGE", "SIÀGE", "MATCH",
         "SHAMP", "SHAMPOO", "COND", "CONDICION",
         "MASCARA CAPILAR", "MASC CAP", "LEAVE IN", "LEAVE-IN",
-        "AMACI", "CAPILAR", "CACHOS", "QUERATINA", "TRAT CAP"
+        "AMACI", "CAPILAR", "CACHOS", "QUERATINA", "TRAT CAP",
+        "CABELO", "HAIR"
     ],
     "Maquiagem": [
         "GLAM", "PO COMP", " PO ", "CORR LIQ", " CORR ", "MASC CILIO", " MASC ",
@@ -48,7 +49,8 @@ CATEGORIAS = {
         " CLIP ", "PORTA ", "ESPELHO", "LENCO", " LUVA"
     ],
     "Cuidados com a Pele": [
-        " CPO ", "CORPORAL", " MAO ", " MAOS ", " HID ", "INSTANCE CR"
+        " CPO ", "CORPORAL", " MAO ", " MAOS ", " HID ", "INSTANCE CR",
+        "CREME", "CRÈME", "CREM"
     ],
     "Cuidados Faciais": [
         " FAC ", "NEO DERMO", "NEO D", " SKIN ", "SKINQ", "FACIAL"
