@@ -142,28 +142,21 @@
 }
 
 .filtro-group select {
-    background: rgba(255,255,255,0.05);
+    background: #1e1e2d;
     border: 1px solid rgba(139, 92, 246, 0.3);
     border-radius: 8px;
     color: #f8fafc;
     padding: 8px 12px;
     font-size: 0.85rem;
     outline: none;
-}
-
-.btn-aplicar {
-    background: linear-gradient(135deg, rgba(139,92,246,0.4), rgba(236,72,153,0.4));
-    border: 1px solid rgba(139, 92, 246, 0.5);
-    border-radius: 8px;
-    color: #f8fafc;
-    padding: 8px 18px;
-    font-size: 0.85rem;
-    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
 }
 
-.btn-aplicar:hover { background: linear-gradient(135deg, rgba(139,92,246,0.6), rgba(236,72,153,0.6)); }
+.filtro-group select option {
+    background-color: #1e1e2d;
+    color: #f8fafc;
+}
+
 
 /* ── Resumo cards ──────────────────────────────────────── */
 .legenda {
@@ -237,7 +230,7 @@
                 <div class="filtros-row">
                     <div class="filtro-group">
                         <label>Ciclo</label>
-                        <select x-model="filtros.ciclo">
+                        <select x-model="filtros.ciclo" @change="buscarDados()">
                             <option value="">Todos os ciclos</option>
                             <template x-for="c in opcoes.ciclos" :key="c">
                                 <option :value="c" x-text="c"></option>
@@ -246,14 +239,13 @@
                     </div>
                     <div class="filtro-group">
                         <label>Gerência</label>
-                        <select x-model="filtros.gerencia">
+                        <select x-model="filtros.gerencia" @change="buscarDados()">
                             <option value="">Todas as gerências</option>
                             <template x-for="g in opcoes.gerencias" :key="g">
                                 <option :value="g" x-text="g"></option>
                             </template>
                         </select>
                     </div>
-                    <button class="btn-aplicar" @click="buscarDados()">Aplicar</button>
                 </div>
             </div>
 
