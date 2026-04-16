@@ -50,100 +50,6 @@
 
 .planilha-banner i { flex-shrink: 0; }
 
-/* ── Override grid ─────────────────────────────────────── */
-.metas-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px;
-}
-
-.meta-input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: 12px;
-    padding: 14px;
-}
-
-.meta-input-group label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #a78bfa;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.meta-input-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.meta-input-group input[type="number"] {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    border-radius: 7px;
-    padding: 6px 10px;
-    color: #f8fafc;
-    font-size: 0.85rem;
-    font-family: var(--font-mono);
-    outline: none;
-    transition: border-color 0.2s;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.meta-input-group input[type="number"]:focus { border-color: rgba(139, 92, 246, 0.7); }
-.meta-input-group input[type="number"]::placeholder { color: #475569; }
-
-/* Slider */
-.meta-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 5px;
-    border-radius: 99px;
-    outline: none;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
-
-.meta-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: #a78bfa;
-    box-shadow: 0 0 6px rgba(167,139,250,0.6);
-    cursor: pointer;
-    transition: box-shadow 0.2s, transform 0.1s;
-}
-
-.meta-slider::-webkit-slider-thumb:hover {
-    box-shadow: 0 0 12px rgba(167,139,250,0.9);
-    transform: scale(1.15);
-}
-
-.meta-slider::-moz-range-thumb {
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    border: none;
-    background: #a78bfa;
-    box-shadow: 0 0 6px rgba(167,139,250,0.6);
-    cursor: pointer;
-}
-
-.meta-valor-display {
-    font-size: 0.78rem;
-    font-family: var(--font-mono);
-    color: #e2e8f0;
-    white-space: nowrap;
-    min-width: 70px;
-    text-align: right;
-}
-
 /* ── Tabela ────────────────────────────────────────────── */
 .meta-table-wrap { overflow-x: auto; }
 
@@ -210,19 +116,6 @@
 .badge-longe   { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
 .badge-sem-meta{ background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.2); font-style: italic; }
 
-/* Indicador de fonte da meta */
-.fonte-badge {
-    display: inline-block;
-    font-size: 0.62rem;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    vertical-align: middle;
-    margin-left: 4px;
-}
-.fonte-planilha { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
-.fonte-manual   { background: rgba(139,92,246,0.15);  color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
 
 /* ── Filtros ───────────────────────────────────────────── */
 .filtros-row {
@@ -314,16 +207,6 @@
 .empty-state { text-align: center; padding: 60px 20px; color: #475569; }
 .empty-state p { margin-top: 8px; font-size: 0.9rem; }
 
-/* Override hint */
-.override-hint {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-bottom: 16px;
-    padding: 8px 12px;
-    background: rgba(255,255,255,0.02);
-    border-radius: 8px;
-    border-left: 3px solid rgba(139,92,246,0.4);
-}
 </style>
 
 <div class="page-header">
@@ -371,154 +254,6 @@
                         </select>
                     </div>
                     <button class="btn-aplicar" @click="buscarDados()">Aplicar</button>
-                </div>
-            </div>
-
-            <!-- Override manual de metas -->
-            <div class="meta-section">
-                <div class="meta-section-title">
-                    <i data-lucide="sliders-horizontal" style="width:18px;height:18px;"></i>
-                    Ajuste Global de Metas
-                    <span style="font-size:0.78rem;font-weight:400;color:#64748b;margin-left:4px;">(opcional)</span>
-                </div>
-
-                <!-- Banner planilha carregada -->
-                <template x-if="planilhaCarregada">
-                    <div class="planilha-banner">
-                        <i data-lucide="check-circle" style="width:16px;height:16px;"></i>
-                        <span>
-                            <strong x-text="totalComMeta"></strong> setores com metas carregadas da planilha <strong>metas.xlsx</strong>.
-                            Os ajustes abaixo substituem os valores da planilha para todos os setores no indicador escolhido.
-                        </span>
-                    </div>
-                </template>
-
-                <template x-if="!planilhaCarregada">
-                    <div class="override-hint">
-                        Nenhuma planilha de metas encontrada (<code>metas.xlsx</code> na raiz do servidor).
-                        Use os campos abaixo para definir metas manuais para todos os setores.
-                    </div>
-                </template>
-
-                <div class="metas-grid">
-
-                    <!-- Receita -->
-                    <div class="meta-input-group">
-                        <label>Receita (R$) <span x-show="override.receita > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.receita" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.receita > 0" x-text="fmt.currency(override.receita)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.receita" :step="Math.max(1, Math.round(ranges.receita / 200))"
-                               :value="override.receita || 0"
-                               :style="sliderStyle(override.receita, ranges.receita)"
-                               @input="override.receita = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- Clientes Ativos -->
-                    <div class="meta-input-group">
-                        <label>Clientes Ativos <span x-show="override.clientes_ativos > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.clientes_ativos" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.clientes_ativos > 0" x-text="fmt.number(override.clientes_ativos)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_ativos" :step="1"
-                               :value="override.clientes_ativos || 0"
-                               :style="sliderStyle(override.clientes_ativos, ranges.clientes_ativos)"
-                               @input="override.clientes_ativos = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- RPA -->
-                    <div class="meta-input-group">
-                        <label>RPA (R$) <span x-show="override.rpa > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.rpa" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.rpa > 0" x-text="fmt.currency(override.rpa)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.rpa" :step="Math.max(1, Math.round(ranges.rpa / 200))"
-                               :value="override.rpa || 0"
-                               :style="sliderStyle(override.rpa, ranges.rpa)"
-                               @input="override.rpa = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- Multimarca Qtd -->
-                    <div class="meta-input-group">
-                        <label>Multimarca Qtd <span x-show="override.clientes_multimarcas > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.clientes_multimarcas" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.clientes_multimarcas > 0" x-text="fmt.number(override.clientes_multimarcas)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_multimarcas" :step="1"
-                               :value="override.clientes_multimarcas || 0"
-                               :style="sliderStyle(override.clientes_multimarcas, ranges.clientes_multimarcas)"
-                               @input="override.clientes_multimarcas = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- Multimarca % -->
-                    <div class="meta-input-group">
-                        <label>Multimarca % <span x-show="override.percent_multimarcas > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.percent_multimarcas" placeholder="deixe 0 para usar planilha" min="0" max="100" step="0.1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.percent_multimarcas > 0" x-text="fmt.percent(override.percent_multimarcas)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" max="100" step="0.5"
-                               :value="override.percent_multimarcas || 0"
-                               :style="sliderStyle(override.percent_multimarcas, 100)"
-                               @input="override.percent_multimarcas = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- IAF Cabelo Qtd -->
-                    <div class="meta-input-group">
-                        <label>IAF Cabelo Qtd <span x-show="override.clientes_cabelos > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.clientes_cabelos" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.clientes_cabelos > 0" x-text="fmt.number(override.clientes_cabelos)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_cabelos" :step="1"
-                               :value="override.clientes_cabelos || 0"
-                               :style="sliderStyle(override.clientes_cabelos, ranges.clientes_cabelos)"
-                               @input="override.clientes_cabelos = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- IAF Cabelo % -->
-                    <div class="meta-input-group">
-                        <label>IAF Cabelo % <span x-show="override.percent_cabelos > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.percent_cabelos" placeholder="deixe 0 para usar planilha" min="0" max="100" step="0.1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.percent_cabelos > 0" x-text="fmt.percent(override.percent_cabelos)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" max="100" step="0.5"
-                               :value="override.percent_cabelos || 0"
-                               :style="sliderStyle(override.percent_cabelos, 100)"
-                               @input="override.percent_cabelos = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- IAF Make Qtd -->
-                    <div class="meta-input-group">
-                        <label>IAF Make Qtd <span x-show="override.clientes_make > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.clientes_make" placeholder="deixe 0 para usar planilha" min="0" step="1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.clientes_make > 0" x-text="fmt.number(override.clientes_make)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" :max="ranges.clientes_make" :step="1"
-                               :value="override.clientes_make || 0"
-                               :style="sliderStyle(override.clientes_make, ranges.clientes_make)"
-                               @input="override.clientes_make = +$event.target.value; calcularStatus()">
-                    </div>
-
-                    <!-- IAF Make % -->
-                    <div class="meta-input-group">
-                        <label>IAF Make % <span x-show="override.percent_make > 0" class="fonte-badge fonte-manual">override</span></label>
-                        <div class="meta-input-row">
-                            <input type="number" x-model.number="override.percent_make" placeholder="deixe 0 para usar planilha" min="0" max="100" step="0.1" @input="calcularStatus()">
-                            <span class="meta-valor-display" x-show="override.percent_make > 0" x-text="fmt.percent(override.percent_make)"></span>
-                        </div>
-                        <input type="range" class="meta-slider" min="0" max="100" step="0.5"
-                               :value="override.percent_make || 0"
-                               :style="sliderStyle(override.percent_make, 100)"
-                               @input="override.percent_make = +$event.target.value; calcularStatus()">
-                    </div>
-
                 </div>
             </div>
 
@@ -570,9 +305,6 @@
                     <span style="color:#4ade80;">&#9679;</span> Bateu a Meta (≥ 100% da meta)
                     <span style="color:#fbbf24;">&#9679;</span> Quase Lá (≥ 60% da meta)
                     <span style="color:#f87171;">&#9679;</span> Precisa Melhorar (&lt; 60% da meta)
-                    &nbsp;|&nbsp;
-                    <span class="fonte-badge fonte-planilha">planilha</span> meta da planilha &nbsp;
-                    <span class="fonte-badge fonte-manual">override</span> meta manual
                 </div>
 
                 <!-- Loading -->
@@ -708,36 +440,7 @@ function metaSetor() {
         opcoes: { ciclos: [], gerencias: [] },
         filtros: { ciclo: '', gerencia: '' },
 
-        // Override global — zero = "sem override, usa planilha"
-        override: {
-            receita:             0,
-            clientes_ativos:     0,
-            rpa:                 0,
-            clientes_multimarcas:0,
-            percent_multimarcas: 0,
-            clientes_cabelos:    0,
-            percent_cabelos:     0,
-            clientes_make:       0,
-            percent_make:        0,
-        },
-
         contagem: { bateu: 0, quase: 0, longe: 0, sem_meta: 0 },
-        ranges: {
-            receita:             100000,
-            clientes_ativos:     200,
-            rpa:                 2000,
-            clientes_multimarcas:100,
-            clientes_cabelos:    100,
-            clientes_make:       100,
-        },
-
-        get planilhaCarregada() {
-            return this.dados.some(s => s.meta_planilha !== null);
-        },
-
-        get totalComMeta() {
-            return this.dados.filter(s => s.meta_planilha !== null).length;
-        },
 
         fmt: {
             currency(v) {
@@ -751,25 +454,12 @@ function metaSetor() {
             },
         },
 
-        // Retorna a meta efetiva para o campo: override > planilha > null
+        // Retorna a meta da planilha para o campo
         metaEfetiva(setor, campo) {
-            const ov = this.override[campo];
-            if (ov !== null && ov !== undefined && Number(ov) > 0) {
-                return Number(ov);
-            }
             if (setor.meta_planilha && setor.meta_planilha[campo] > 0) {
                 return setor.meta_planilha[campo];
             }
             return null;
-        },
-
-        // Indica de onde veio a meta (para exibição)
-        fonteIcon(setor, campo) {
-            const ov = this.override[campo];
-            if (ov !== null && ov !== undefined && Number(ov) > 0) {
-                return ' ▲';  // override manual
-            }
-            return '';
         },
 
         async init() {
@@ -797,35 +487,12 @@ function metaSetor() {
 
                 const res  = await fetch('/api/metas/por-setor?' + params);
                 this.dados = await res.json();
-                this.atualizarRanges();
                 this.calcularStatus();
             } catch (e) {
                 console.error('Erro ao buscar dados:', e);
             } finally {
                 this.loading = false;
             }
-        },
-
-        atualizarRanges() {
-            if (!this.dados.length) return;
-            const maxOf = f => Math.max(...this.dados.map(s => s[f] || 0));
-            const ceil2 = v => v <= 0 ? 100 : Math.ceil(v * 1.5 / 10) * 10;
-
-            // Também considera as metas da planilha no cálculo do range
-            const maxPlanilha = f => Math.max(0, ...this.dados.map(s =>
-                s.meta_planilha ? (s.meta_planilha[f] || 0) : 0));
-
-            this.ranges.receita              = ceil2(Math.max(maxOf('receita'),              maxPlanilha('receita')));
-            this.ranges.clientes_ativos      = ceil2(Math.max(maxOf('clientes_ativos'),      maxPlanilha('clientes_ativos')));
-            this.ranges.rpa                  = ceil2(Math.max(maxOf('rpa'),                  maxPlanilha('rpa')));
-            this.ranges.clientes_multimarcas = ceil2(Math.max(maxOf('clientes_multimarcas'), maxPlanilha('clientes_multimarcas')));
-            this.ranges.clientes_cabelos     = ceil2(Math.max(maxOf('clientes_cabelos'),     maxPlanilha('clientes_cabelos')));
-            this.ranges.clientes_make        = ceil2(Math.max(maxOf('clientes_make'),        maxPlanilha('clientes_make')));
-        },
-
-        sliderStyle(valor, max) {
-            const pct = max > 0 ? Math.min(100, ((valor || 0) / max) * 100) : 0;
-            return `background: linear-gradient(to right, #a78bfa ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
         },
 
         // Pior % atingida entre os indicadores que têm meta efetiva
