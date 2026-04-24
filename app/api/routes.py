@@ -67,6 +67,7 @@ from app.services.auditoria import (
     listar_produtos_novos,
 )
 from app.services.metas import ler_planilha_metas, encontrar_meta_setor
+from app.services.slack_service import enviar_meta_slack, resolver_slack_id
 from app.services.categoria import (
     classificar_vendas,
     calcular_metricas_categoria,
@@ -2262,3 +2263,32 @@ async def export_geo_clientes(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=clientes_geografico.xlsx"},
         )
+
+
+# =============================================================================
+# SLACK
+# =============================================================================
+
+class SlackEnviarMetaRequest:
+    pass
+
+@api_router.post("/slack/enviar-meta")
+async def slack_enviar_meta(request: Request):
+    """Send a sector goal card image to the supervisora via Slack DM."""
+    from app.config import SLACK_BOT_TOKEN
+    body = await request.json()
+    supervisora = body.get("supervisora", "")
+    setor = body.get("setor", "")
+    image_data = body.get("image_data", "")
+
+    if not image_data:
+        raise HTTPException(status_code=400, detail="image_data obrigatório")
+
+    if not SLACK_BOT_TOKEN:
+        raise HTTPException(status_code=503, detail="SLACK_BOT_TOKEN não configurado no servidor")
+
+    result = enviar_meta_slack(supervisora=supervisora, setor=setor, image_base64=image_data)
+    if result["ok"]:
+        return {"ok": True, "message": f"Enviado para {supervisora or 'usuário'} via Slack"}
+    else:
+        raise HTTPException(status_code=500, detail=result.get("error", "Erro desconhecido"))

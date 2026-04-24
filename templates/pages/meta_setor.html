@@ -652,6 +652,8 @@ function metaSetor() {
   .btn-print { background:linear-gradient(135deg,#6d28d9,#db2777); color:#fff; }
   .btn-img   { background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15) !important; }
   .btn-img:disabled { opacity:0.5; cursor:wait; }
+  .btn-slack { background:linear-gradient(135deg,#4A154B,#7B2FBE); color:#fff; }
+  .btn-slack:disabled { opacity:0.5; cursor:wait; }
   @media print { .actions { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head>
@@ -661,6 +663,7 @@ function metaSetor() {
   <!-- Ações -->
   <div class="actions">
     <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
+    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">💬 Enviar via Slack</button>
     <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
@@ -689,6 +692,7 @@ function metaSetor() {
 </div>
 
 <script>
+const _slackMeta = {setor: ${JSON.stringify(s.setor)}, supervisora: ${JSON.stringify(s.supervisora || '')}, base: '${window.location.origin}'};
 function salvarImagem() {
     const btn = document.getElementById('btnImg');
     btn.disabled = true;
@@ -705,6 +709,33 @@ function salvarImagem() {
         link.click();
         btn.disabled = false;
         btn.textContent = '📷 Salvar como PNG';
+    });
+}
+function enviarSlack() {
+    const btn = document.getElementById('btnSlack');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    html2canvas(document.getElementById('card'), {
+        scale: 2, backgroundColor: '#0f0f1a', useCORS: true, logging: false,
+    }).then(canvas => {
+        return fetch(_slackMeta.base + '/api/slack/enviar-meta', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({supervisora: _slackMeta.supervisora, setor: _slackMeta.setor, image_data: canvas.toDataURL('image/png')}),
+        });
+    }).then(r => r.json()).then(data => {
+        btn.disabled = false;
+        if (data.ok) {
+            btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+            btn.textContent = '✓ Enviado!';
+        } else {
+            btn.textContent = '✗ Erro';
+        }
+        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; btn.style.background = ''; }, 4000);
+    }).catch(() => {
+        btn.disabled = false;
+        btn.textContent = '✗ Erro';
+        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; }, 4000);
     });
 }
 <\/script>
@@ -801,6 +832,8 @@ function salvarImagem() {
   .btn-print { background:linear-gradient(135deg,#6d28d9,#db2777); color:#fff; }
   .btn-img   { background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.15) !important; }
   .btn-img:disabled { opacity:0.5; cursor:wait; }
+  .btn-slack { background:linear-gradient(135deg,#4A154B,#7B2FBE); color:#fff; }
+  .btn-slack:disabled { opacity:0.5; cursor:wait; }
   @media print { .actions { display:none !important; } * { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 </style>
 </head>
@@ -809,6 +842,7 @@ function salvarImagem() {
 
   <div class="actions">
     <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
+    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">💬 Enviar via Slack</button>
     <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
@@ -822,6 +856,7 @@ function salvarImagem() {
 </div>
 
 <script>
+const _slackBase = '${window.location.origin}';
 function salvarImagem() {
     const btn = document.getElementById('btnImg');
     btn.disabled = true;
@@ -838,6 +873,33 @@ function salvarImagem() {
         link.click();
         btn.disabled = false;
         btn.textContent = '📷 Salvar como PNG';
+    });
+}
+function enviarSlack() {
+    const btn = document.getElementById('btnSlack');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    html2canvas(document.getElementById('conteudo'), {
+        scale: 2, backgroundColor: '#0f0f1a', useCORS: true, logging: false,
+    }).then(canvas => {
+        return fetch(_slackBase + '/api/slack/enviar-meta', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({supervisora: '', setor: 'Todos os Setores', image_data: canvas.toDataURL('image/png')}),
+        });
+    }).then(r => r.json()).then(data => {
+        btn.disabled = false;
+        if (data.ok) {
+            btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+            btn.textContent = '✓ Enviado!';
+        } else {
+            btn.textContent = '✗ Erro';
+        }
+        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; btn.style.background = ''; }, 4000);
+    }).catch(() => {
+        btn.disabled = false;
+        btn.textContent = '✗ Erro';
+        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; }, 4000);
     });
 }
 <\/script>

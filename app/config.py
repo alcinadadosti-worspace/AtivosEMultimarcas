@@ -53,6 +53,23 @@ VENDAS_OPTIONAL_COLUMNS = [VENDAS_COL_MEIO_CAPTACAO, VENDAS_COL_GERENCIA]
 TIPO_VENDA = "Venda"
 
 # =============================================================================
+# SLACK
+# =============================================================================
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
+
+# Maps supervisora name (uppercase) → Slack user ID.
+# Set via SLACK_USER_MAP env var as JSON, e.g.:
+#   {"KARINE": "U0895CZ8HU7", "LAÍS": "U0123456789"}
+# Falls back to SLACK_DEFAULT_USER_ID for any unmapped supervisora.
+import json as _json
+SLACK_DEFAULT_USER_ID = os.getenv("SLACK_DEFAULT_USER_ID", "U0895CZ8HU7")
+_raw_map = os.getenv("SLACK_USER_MAP", "{}")
+try:
+    SLACK_USER_MAP: dict = {k.upper(): v for k, v in _json.loads(_raw_map).items()}
+except Exception:
+    SLACK_USER_MAP: dict = {}
+
+# =============================================================================
 # SKU MATCHING CONSTANTS
 # =============================================================================
 MOTIVO_MATCH_EXATO = "MATCH_EXATO"
