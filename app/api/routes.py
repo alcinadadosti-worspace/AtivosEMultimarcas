@@ -2269,25 +2269,21 @@ async def export_geo_clientes(
 # SLACK
 # =============================================================================
 
-class SlackEnviarMetaRequest:
-    pass
-
 @api_router.post("/slack/enviar-meta")
 async def slack_enviar_meta(request: Request):
-    """Send a sector goal card image to the supervisora via Slack DM."""
+    """Send formatted sector goal metrics to supervisora via Slack DM."""
     from app.config import SLACK_BOT_TOKEN
     body = await request.json()
     supervisora = body.get("supervisora", "")
     setor = body.get("setor", "")
-    image_data = body.get("image_data", "")
+    dados = body.get("dados", {})
 
-    if not image_data:
-        raise HTTPException(status_code=400, detail="image_data obrigatório")
-
+    if not setor:
+        raise HTTPException(status_code=400, detail="setor obrigatório")
     if not SLACK_BOT_TOKEN:
         raise HTTPException(status_code=503, detail="SLACK_BOT_TOKEN não configurado no servidor")
 
-    result = enviar_meta_slack(supervisora=supervisora, setor=setor, image_base64=image_data)
+    result = enviar_meta_slack(supervisora=supervisora, setor=setor, dados=dados)
     if result["ok"]:
         return {"ok": True, "message": f"Enviado para {supervisora or 'usuário'} via Slack"}
     else:

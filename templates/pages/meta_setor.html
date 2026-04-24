@@ -692,7 +692,27 @@ function metaSetor() {
 </div>
 
 <script>
-const _slackMeta = {setor: ${JSON.stringify(s.setor)}, supervisora: ${JSON.stringify(s.supervisora || '')}, base: '${window.location.origin}'};
+const _mp = ${JSON.stringify(s.meta_planilha || {})};
+const _slackMeta = {
+    setor: ${JSON.stringify(s.setor)},
+    supervisora: ${JSON.stringify(s.supervisora || '')},
+    base: '${window.location.origin}',
+    dados: {
+        status: ${JSON.stringify(s._status || '')},
+        receita: ${s.receita || 0},
+        meta_receita: ${JSON.stringify(s.meta_planilha && s.meta_planilha.receita ? s.meta_planilha.receita : null)},
+        clientes_ativos: ${s.clientes_ativos || 0},
+        meta_ativo: ${JSON.stringify(s.meta_planilha && s.meta_planilha.clientes_ativos ? s.meta_planilha.clientes_ativos : null)},
+        rpa: ${s.rpa || 0},
+        meta_rpa: ${JSON.stringify(s.meta_planilha && s.meta_planilha.rpa ? s.meta_planilha.rpa : null)},
+        multimarca: ${s.percent_multimarcas || 0},
+        meta_multimarca: ${JSON.stringify(s.meta_planilha && s.meta_planilha.percent_multimarcas ? s.meta_planilha.percent_multimarcas : null)},
+        cabelos: ${s.percent_cabelos || 0},
+        meta_cabelos: ${JSON.stringify(s.meta_planilha && s.meta_planilha.percent_cabelos ? s.meta_planilha.percent_cabelos : null)},
+        make: ${s.percent_make || 0},
+        meta_make: ${JSON.stringify(s.meta_planilha && s.meta_planilha.percent_make ? s.meta_planilha.percent_make : null)},
+    }
+};
 function salvarImagem() {
     const btn = document.getElementById('btnImg');
     btn.disabled = true;
@@ -715,14 +735,10 @@ function enviarSlack() {
     const btn = document.getElementById('btnSlack');
     btn.disabled = true;
     btn.textContent = 'Enviando...';
-    html2canvas(document.getElementById('card'), {
-        scale: 2, backgroundColor: '#0f0f1a', useCORS: true, logging: false,
-    }).then(canvas => {
-        return fetch(_slackMeta.base + '/api/slack/enviar-meta', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({supervisora: _slackMeta.supervisora, setor: _slackMeta.setor, image_data: canvas.toDataURL('image/png')}),
-        });
+    fetch(_slackMeta.base + '/api/slack/enviar-meta', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({supervisora: _slackMeta.supervisora, setor: _slackMeta.setor, dados: _slackMeta.dados}),
     }).then(r => r.json()).then(data => {
         btn.disabled = false;
         if (data.ok) {
@@ -730,11 +746,13 @@ function enviarSlack() {
             btn.textContent = '✓ Enviado!';
         } else {
             btn.textContent = '✗ Erro';
+            console.error(data);
         }
         setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; btn.style.background = ''; }, 4000);
-    }).catch(() => {
+    }).catch(err => {
         btn.disabled = false;
         btn.textContent = '✗ Erro';
+        console.error(err);
         setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; }, 4000);
     });
 }
@@ -879,14 +897,10 @@ function enviarSlack() {
     const btn = document.getElementById('btnSlack');
     btn.disabled = true;
     btn.textContent = 'Enviando...';
-    html2canvas(document.getElementById('conteudo'), {
-        scale: 2, backgroundColor: '#0f0f1a', useCORS: true, logging: false,
-    }).then(canvas => {
-        return fetch(_slackBase + '/api/slack/enviar-meta', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({supervisora: '', setor: 'Todos os Setores', image_data: canvas.toDataURL('image/png')}),
-        });
+    fetch(_slackBase + '/api/slack/enviar-meta', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({supervisora: '', setor: 'Resumo — Todos os Setores', dados: {status: ''}}),
     }).then(r => r.json()).then(data => {
         btn.disabled = false;
         if (data.ok) {
