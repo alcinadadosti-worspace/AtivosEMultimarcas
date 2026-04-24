@@ -51,6 +51,26 @@ async def lifespan(app: FastAPI):
         cursor.execute("SELECT COUNT(*) FROM produtos")
         count = cursor.fetchone()[0]
         print(f"[INFO] Database loaded: {count} products")
+
+        # Re-import IAF tables if xlsx source has grown (new SKUs added)
+        import import_db as _import_db
+        iaf_make_file = DATA_DIR / "make_iaf.xlsx"
+        iaf_cab_file = DATA_DIR / "cabelos_iaf.xlsx"
+        try:
+            cursor.execute("SELECT COUNT(*) FROM iaf_make")
+            db_make_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM iaf_cabelos")
+            db_cab_count = cursor.fetchone()[0]
+            xlsx_make_rows = len(pl.read_excel(str(iaf_make_file), infer_schema_length=0)) if iaf_make_file.exists() else 0
+            xlsx_cab_rows = len(pl.read_excel(str(iaf_cab_file), infer_schema_length=0)) if iaf_cab_file.exists() else 0
+            if xlsx_make_rows > db_make_count:
+                print(f"[INFO] iaf_make xlsx has {xlsx_make_rows} rows vs {db_make_count} in DB — re-importing...")
+                _import_db.import_iaf(conn, iaf_make_file, "iaf_make")
+            if xlsx_cab_rows > db_cab_count:
+                print(f"[INFO] iaf_cabelos xlsx has {xlsx_cab_rows} rows vs {db_cab_count} in DB — re-importing...")
+                _import_db.import_iaf(conn, iaf_cab_file, "iaf_cabelos")
+        except Exception as e:
+            print(f"[WARN] IAF re-import check failed: {e}")
         conn.close()
 
     # Load persistent geo data (clients spreadsheet)

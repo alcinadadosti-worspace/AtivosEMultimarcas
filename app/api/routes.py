@@ -439,7 +439,7 @@ async def upload_vendas(
 
         # Process IAF if available
         try:
-            df_iaf = cruzar_vendas_com_iaf(resultado["df_vendas"], conn)
+            df_iaf = cruzar_vendas_com_iaf(resultado["df"], conn)
             set_session_value(session_id, "df_iaf", df_iaf)
             print(f"[Session {session_id[:8]}] IAF processado: {len(df_iaf)} registros")
         except Exception as e:

@@ -116,16 +116,16 @@ def cruzar_vendas_com_iaf(
     """
     Cross-reference sales with IAF database to identify premium items.
 
-    Also includes Siège hair products (combos/kits) that aren't in the official
-    IAF list but should be counted as IAF Cabelos.
+    Only counts products present in the official iaf_cabelos/iaf_make tables.
+    Receives the full DataFrame (all transaction types) so Brinde/Doação
+    transactions are included in IAF identification, matching the official system.
 
     Args:
-        df_vendas: Enriched sales DataFrame
+        df_vendas: Enriched sales DataFrame (all transaction types)
         conn: SQLite connection
 
     Returns:
         DataFrame with only IAF sales, including type (Cabelos/Make)
-        Also includes "TipoTransacao" column for filtering Make without Brinde
     """
     # Load IAF index
     indice_iaf = criar_indice_iaf(conn)
@@ -154,25 +154,6 @@ def cruzar_vendas_com_iaf(
             tipo_iaf = info["tipo"]
             descricao = info["descricao"]
             marca = info["marca"]
-        # Check if it's a Siège hair product (combo/kit) not in official list
-        elif is_siage_hair_product(nome_produto):
-            tipo_iaf = "Cabelos"
-            descricao = nome_produto
-            marca = "Eudora"
-        # Check if it's a makeup product not in official list
-        elif is_makeup_product(nome_produto):
-            tipo_iaf = "Make"
-            descricao = nome_produto
-            # Determine brand from product name
-            nome_upper = nome_produto.upper() if nome_produto else ""
-            if "EUD" in nome_upper or "EUDORA" in nome_upper:
-                marca = "Eudora"
-            elif "NIINA" in nome_upper:
-                marca = "oBoticário"
-            elif "QDB" in nome_upper or "QUEM DISSE" in nome_upper:
-                marca = "Quem Disse Berenice"
-            else:
-                marca = "oBoticário"
 
         if tipo_iaf:
             # Get gerencia - handle missing column gracefully
@@ -208,11 +189,9 @@ def calcular_percentual_iaf(
     """
     Calculate percentage of customers who purchased IAF items.
 
-    IMPORTANT: For Make, excludes "Brinde" transaction type from calculation.
-
     Args:
         df_clientes: DataFrame with all active customers
-        df_iaf: DataFrame of IAF sales
+        df_iaf: DataFrame of IAF sales (all transaction types)
         tipo_iaf: Filter by type ("Cabelos", "Make") or None for all
 
     Returns:
@@ -232,10 +211,12 @@ def calcular_percentual_iaf(
     df_iaf_filtrado = df_iaf
     if tipo_iaf:
         df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoIAF") == tipo_iaf)
-
-    # IMPORTANT: For Make, exclude "Brinde" transactions
-    if tipo_iaf == "Make" and "TipoTransacao" in df_iaf_filtrado.columns:
-        df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") != "Brinde")
+        # Cabelos: Venda-only (official system excludes Brinde/Doação for hair)
+        if tipo_iaf == "Cabelos" and "TipoTransacao" in df_iaf_filtrado.columns:
+            df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") == "Venda")
+        # Make: Venda + Brinde (Doação = amostras/sachets, not counted by official system)
+        elif tipo_iaf == "Make" and "TipoTransacao" in df_iaf_filtrado.columns:
+            df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") != "Doação")
 
     if df_iaf_filtrado.is_empty():
         return {
@@ -305,17 +286,19 @@ def calcular_iaf_por_setor(
         pl.col("ClienteID").n_unique().alias("ClientesIAF")
     ])
 
-    # Count IAF customers by sector and type
-    # Cabelos: all transaction types
-    df_iaf_cabelos = df_iaf.filter(pl.col("TipoIAF") == "Cabelos").group_by(VENDAS_COL_SETOR).agg([
+    # Cabelos: Venda-only (official system excludes Brinde/Doação for hair)
+    df_iaf_cabelos_filter = df_iaf.filter(pl.col("TipoIAF") == "Cabelos")
+    if "TipoTransacao" in df_iaf.columns:
+        df_iaf_cabelos_filter = df_iaf_cabelos_filter.filter(pl.col("TipoTransacao") == "Venda")
+    df_iaf_cabelos = df_iaf_cabelos_filter.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesCabelos")
     ])
 
-    # Make: exclude "Brinde" transactions
-    df_make_filter = df_iaf.filter(pl.col("TipoIAF") == "Make")
+    # Make: Venda + Brinde only (Doação = amostras/sachets, not counted by official system)
+    df_iaf_make_filter = df_iaf.filter(pl.col("TipoIAF") == "Make")
     if "TipoTransacao" in df_iaf.columns:
-        df_make_filter = df_make_filter.filter(pl.col("TipoTransacao") != "Brinde")
-    df_iaf_make = df_make_filter.group_by(VENDAS_COL_SETOR).agg([
+        df_iaf_make_filter = df_iaf_make_filter.filter(pl.col("TipoTransacao") != "Doação")
+    df_iaf_make = df_iaf_make_filter.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesMake")
     ])
 
