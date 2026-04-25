@@ -325,18 +325,11 @@
                             <tbody>
                                 <template x-for="s in dados" :key="s.setor">
                                     <tr>
-                                        <!-- Ações: imprimir + slack -->
-                                        <td style="text-align:center;padding:6px;white-space:nowrap;">
-                                            <button @click="imprimirSetor(s)" title="Imprimir setor"
-                                                style="background:none;border:1px solid rgba(139,92,246,0.3);border-radius:6px;
-                                                       padding:4px 6px;cursor:pointer;color:#a78bfa;transition:all 0.2s;"
-                                                onmouseover="this.style.background='rgba(139,92,246,0.15)'"
-                                                onmouseout="this.style.background='none'">
-                                                <i data-lucide="printer" style="width:14px;height:14px;display:block;"></i>
-                                            </button>
+                                        <!-- Botão envio Slack -->
+                                        <td style="text-align:center;padding:6px;">
                                             <button @click="enviarSlackSetor(s, $el)" title="Enviar via Slack"
                                                 style="background:none;border:1px solid rgba(74,21,75,0.5);border-radius:6px;
-                                                       padding:4px 6px;cursor:pointer;color:#c084fc;transition:all 0.2s;margin-left:4px;font-size:13px;"
+                                                       padding:4px 8px;cursor:pointer;color:#c084fc;transition:all 0.2s;font-size:14px;"
                                                 onmouseover="this.style.background='rgba(74,21,75,0.3)'"
                                                 onmouseout="this.style.background='none'">💬</button>
                                         </td>
