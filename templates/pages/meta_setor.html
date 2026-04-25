@@ -335,11 +335,15 @@
                                     <tr>
                                         <!-- Botão envio Slack -->
                                         <td style="text-align:center;padding:6px;">
-                                            <button @click="enviarSlackSetor(s, $el)" title="Enviar via Slack"
-                                                style="background:none;border:1px solid rgba(74,21,75,0.5);border-radius:6px;
-                                                       padding:4px 8px;cursor:pointer;color:#c084fc;transition:all 0.2s;font-size:14px;"
-                                                onmouseover="this.style.background='rgba(74,21,75,0.3)'"
-                                                onmouseout="this.style.background='none'">💬</button>
+                                            <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+                                                <button @click="enviarSlackSetor(s, $el)" title="Enviar via Slack"
+                                                    style="background:none;border:1px solid rgba(74,21,75,0.5);border-radius:6px;
+                                                           padding:4px 8px;cursor:pointer;color:#c084fc;transition:all 0.2s;font-size:14px;"
+                                                    onmouseover="this.style.background='rgba(74,21,75,0.3)'"
+                                                    onmouseout="this.style.background='none'">💬</button>
+                                                <span x-show="enviados[s.setor]" title="Enviado via Slack"
+                                                    style="color:#4ade80;font-size:13px;font-weight:700;">✓</span>
+                                            </div>
                                         </td>
 
                                         <td style="font-weight:600;color:#f8fafc;max-width:200px;white-space:normal;" x-text="s.setor"></td>
@@ -437,6 +441,7 @@ function metaSetor() {
         dados: [],               // setores com métricas reais + meta_planilha
         opcoes: { ciclos: [], gerencias: [] },
         filtros: { ciclo: '', gerencia: '' },
+        enviados: {},            // setor → true após envio Slack bem-sucedido
 
         contagem: { bateu: 0, quase: 0, longe: 0, sem_meta: 0 },
 
@@ -594,8 +599,14 @@ function metaSetor() {
                     body: JSON.stringify({supervisora: s.supervisora || '', setor: s.setor, dados}),
                 });
                 const data = await r.json();
-                btn.textContent = data.ok ? '✓' : '✗';
-                btn.style.color = data.ok ? '#4ade80' : '#f87171';
+                if (data.ok) {
+                    this.enviados[s.setor] = true;
+                    btn.textContent = '✓';
+                    btn.style.color = '#4ade80';
+                } else {
+                    btn.textContent = '✗';
+                    btn.style.color = '#f87171';
+                }
             } catch(e) {
                 btn.textContent = '✗';
                 btn.style.color = '#f87171';
@@ -632,7 +643,7 @@ function metaSetor() {
                         body: JSON.stringify({supervisora: s.supervisora || '', setor: s.setor, dados}),
                     });
                     const data = await r.json();
-                    data.ok ? ok++ : erro++;
+                    if (data.ok) { ok++; this.enviados[s.setor] = true; } else erro++;
                 } catch(e) { erro++; }
                 btn.innerHTML = `⏳ ${ok + erro}/${this.dados.length}`;
             }
