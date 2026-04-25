@@ -325,8 +325,8 @@
                             <tbody>
                                 <template x-for="s in dados" :key="s.setor">
                                     <tr>
-                                        <!-- Botão de impressão -->
-                                        <td style="text-align:center;padding:6px;">
+                                        <!-- Ações: imprimir + slack -->
+                                        <td style="text-align:center;padding:6px;white-space:nowrap;">
                                             <button @click="imprimirSetor(s)" title="Imprimir setor"
                                                 style="background:none;border:1px solid rgba(139,92,246,0.3);border-radius:6px;
                                                        padding:4px 6px;cursor:pointer;color:#a78bfa;transition:all 0.2s;"
@@ -334,6 +334,11 @@
                                                 onmouseout="this.style.background='none'">
                                                 <i data-lucide="printer" style="width:14px;height:14px;display:block;"></i>
                                             </button>
+                                            <button @click="enviarSlackSetor(s, $el)" title="Enviar via Slack"
+                                                style="background:none;border:1px solid rgba(74,21,75,0.5);border-radius:6px;
+                                                       padding:4px 6px;cursor:pointer;color:#c084fc;transition:all 0.2s;margin-left:4px;font-size:13px;"
+                                                onmouseover="this.style.background='rgba(74,21,75,0.3)'"
+                                                onmouseout="this.style.background='none'">💬</button>
                                         </td>
 
                                         <td style="font-weight:600;color:#f8fafc;max-width:200px;white-space:normal;" x-text="s.setor"></td>
@@ -560,6 +565,41 @@ function metaSetor() {
                 longe:    'Precisa Melhorar',
                 sem_meta: 'Sem Meta',
             }[status] || '';
+        },
+
+        async enviarSlackSetor(s, btn) {
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            const mp = s.meta_planilha || {};
+            const dados = {
+                receita:         s.receita || 0,
+                meta_receita:    mp.receita || null,
+                clientes_ativos: s.clientes_ativos || 0,
+                meta_ativo:      mp.clientes_ativos || null,
+                rpa:             s.rpa || 0,
+                meta_rpa:        mp.rpa || null,
+                multimarca:      s.percent_multimarcas || 0,
+                meta_multimarca: mp.percent_multimarcas || null,
+                cabelos:         s.percent_cabelos || 0,
+                meta_cabelos:    mp.percent_cabelos || null,
+                make:            s.percent_make || 0,
+                meta_make:       mp.percent_make || null,
+            };
+            try {
+                const r = await fetch('/api/slack/enviar-meta', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({supervisora: s.supervisora || '', setor: s.setor, dados}),
+                });
+                const data = await r.json();
+                btn.textContent = data.ok ? '✓' : '✗';
+                btn.style.color = data.ok ? '#4ade80' : '#f87171';
+            } catch(e) {
+                btn.textContent = '✗';
+                btn.style.color = '#f87171';
+            }
+            setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 3000);
         },
 
         imprimirSetor(s) {
