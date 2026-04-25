@@ -99,7 +99,7 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
         _linha_metrica("RPA",              _fmt_currency(r_rpa), _fmt_currency(m_rpa) if m_rpa else "—", pct(r_rpa, m_rpa)),
         _linha_metrica("Multimarca %",     _fmt_pct(r_mul),      _fmt_pct(m_mul) if m_mul else "—",      pct(r_mul, m_mul)),
         _linha_metrica("IAF Cabelo %",     _fmt_pct(r_cab),      _fmt_pct(m_cab) if m_cab else "—",      pct(r_cab, m_cab)),
-        _linha_metrica("IAF Make %",       _fmt_pct(r_mak),      _fmt_pct(m_mak) if m_mak else "—",      pct(r_rpa, m_mak)),
+        _linha_metrica("IAF Make %",       _fmt_pct(r_mak),      _fmt_pct(m_mak) if m_mak else "—",      pct(r_mak, m_mak)),
     ]
 
     from datetime import date
