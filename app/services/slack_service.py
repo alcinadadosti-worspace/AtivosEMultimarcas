@@ -68,15 +68,10 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
     """
     Build Slack Block Kit blocks for a sector goal card.
 
-    dados keys: status, receita, meta_receita, clientes_ativos, meta_ativo,
+    dados keys: receita, meta_receita, clientes_ativos, meta_ativo,
                 rpa, meta_rpa, multimarca, meta_multimarca,
                 cabelos, meta_cabelos, make, meta_make
     """
-    status = dados.get("status", "")
-    status_emoji = {"bateu": "✅", "quase": "⚡", "longe": "🔴"}.get(status, "📊")
-    status_label = {"bateu": "Bateu a Meta!", "quase": "Quase lá!", "longe": "Precisa melhorar"}.get(status, "")
-
-    # Build metric lines
     r_rec   = dados.get("receita", 0)
     m_rec   = dados.get("meta_receita")
     r_atv   = dados.get("clientes_ativos", 0)
@@ -108,14 +103,13 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
     blocks = [
         {
             "type": "header",
-            "text": {"type": "plain_text", "text": f"{status_emoji}  Meta por Setor — {setor}", "emoji": True},
+            "text": {"type": "plain_text", "text": f"📊  Meta por Setor — {setor}", "emoji": True},
         },
         {"type": "divider"},
         {
             "type": "section",
             "fields": [
                 {"type": "mrkdwn", "text": f"*Supervisora*\n{supervisora or '—'}"},
-                {"type": "mrkdwn", "text": f"*Status*\n{status_emoji} {status_label}"},
             ],
         },
         {"type": "divider"},
