@@ -211,12 +211,6 @@ def calcular_percentual_iaf(
     df_iaf_filtrado = df_iaf
     if tipo_iaf:
         df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoIAF") == tipo_iaf)
-        # Cabelos: Venda-only (official system excludes Brinde/Doação for hair)
-        if tipo_iaf == "Cabelos" and "TipoTransacao" in df_iaf_filtrado.columns:
-            df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") == "Venda")
-        # Make: Venda + Brinde (Doação = amostras/sachets, not counted by official system)
-        elif tipo_iaf == "Make" and "TipoTransacao" in df_iaf_filtrado.columns:
-            df_iaf_filtrado = df_iaf_filtrado.filter(pl.col("TipoTransacao") != "Doação")
 
     if df_iaf_filtrado.is_empty():
         return {
@@ -286,18 +280,12 @@ def calcular_iaf_por_setor(
         pl.col("ClienteID").n_unique().alias("ClientesIAF")
     ])
 
-    # Cabelos: Venda-only (official system excludes Brinde/Doação for hair)
     df_iaf_cabelos_filter = df_iaf.filter(pl.col("TipoIAF") == "Cabelos")
-    if "TipoTransacao" in df_iaf.columns:
-        df_iaf_cabelos_filter = df_iaf_cabelos_filter.filter(pl.col("TipoTransacao") == "Venda")
     df_iaf_cabelos = df_iaf_cabelos_filter.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesCabelos")
     ])
 
-    # Make: Venda + Brinde only (Doação = amostras/sachets, not counted by official system)
     df_iaf_make_filter = df_iaf.filter(pl.col("TipoIAF") == "Make")
-    if "TipoTransacao" in df_iaf.columns:
-        df_iaf_make_filter = df_iaf_make_filter.filter(pl.col("TipoTransacao") != "Doação")
     df_iaf_make = df_iaf_make_filter.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesMake")
     ])
