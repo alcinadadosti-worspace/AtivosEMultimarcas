@@ -193,11 +193,21 @@ def calcular_top_setores(
     Returns:
         List of dicts with sector name and totals
     """
-    df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
+    df_base = df_clientes.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
-        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
         pl.col("ValorTotal").sum().alias("ValorTotal"),
-    ]).sort("ValorTotal", descending=True).head(limite)
+    ])
+    df_multi = (
+        df_clientes.filter(pl.col("IsMultimarcas"))
+        .group_by(VENDAS_COL_SETOR)
+        .agg(pl.col("ClienteID").n_unique().alias("ClientesMultimarcas"))
+    )
+    df_setores = (
+        df_base.join(df_multi, on=VENDAS_COL_SETOR, how="left")
+        .with_columns(pl.col("ClientesMultimarcas").fill_null(0))
+        .sort("ValorTotal", descending=True)
+        .head(limite)
+    )
 
     return [
         {
@@ -305,12 +315,22 @@ def calcular_top_setores_completo(
     Returns:
         List of dicts with sector, clients, items, value
     """
-    df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
+    df_base = df_clientes.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
-        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
         pl.col("ItensTotal").sum().alias("ItensTotal"),
         pl.col("ValorTotal").sum().alias("ValorTotal"),
-    ]).sort("ValorTotal", descending=True).head(limite)
+    ])
+    df_multi = (
+        df_clientes.filter(pl.col("IsMultimarcas"))
+        .group_by(VENDAS_COL_SETOR)
+        .agg(pl.col("ClienteID").n_unique().alias("ClientesMultimarcas"))
+    )
+    df_setores = (
+        df_base.join(df_multi, on=VENDAS_COL_SETOR, how="left")
+        .with_columns(pl.col("ClientesMultimarcas").fill_null(0))
+        .sort("ValorTotal", descending=True)
+        .head(limite)
+    )
 
     return [
         {
@@ -337,11 +357,22 @@ def calcular_metricas_por_setor(
     if df_clientes.is_empty():
         return []
 
-    df_setores = df_clientes.group_by(VENDAS_COL_SETOR).agg([
+    df_base = df_clientes.group_by(VENDAS_COL_SETOR).agg([
         pl.col("ClienteID").n_unique().alias("ClientesAtivos"),
-        pl.col("IsMultimarcas").sum().alias("ClientesMultimarcas"),
         pl.col("ValorTotal").sum().alias("ValorTotal"),
     ]).sort(VENDAS_COL_SETOR)
+
+    # Count unique multimarca customers per sector (a customer who is multimarca
+    # in ANY cycle counts once — avoids double-counting in multi-cycle data)
+    df_multi = (
+        df_clientes.filter(pl.col("IsMultimarcas"))
+        .group_by(VENDAS_COL_SETOR)
+        .agg(pl.col("ClienteID").n_unique().alias("ClientesMultimarcas"))
+    )
+
+    df_setores = df_base.join(df_multi, on=VENDAS_COL_SETOR, how="left").with_columns(
+        pl.col("ClientesMultimarcas").fill_null(0)
+    )
 
     result = []
     for row in df_setores.iter_rows(named=True):
