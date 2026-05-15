@@ -85,29 +85,62 @@ def is_makeup_product(nome_produto: str) -> bool:
     """
     Check if a product is a makeup product that should be counted as IAF Make.
 
-    Detects makeup products that may not be in the official IAF list.
+    Política: todo item de maquiagem é IAF make, mesmo que não esteja na
+    lista oficial (Boti foi expandida).
     """
     if not nome_produto:
         return False
     nome_upper = nome_produto.upper()
 
-    # Makeup product indicators
+    # Exclusões — perfumaria, corpo, cabelo, etc.
+    exclude_patterns = [
+        'BODY SPRAY', 'BODY SPLASH', 'BODY MIST', 'BODY ', 'CORPORAL',
+        'CABELO', 'SHAMP', 'COND ', 'CONDICIONADOR', 'MASCARA CAPILAR',
+        'OLEO CAPILAR', 'LEAVE', 'CREME PENT', 'ALISA', 'CHANTILLY',
+        'DES COL', 'DESODORANTE COL', 'COLONIA', 'COLÔNIA',
+        'EAU DE PARFUM', 'EAU DE TOIL', 'EDP ', 'EDT ', ' EDP', ' EDT',
+        'PERFUM', 'SPLASH DREAM', 'PARFUMEE', 'CR DES HID',
+        'LOC HID', 'LOC DES', 'HIDRATANTE DESOD', 'CR HID CPO',
+        'SAB BARRA', 'SAB LIQ', 'SABONETE BARRA', 'SABONETE LÍQ',
+        'SAB ÍNT', 'SAB INT', 'PROTET',
+        'BATERIA', 'BATEDOR',  # falsos positivos de "BAT"
+    ]
+    if any(excl in nome_upper for excl in exclude_patterns):
+        return False
+
+    # Indicadores de maquiagem — produto, abreviações, marcas-linha
     makeup_indicators = [
-        'BATOM', 'GLOSS', 'SOMBRA', 'PLT SOMBRA', 'PALETTE SOMBRA',
-        'RIMEL', 'MASCARA CILIOS', 'DELINEADOR', 'BLUSH', 'BRONZER',
-        'ILUMINADOR', 'PRIMER', 'CORRETIVO', 'PO COMPACTO', 'CONTORNO',
-        'BASE LIQ', 'BASE STICK', 'MAKE B ', 'MAKEB ', 'LABIAL',
-        'LAPIS OLHO', 'LAPIS BOCA', 'EUD MAKE', 'NIINA'
+        # Batom (e variações)
+        'BATOM', 'BAT HID', 'BAT MATE', 'BAT LIQ', 'BAT CREM',
+        'BAT SEMIMATE', 'BAT SEMI MATE', 'MAK BAT', 'BATIOM',
+        'LIPSTICK', 'LIP TINT', 'LIP OIL', 'LIP GLOSS',
+        # Gloss / labiais
+        'GLOSS', 'LABIAL',
+        # Olhos
+        'SOMBRA', 'PALETA SOMBRA', 'PALETTE SOMBRA', 'PLT SOMBRA',
+        'RIMEL', 'RIMÉL', 'MÁSCARA CILIOS', 'MASCARA CILIOS',
+        'MÁSC CILIOS', 'MASC CILIOS', 'DELINEADOR',
+        'LAP OLHO', 'LAPIS OLHO', 'LÁPIS OLHO',
+        'LAP SOBR', 'LAPIS SOBR', 'LÁPIS SOBR',
+        # Boca
+        'LAP BOCA', 'LAPIS BOCA', 'LÁPIS BOCA',
+        # Rosto / base
+        'BLUSH', 'BRONZER', 'ILUMINADOR', 'PRIMER', 'CORRETIVO',
+        'PO COMPACTO', 'PÓ COMPACTO', 'PO FACIAL', 'PÓ FACIAL',
+        'CONTORNO', 'BASE LIQ', 'BASE LÍQ', 'BASE STICK',
+        'BASE PO', 'BASE PÓ', 'BASE FACIAL',
+        # Linhas/marcas de maquiagem
+        'MAKE B ', 'MAKEB ', 'MAKE B,', 'EUD MAKE', 'EUD MAK',
+        'NIINA SECRETS GLOSS', 'NIINA SECRETS BAT', 'NIINA SECRETS LIP',
+        'NIINA SECRETS PALET', 'NIINA SECRETS SOMBRA',
+        'QDB BAT', 'QDB GLOSS', 'QDB SOMBRA', 'QDB DELIN',
+        'QDB BASE', 'QDB LAP', 'QDB BLUSH',
+        # Acessórios / kits make
+        'ESPONJA MAQ', 'PINCEL MAQ', 'PALETA MULTIF', 'PLT MULTIF',
+        'MINI MALETA', 'MALETA ALL SET', 'KIT MAQ',
     ]
 
-    # Check if product name matches makeup indicators
-    if any(ind in nome_upper for ind in makeup_indicators):
-        # Exclude products that are clearly not makeup
-        exclude_patterns = ['BODY', 'CORPORAL', 'CABELO', 'SHAMP', 'COND']
-        if not any(excl in nome_upper for excl in exclude_patterns):
-            return True
-
-    return False
+    return any(ind in nome_upper for ind in makeup_indicators)
 
 
 def cruzar_vendas_com_iaf(
@@ -162,6 +195,11 @@ def cruzar_vendas_com_iaf(
             tipo_iaf = info["tipo"]
             descricao = info["descricao"]
             marca = info["marca"]
+        # Fallback heurístico: todo item de maquiagem é IAF make
+        elif is_makeup_product(nome_produto):
+            tipo_iaf = "Make"
+            descricao = nome_produto
+            marca = row.get("Marca_BD", "") or ""
 
         if tipo_iaf:
             # Get gerencia - handle missing column gracefully
