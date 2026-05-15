@@ -92,7 +92,7 @@ def is_makeup_product(nome_produto: str) -> bool:
         return False
     nome_upper = nome_produto.upper()
 
-    # Exclusões — perfumaria, corpo, cabelo, etc.
+    # Exclusões — perfumaria, corpo, cabelo, acessórios, etc.
     exclude_patterns = [
         'BODY SPRAY', 'BODY SPLASH', 'BODY MIST', 'BODY ', 'CORPORAL',
         'CABELO', 'SHAMP', 'COND ', 'CONDICIONADOR', 'MASCARA CAPILAR',
@@ -104,6 +104,9 @@ def is_makeup_product(nome_produto: str) -> bool:
         'SAB BARRA', 'SAB LIQ', 'SABONETE BARRA', 'SABONETE LÍQ',
         'SAB ÍNT', 'SAB INT', 'PROTET',
         'BATERIA', 'BATEDOR',  # falsos positivos de "BAT"
+        # Acessórios não contam como IAF make
+        'PINCEL', 'ESPONJA', 'MALETA', 'NECESSAIRE', 'NECESS ',
+        'NECESSÉR', 'KIT MAQ',
     ]
     if any(excl in nome_upper for excl in exclude_patterns):
         return False
@@ -135,9 +138,8 @@ def is_makeup_product(nome_produto: str) -> bool:
         'NIINA SECRETS PALET', 'NIINA SECRETS SOMBRA',
         'QDB BAT', 'QDB GLOSS', 'QDB SOMBRA', 'QDB DELIN',
         'QDB BASE', 'QDB LAP', 'QDB BLUSH',
-        # Acessórios / kits make
-        'ESPONJA MAQ', 'PINCEL MAQ', 'PALETA MULTIF', 'PLT MULTIF',
-        'MINI MALETA', 'MALETA ALL SET', 'KIT MAQ',
+        # Paletas multifuncionais (contêm sombra/blush/iluminador)
+        'PALETA MULTIF', 'PLT MULTIF',
     ]
 
     return any(ind in nome_upper for ind in makeup_indicators)
