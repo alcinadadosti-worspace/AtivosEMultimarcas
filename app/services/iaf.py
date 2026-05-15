@@ -17,6 +17,7 @@ from app.config import (
     VENDAS_COL_QTD_ITENS,
     VENDAS_COL_VALOR,
     VENDAS_COL_GERENCIA,
+    TIPO_VENDA,
 )
 from app.utils.normalizers import normalizar_sku
 
@@ -116,16 +117,18 @@ def cruzar_vendas_com_iaf(
     """
     Cross-reference sales with IAF database to identify premium items.
 
-    Only counts products present in the official iaf_cabelos/iaf_make tables.
-    Receives the full DataFrame (all transaction types) so Brinde/Doação
-    transactions are included in IAF identification, matching the official system.
+    Only counts products present in the official iaf_cabelos/iaf_make tables
+    AND only when the transaction type is "Venda" — the official panel does
+    not count Brinde/Doação as IAF.
 
     Args:
-        df_vendas: Enriched sales DataFrame (all transaction types)
+        df_vendas: Enriched sales DataFrame (all transaction types — filtered
+            internally to Venda only)
         conn: SQLite connection
 
     Returns:
-        DataFrame with only IAF sales, including type (Cabelos/Make)
+        DataFrame with only IAF sales (Tipo == "Venda"), including type
+        (Cabelos/Make)
     """
     # Load IAF index
     indice_iaf = criar_indice_iaf(conn)
@@ -140,9 +143,14 @@ def cruzar_vendas_com_iaf(
     resultados = []
 
     for row in df_vendas.iter_rows(named=True):
+        tipo_transacao = row.get("Tipo", "Venda")
+
+        # Painel oficial considera apenas vendas reais — descarta Brinde/Doação
+        if tipo_transacao != TIPO_VENDA:
+            continue
+
         codigo = row.get("CodigoProduto_normalizado", "")
         nome_produto = row.get("NomeProduto", "")
-        tipo_transacao = row.get("Tipo", "Venda")
 
         tipo_iaf = None
         descricao = ""
