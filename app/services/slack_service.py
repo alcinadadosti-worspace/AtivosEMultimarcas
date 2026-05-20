@@ -24,7 +24,13 @@ def resolver_slack_id(supervisora: str) -> str:
 
 def _barra(pct: float, largura: int = 10) -> str:
     filled = round(min(100.0, pct) / 100 * largura)
-    return "▰" * filled + "▱" * (largura - filled)
+    if pct >= 100:
+        full = "🟩"
+    elif pct >= 60:
+        full = "🟨"
+    else:
+        full = "🟥"
+    return full * filled + "⬜" * (largura - filled)
 
 
 def _fmt_currency(v) -> str:
@@ -58,10 +64,10 @@ def _pct_atingimento(real, meta) -> Optional[float]:
 
 def _linha_metrica(label: str, real_fmt: str, meta_fmt: str, pct: Optional[float]) -> str:
     if pct is None:
-        return f"• *{label}:* {real_fmt}  _(sem meta)_"
+        return f"•  *{label}:*  {real_fmt}  ·  _sem meta_"
     bar = _barra(pct)
-    emoji = "🟢" if pct >= 100 else ("🟡" if pct >= 60 else "🔴")
-    return f"{emoji}  *{label}:* {real_fmt}  ›  meta {meta_fmt}\n      {bar}  {pct:.0f}%"
+    emoji = "✅" if pct >= 100 else ("⚡" if pct >= 60 else "🔴")
+    return f"{emoji}  *{label}:* {real_fmt}  ›  meta {meta_fmt}  {bar}  *{pct:.0f}%*"
 
 
 _STATUS_TEXTO = {
