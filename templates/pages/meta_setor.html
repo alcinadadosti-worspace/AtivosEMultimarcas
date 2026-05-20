@@ -302,9 +302,9 @@
 
                 <!-- Legenda -->
                 <div class="legenda">
-                    <span style="color:#4ade80;">&#9679;</span> Bateu a Meta (≥ 100% da meta)
-                    <span style="color:#fbbf24;">&#9679;</span> Quase Lá (≥ 60% da meta)
-                    <span style="color:#f87171;">&#9679;</span> Precisa Melhorar (&lt; 60% da meta)
+                    <span style="color:#4ade80;">&#9679;</span> Parabéns, meta batida! 🎉 (≥ 100% da meta)
+                    <span style="color:#fbbf24;">&#9679;</span> Falta pouco, você consegue! 💪 (≥ 60% da meta)
+                    <span style="color:#f87171;">&#9679;</span> Bora virar o jogo! 🚀 (&lt; 60% da meta)
                 </div>
 
                 <!-- Loading -->
@@ -566,9 +566,9 @@ function metaSetor() {
 
         badgeLabel(status) {
             return {
-                bateu:    'Bateu a Meta',
-                quase:    'Quase Lá',
-                longe:    'Precisa Melhorar',
+                bateu:    'Parabéns, meta batida! 🎉',
+                quase:    'Falta pouco, você consegue! 💪',
+                longe:    'Bora virar o jogo! 🚀',
                 sem_meta: 'Sem Meta',
             }[status] || '';
         },
@@ -675,7 +675,7 @@ function metaSetor() {
                 if (p === null) return 0;
                 return Math.min(100, p).toFixed(1);
             };
-            const statusLabel = { bateu: 'Bateu a Meta', quase: 'Quase Lá', longe: 'Precisa Melhorar', sem_meta: 'Sem Meta' };
+            const statusLabel = { bateu: 'Parabéns, meta batida! 🎉', quase: 'Falta pouco, você consegue! 💪', longe: 'Bora virar o jogo! 🚀', sem_meta: 'Sem Meta' };
             const statusCor   = { bateu: '#4ade80', quase: '#fbbf24', longe: '#f87171', sem_meta: '#64748b' };
 
             const indicadores = [
@@ -872,7 +872,7 @@ function enviarSlack() {
                     return '#f87171';
                 };
 
-                const statusLabel = { bateu: 'Bateu a Meta', quase: 'Quase Lá', longe: 'Precisa Melhorar', sem_meta: 'Sem Meta' };
+                const statusLabel = { bateu: 'Parabéns, meta batida! 🎉', quase: 'Falta pouco, você consegue! 💪', longe: 'Bora virar o jogo! 🚀', sem_meta: 'Sem Meta' };
                 const statusCor   = { bateu: '#4ade80', quase: '#fbbf24', longe: '#f87171', sem_meta: '#64748b' };
                 const stCor = statusCor[s._status] || '#64748b';
                 const stLbl = statusLabel[s._status] || '—';

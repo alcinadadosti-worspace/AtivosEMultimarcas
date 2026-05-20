@@ -24,7 +24,7 @@ def resolver_slack_id(supervisora: str) -> str:
 
 def _barra(pct: float, largura: int = 10) -> str:
     filled = round(min(100.0, pct) / 100 * largura)
-    return "█" * filled + "░" * (largura - filled)
+    return "▰" * filled + "▱" * (largura - filled)
 
 
 def _fmt_currency(v) -> str:
@@ -60,8 +60,40 @@ def _linha_metrica(label: str, real_fmt: str, meta_fmt: str, pct: Optional[float
     if pct is None:
         return f"• *{label}:* {real_fmt}  _(sem meta)_"
     bar = _barra(pct)
-    emoji = "✅" if pct >= 100 else ("⚡" if pct >= 60 else "🔴")
-    return f"{emoji} *{label}:* {real_fmt}  ›  meta {meta_fmt}  `{bar}` {pct:.0f}%"
+    emoji = "🟢" if pct >= 100 else ("🟡" if pct >= 60 else "🔴")
+    return f"{emoji}  *{label}:* {real_fmt}  ›  meta {meta_fmt}\n      {bar}  {pct:.0f}%"
+
+
+_STATUS_TEXTO = {
+    "bateu":    "Parabéns, meta batida! 🎉",
+    "quase":    "Falta pouco, você consegue! 💪",
+    "longe":    "Bora virar o jogo! 🚀",
+    "sem_meta": "Sem meta definida",
+}
+
+
+def _status_geral(dados: dict) -> str:
+    """Worst pct across indicators with goal — matches UI's piorPct logic."""
+    pares = [
+        (dados.get("receita", 0),         dados.get("meta_receita")),
+        (dados.get("clientes_ativos", 0), dados.get("meta_ativo")),
+        (dados.get("rpa", 0),             dados.get("meta_rpa")),
+        (dados.get("multimarca", 0),      dados.get("meta_multimarca")),
+        (dados.get("cabelos", 0),         dados.get("meta_cabelos")),
+        (dados.get("make", 0),            dados.get("meta_make")),
+    ]
+    pior = None
+    for real, meta in pares:
+        pct = _pct_atingimento(real, meta)
+        if pct is not None:
+            pior = pct if pior is None else min(pior, pct)
+    if pior is None:
+        return "sem_meta"
+    if pior >= 100:
+        return "bateu"
+    if pior >= 60:
+        return "quase"
+    return "longe"
 
 
 def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
@@ -100,6 +132,9 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
     from datetime import date
     hoje = date.today().strftime("%d/%m/%Y")
 
+    status_geral = _status_geral(dados)
+    status_msg   = _STATUS_TEXTO.get(status_geral, "—")
+
     blocks = [
         {
             "type": "header",
@@ -111,6 +146,10 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
             "fields": [
                 {"type": "mrkdwn", "text": f"*Supervisora*\n{supervisora or '—'}"},
             ],
+        },
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"*{status_msg}*"},
         },
         {"type": "divider"},
         {
