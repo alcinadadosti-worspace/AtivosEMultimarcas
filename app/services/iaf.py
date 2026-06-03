@@ -59,11 +59,53 @@ def criar_indice_iaf(conn: sqlite3.Connection) -> Dict[str, Dict]:
     return indice
 
 
+# Tokens que indicam que o produto é um combo/kit/conjunto.
+# OBS: estojos (ESTJ/ESTOJO) são presentes/gift, NÃO combos — não entram aqui.
+COMBO_TOKENS = [
+    'COMBO', 'COMB ', 'KIT', 'CJ ', 'CJ SCH', 'CONJUNTO',
+    'DUO', 'TRIO', 'SACHE', 'SACHET', 'SCH ',
+]
+
+# Palavras-chave de cabelo — usadas para classificar um combo como IAF Cabelos.
+HAIR_KEYWORDS = [
+    'SIAGE', 'SIÀGE', 'SHAMP', 'COND', 'CONDICIONADOR',
+    'MASC CAP', 'MASCARA CAPILAR', 'MÁSCARA CAPILAR', 'CREME PENT',
+    'LEAVE', 'OLEO CAPILAR', 'ÓLEO CAPILAR', 'HAIRPLASTIA',
+    'HAIR PLASTIA', 'CAUTERIZ', 'CRONOLOGY', 'FRIZZ', 'FIOS',
+    'CABELO', 'CAPILAR', 'HAIR',
+    # Abreviações comuns de shampoo/condicionador em nomes de combo
+    'SHP', 'CND', 'SH+C', 'SH/C',
+]
+
+
+def is_combo(nome_produto: str) -> bool:
+    """Check whether a product name looks like a combo/kit/estojo."""
+    if not nome_produto:
+        return False
+    return any(tok in nome_produto.upper() for tok in COMBO_TOKENS)
+
+
+def is_hair_combo(nome_produto: str) -> bool:
+    """
+    Check if a product is a hair combo/kit that should count as IAF Cabelos.
+
+    Política: combos de cabelo entram no IAF Cabelos mesmo que não estejam na
+    lista oficial. Exige um indicador de combo/kit + uma palavra-chave de cabelo.
+    """
+    if not nome_produto:
+        return False
+    if not is_combo(nome_produto):
+        return False
+    nome_upper = nome_produto.upper()
+    return any(kw in nome_upper for kw in HAIR_KEYWORDS)
+
+
 def is_siage_hair_product(nome_produto: str) -> bool:
     """
     Check if a product is a Siège hair product (combo/kit/sachet).
 
     These products should be counted as IAF Cabelos even if not in the official list.
+    Mantida para compatibilidade — is_hair_combo cobre o caso geral.
     """
     if not nome_produto:
         return False
@@ -105,8 +147,8 @@ def is_makeup_product(nome_produto: str) -> bool:
         'SAB ÍNT', 'SAB INT', 'PROTET',
         'BATERIA', 'BATEDOR',  # falsos positivos de "BAT"
         # Acessórios não contam como IAF make
-        'PINCEL', 'ESPONJA', 'MALETA', 'NECESSAIRE', 'NECESS ',
-        'NECESSÉR', 'KIT MAQ',
+        'PINCEL', 'PINCEIS', 'PINCÉIS', 'ESPONJA', 'MALETA',
+        'NECESSAIRE', 'NECESS ', 'NECESSÉR', 'KIT MAQ',
     ]
     if any(excl in nome_upper for excl in exclude_patterns):
         return False
@@ -117,6 +159,7 @@ def is_makeup_product(nome_produto: str) -> bool:
         'BATOM', 'BAT HID', 'BAT MATE', 'BAT LIQ', 'BAT CREM',
         'BAT SEMIMATE', 'BAT SEMI MATE', 'MAK BAT', 'BATIOM',
         'LIPSTICK', 'LIP TINT', 'LIP OIL', 'LIP GLOSS',
+        'LIP KIT', 'GLAM LIP', ' LIP ',
         # Gloss / labiais
         'GLOSS', 'LABIAL',
         # Olhos
@@ -136,6 +179,8 @@ def is_makeup_product(nome_produto: str) -> bool:
         'MAKE B ', 'MAKEB ', 'MAKE B,', 'EUD MAKE', 'EUD MAK',
         'NIINA SECRETS GLOSS', 'NIINA SECRETS BAT', 'NIINA SECRETS LIP',
         'NIINA SECRETS PALET', 'NIINA SECRETS SOMBRA',
+        # Linha Niina conta como IAF Make (Niina Secrets = maquiagem; Niina Skin também conta)
+        'NIINA',
         'QDB BAT', 'QDB GLOSS', 'QDB SOMBRA', 'QDB DELIN',
         'QDB BASE', 'QDB LAP', 'QDB BLUSH',
         # Paletas multifuncionais (contêm sombra/blush/iluminador)
@@ -197,9 +242,14 @@ def cruzar_vendas_com_iaf(
             tipo_iaf = info["tipo"]
             descricao = info["descricao"]
             marca = info["marca"]
-        # Fallback heurístico: todo item de maquiagem é IAF make
+        # Fallback heurístico: todo item de maquiagem (incl. combos de make) é IAF make
         elif is_makeup_product(nome_produto):
             tipo_iaf = "Make"
+            descricao = nome_produto
+            marca = row.get("Marca_BD", "") or ""
+        # Fallback heurístico: combos de cabelo entram no IAF Cabelos
+        elif is_hair_combo(nome_produto):
+            tipo_iaf = "Cabelos"
             descricao = nome_produto
             marca = row.get("Marca_BD", "") or ""
 
