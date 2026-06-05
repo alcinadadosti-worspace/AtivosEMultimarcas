@@ -63,11 +63,24 @@ SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
 # Falls back to SLACK_DEFAULT_USER_ID for any unmapped supervisora.
 import json as _json
 SLACK_DEFAULT_USER_ID = os.getenv("SLACK_DEFAULT_USER_ID", "U0895CZ8HU7")
+
+# Mapa-padrão embutido para supervisoras que devem funcionar mesmo sem a env
+# var (ex.: ambiente local). O SLACK_USER_MAP do ambiente (Render) é mesclado
+# POR CIMA e sobrescreve estas entradas.
+_DEFAULT_SLACK_USER_MAP = {
+    "GESSICA": "U09G04R3CNP",
+}
+
 _raw_map = os.getenv("SLACK_USER_MAP", "{}")
 try:
-    SLACK_USER_MAP: dict = {k.upper(): v for k, v in _json.loads(_raw_map).items()}
+    _env_map = {k.upper(): v for k, v in _json.loads(_raw_map).items()}
 except Exception:
-    SLACK_USER_MAP: dict = {}
+    _env_map = {}
+
+SLACK_USER_MAP: dict = {
+    **{k.upper(): v for k, v in _DEFAULT_SLACK_USER_MAP.items()},
+    **_env_map,
+}
 
 # =============================================================================
 # SKU MATCHING CONSTANTS

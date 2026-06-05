@@ -229,6 +229,18 @@ def processar_planilha_vendas(
     if colunas_faltando:
         raise ValueError(f"Colunas obrigatorias faltando: {', '.join(colunas_faltando)}")
 
+    # 2b. NORMALIZE SETOR WHITESPACE
+    # O mesmo setor às vezes vem grafado de formas diferentes (espaço no fim,
+    # espaços duplicados). Sem limpar, o group_by(Setor) cria grupos duplicados
+    # — ex.: "SUPERVISORA DE RELACIONAMENTO PENEDO" e "...PENEDO " viram dois
+    # setores na tela de metas. Tira espaços das pontas e colapsa os internos.
+    df = df.with_columns(
+        pl.col(VENDAS_COL_SETOR).cast(pl.Utf8)
+          .str.strip_chars()
+          .str.replace_all(r"\s+", " ")
+          .alias(VENDAS_COL_SETOR)
+    )
+
     # 3. NORMALIZE SKUs
     df = df.with_columns([
         pl.col(VENDAS_COL_CODIGO_PRODUTO)
