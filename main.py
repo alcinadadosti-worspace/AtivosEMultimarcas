@@ -52,9 +52,23 @@ async def lifespan(app: FastAPI):
         count = cursor.fetchone()[0]
         print(f"[INFO] Database loaded: {count} products")
 
+        import import_db as _import_db
+
+        # Re-sync da tabela produtos quando a planilha-fonte diverge.
+        # import_produtos faz UPSERT (ON CONFLICT DO UPDATE) — atualiza marcas
+        # corrigidas e adiciona produtos novos SEM apagar nada que já exista no
+        # disco. Roda só quando a contagem difere (em sync, não faz nada).
+        estoque_file = DATA_DIR / "estoqueplanilha.xlsx"
+        try:
+            xlsx_prod_rows = len(pl.read_excel(str(estoque_file), infer_schema_length=0)) if estoque_file.exists() else 0
+            if xlsx_prod_rows and xlsx_prod_rows != count:
+                print(f"[INFO] produtos xlsx tem {xlsx_prod_rows} linhas vs {count} no DB — re-sync (upsert)...")
+                _import_db.import_produtos(conn, estoque_file)
+        except Exception as e:
+            print(f"[WARN] produtos re-sync check failed: {e}")
+
         # Re-import IAF tables if xlsx source diverged from DB (added OR removed SKUs).
         # pl.read_excel já descarta o header — quando em sync, len(xlsx) == count(db).
-        import import_db as _import_db
         iaf_make_file = DATA_DIR / "make_iaf.xlsx"
         iaf_cab_file = DATA_DIR / "cabelos_iaf.xlsx"
         try:
