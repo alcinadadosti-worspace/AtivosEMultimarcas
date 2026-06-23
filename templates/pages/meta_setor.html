@@ -264,6 +264,15 @@
                             onmouseout="this.style.background='linear-gradient(135deg,rgba(74,21,75,0.4),rgba(123,47,190,0.4))'">
                             💬 Enviar para Todas
                         </button>
+                        <button @click="exportarExcel($el)" title="Exportar metas para Excel (somente setores com meta cadastrada)"
+                            style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(16,185,129,0.3),rgba(5,150,105,0.3));
+                                   border:1px solid rgba(16,185,129,0.4);border-radius:8px;padding:5px 12px;
+                                   color:#e2e8f0;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                            onmouseover="this.style.background='linear-gradient(135deg,rgba(16,185,129,0.5),rgba(5,150,105,0.5))'"
+                            onmouseout="this.style.background='linear-gradient(135deg,rgba(16,185,129,0.3),rgba(5,150,105,0.3))'">
+                            <i data-lucide="file-spreadsheet" style="width:13px;height:13px;"></i>
+                            Exportar Excel
+                        </button>
                         <button @click="imprimirTodos()" title="Imprimir todos os setores"
                             style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(139,92,246,0.3),rgba(236,72,153,0.3));
                                    border:1px solid rgba(139,92,246,0.4);border-radius:8px;padding:5px 12px;
@@ -652,6 +661,45 @@ function metaSetor() {
                 ? 'linear-gradient(135deg,#059669,#10b981)'
                 : 'linear-gradient(135deg,#b45309,#d97706)';
             setTimeout(() => { btn.innerHTML = origText; btn.style.background = ''; btn.disabled = false; }, 5000);
+        },
+
+        async exportarExcel(btn) {
+            // Conta setores com meta cadastrada (os únicos que serão exportados)
+            const comMeta = this.dados.filter(s => s.meta_planilha).length;
+            if (comMeta === 0) {
+                alert('Nenhum setor com meta cadastrada para exportar.');
+                return;
+            }
+
+            const origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Gerando...';
+            try {
+                const params = new URLSearchParams();
+                if (this.filtros.ciclo)    params.set('ciclos',    this.filtros.ciclo);
+                if (this.filtros.gerencia) params.set('gerencias', this.filtros.gerencia);
+
+                const res = await fetch('/api/metas/export?' + params);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Falha ao exportar');
+                }
+                const blob = await res.blob();
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url;
+                a.download = 'metas_por_setor.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                btn.innerHTML = '✓ Exportado!';
+            } catch (e) {
+                console.error('Erro ao exportar Excel:', e);
+                btn.innerHTML = '✗ Erro';
+            } finally {
+                setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 3000);
+            }
         },
 
         imprimirSetor(s) {

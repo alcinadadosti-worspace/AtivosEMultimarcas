@@ -81,7 +81,7 @@ from app.services.ranking import (
     calcular_evolucao_revendedora,
     calcular_comparativo_ciclos,
 )
-from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas
+from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas, exportar_metas_excel
 from app.services.geo import (
     processar_planilha_clientes,
     calcular_metricas_bairro,
@@ -1155,14 +1155,16 @@ async def get_iaf_por_setor(
 # METAS POR SETOR
 # =============================================================================
 
-@api_router.get("/metas/por-setor")
-async def get_metas_por_setor(
-    ciclos: Optional[str] = Query(None),
-    gerencias: Optional[str] = Query(None),
-    session: tuple = Depends(get_user_session),
-):
-    """Get per-sector metrics for goal tracking page."""
-    session_id, session_data = session
+def _montar_metas_por_setor(
+    session_data: dict,
+    ciclos_list: Optional[List[str]],
+    gerencias_list: Optional[List[str]],
+) -> List[Dict[str, Any]]:
+    """Monta a lista de métricas reais por setor cruzada com as metas da planilha.
+
+    Cada item inclui ``supervisora`` e ``meta_planilha`` (None quando não há
+    meta cadastrada para o setor). Compartilhado entre a tela e a exportação.
+    """
     df_clientes = session_data.get("df_clientes")
     df_vendas = session_data.get("df_vendas")
     df_iaf = session_data.get("df_iaf")
@@ -1173,11 +1175,7 @@ async def get_metas_por_setor(
     if df_iaf is None:
         df_iaf = pl.DataFrame()
 
-    ciclos_list = ciclos.split(",") if ciclos else None
-    gerencias_list = gerencias.split(",") if gerencias else None
-
     df_clientes_f = aplicar_filtros(df_clientes, ciclos=ciclos_list, gerencias=gerencias_list)
-    df_vendas_f = aplicar_filtros(df_vendas, ciclos=ciclos_list, gerencias=gerencias_list)
     df_iaf_f = aplicar_filtros(df_iaf, ciclos=ciclos_list, gerencias=gerencias_list)
 
     metricas = calcular_metricas_por_setor(df_clientes_f)
@@ -1212,6 +1210,49 @@ async def get_metas_por_setor(
             m["meta_planilha"] = None
 
     return metricas
+
+
+@api_router.get("/metas/por-setor")
+async def get_metas_por_setor(
+    ciclos: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Get per-sector metrics for goal tracking page."""
+    session_id, session_data = session
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    return _montar_metas_por_setor(session_data, ciclos_list, gerencias_list)
+
+
+@api_router.get("/metas/export")
+async def export_metas(
+    formato: str = Query("xlsx", pattern="^(xlsx)$"),
+    ciclos: Optional[str] = Query(None),
+    gerencias: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Exporta as metas por setor para Excel (apenas setores com meta cadastrada)."""
+    session_id, session_data = session
+
+    ciclos_list = ciclos.split(",") if ciclos else None
+    gerencias_list = gerencias.split(",") if gerencias else None
+
+    metricas = _montar_metas_por_setor(session_data, ciclos_list, gerencias_list)
+
+    # Mantém apenas setores com meta cadastrada na planilha.
+    com_meta = [m for m in metricas if m.get("meta_planilha")]
+    if not com_meta:
+        raise HTTPException(status_code=404, detail="Nenhum setor com meta cadastrada para exportar")
+
+    content = exportar_metas_excel(com_meta)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=metas_por_setor.xlsx"},
+    )
 
 
 @api_router.get("/metas/planilha")
