@@ -19,7 +19,7 @@ import polars as pl
 from openpyxl import Workbook, load_workbook
 
 from app.api.dependencies import get_db
-from app.config import DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, MARCAS_GRUPO, MOTIVO_MATCH_EXATO
+from app.config import DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, MARCAS_GRUPO, MOTIVO_MATCH_EXATO, VENDAS_COL_SETOR, VENDAS_COL_GERENCIA
 from app.utils.normalizers import normalizar_sku
 from app.api.schemas import (
     UploadResponse,
@@ -81,7 +81,7 @@ from app.services.ranking import (
     calcular_evolucao_revendedora,
     calcular_comparativo_ciclos,
 )
-from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas, exportar_metas_excel
+from app.utils.exporters import exportar_csv, exportar_excel, exportar_multiplas_abas, exportar_metas_excel, exportar_metas_excel_por_gerencia
 from app.services.geo import (
     processar_planilha_clientes,
     calcular_metricas_bairro,
@@ -1182,9 +1182,28 @@ def _montar_metas_por_setor(
     iaf_por_setor = calcular_iaf_por_setor(df_clientes_f, df_iaf_f)
     iaf_dict = {item["setor"]: item for item in iaf_por_setor}
 
+    # Mapa setor → gerência (gerência com mais clientes no setor), usado para
+    # paginar a exportação por gerência. Vazio se a coluna não existir.
+    gerencia_por_setor: Dict[str, str] = {}
+    if VENDAS_COL_GERENCIA in df_clientes_f.columns:
+        try:
+            df_g = (
+                df_clientes_f
+                .group_by([VENDAS_COL_SETOR, VENDAS_COL_GERENCIA])
+                .agg(pl.col("ClienteID").n_unique().alias("_n"))
+                .sort("_n", descending=True)
+            )
+            for row in df_g.iter_rows(named=True):
+                setor = row[VENDAS_COL_SETOR]
+                if setor not in gerencia_por_setor:
+                    gerencia_por_setor[setor] = str(row[VENDAS_COL_GERENCIA] or "").strip()
+        except Exception as exc:
+            print(f"[WARN] Could not map setor→gerencia: {exc}")
+
     metas_planilha = ler_planilha_metas()
 
     for m in metricas:
+        m["gerencia"] = gerencia_por_setor.get(m["setor"], "")
         iaf = iaf_dict.get(m["setor"], {})
         m["clientes_cabelos"] = iaf.get("clientes_cabelos", 0)
         m["percent_cabelos"] = iaf.get("percent_cabelos", 0.0)
@@ -1247,7 +1266,22 @@ async def export_metas(
     if not com_meta:
         raise HTTPException(status_code=404, detail="Nenhum setor com meta cadastrada para exportar")
 
-    content = exportar_metas_excel(com_meta)
+    # Agrupa por gerência: com mais de uma gerência, gera uma aba por gerência
+    # para deixar a planilha mais organizada. Com uma só, mantém aba única.
+    grupos: Dict[str, List[Dict[str, Any]]] = {}
+    for m in com_meta:
+        chave = str(m.get("gerencia") or "").strip()
+        grupos.setdefault(chave, []).append(m)
+
+    if len(grupos) > 1:
+        abas = [
+            (f"Gerência {g}" if g else "Sem gerência", linhas)
+            for g, linhas in sorted(grupos.items(), key=lambda kv: kv[0])
+        ]
+        content = exportar_metas_excel_por_gerencia(abas)
+    else:
+        content = exportar_metas_excel(com_meta)
+
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

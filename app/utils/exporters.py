@@ -60,14 +60,71 @@ def exportar_metas_excel(metricas: List[Dict[str, Any]]) -> bytes:
     Para cada indicador são geradas três colunas: valor realizado, meta e
     percentual atingido (% da meta), com formatação de moeda/percentual.
     """
-    linhas: List[Dict[str, Any]] = []
+    buffer = io.BytesIO()
+    import xlsxwriter
+    wb = xlsxwriter.Workbook(buffer, {"in_memory": True})
+    _escrever_aba_metas(wb, "Metas", metricas)
+    wb.close()
+    buffer.seek(0)
+    return buffer.getvalue()
 
+
+def exportar_metas_excel_por_gerencia(
+    grupos: List["tuple[str, List[Dict[str, Any]]]"]
+) -> bytes:
+    """Exporta as metas em um Excel com uma aba por gerência.
+
+    ``grupos`` é uma lista de tuplas ``(nome_aba, metricas)``. Mantém o mesmo
+    layout/formatação da exportação de aba única, apenas separando os setores
+    de cada gerência em sua própria página para ficar mais organizado.
+    """
+    buffer = io.BytesIO()
+    import xlsxwriter
+    wb = xlsxwriter.Workbook(buffer, {"in_memory": True})
+    usados: set = set()
+    for nome, metricas in grupos:
+        _escrever_aba_metas(wb, _nome_aba_unico(nome, usados), metricas)
+    wb.close()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Helpers de montagem das abas de metas
+# ---------------------------------------------------------------------------
+
+_METAS_COLUMN_FORMATS = {
+    "Receita Realizada":           'R$ #,##0.00',
+    "Meta de Receita":             'R$ #,##0.00',
+    "Receita (% da Meta)":         '0.0"%"',
+    "Clientes Ativos":             '#,##0',
+    "Meta de Clientes Ativos":     '#,##0',
+    "Clientes Ativos (% da Meta)": '0.0"%"',
+    "RPA Realizado":               'R$ #,##0.00',
+    "Meta de RPA":                 'R$ #,##0.00',
+    "RPA (% da Meta)":             '0.0"%"',
+    "Multimarca % Realizado":      '0.0"%"',
+    "Meta Multimarca %":           '0.0"%"',
+    "Multimarca (% da Meta)":      '0.0"%"',
+    "Cabelo % Realizado":          '0.0"%"',
+    "Meta Cabelo %":               '0.0"%"',
+    "Cabelo (% da Meta)":          '0.0"%"',
+    "Make % Realizado":            '0.0"%"',
+    "Meta Make %":                 '0.0"%"',
+    "Make (% da Meta)":            '0.0"%"',
+}
+
+_METAS_HEADER_FORMAT = {"bold": True, "bg_color": "#6D28D9", "font_color": "#FFFFFF", "border": 1}
+
+
+def _metas_linhas(metricas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Monta as linhas (colunas ordenadas) das metas, ignorando setores sem meta."""
+    linhas: List[Dict[str, Any]] = []
     for m in metricas:
         meta = m.get("meta_planilha")
         if not meta:
             # Sem meta cadastrada → não entra na exportação.
             continue
-
         pct = _pior_pct(m, meta)
         linhas.append({
             "Setor":                       m.get("setor", ""),
@@ -92,50 +149,42 @@ def exportar_metas_excel(metricas: List[Dict[str, Any]]) -> bytes:
             "Meta Make %":                 round(float(meta.get("percent_make") or 0), 1),
             "Make (% da Meta)":            _pct_da_meta(m.get("percent_make"), meta.get("percent_make")),
         })
+    return linhas
 
+
+def _nome_aba_unico(nome: str, usados: set) -> str:
+    """Sanitiza e garante unicidade do nome da aba (limite Excel de 31 chars)."""
+    limpo = nome or "Metas"
+    for ch in "[]:*?/\\":
+        limpo = limpo.replace(ch, " ")
+    limpo = limpo.strip()[:31] or "Metas"
+    base, i = limpo, 2
+    while limpo in usados:
+        sufixo = f" ({i})"
+        limpo = base[:31 - len(sufixo)] + sufixo
+        i += 1
+    usados.add(limpo)
+    return limpo
+
+
+def _escrever_aba_metas(workbook, sheet_name: str, metricas: List[Dict[str, Any]]) -> int:
+    """Escreve uma aba de metas no workbook xlsxwriter. Retorna o nº de linhas."""
+    linhas = _metas_linhas(metricas)
+    sheet = (sheet_name or "Metas")[:31]
     if not linhas:
-        # DataFrame vazio (apenas cabeçalhos) — o chamador decide o que fazer.
-        df = pl.DataFrame()
-    else:
-        df = pl.DataFrame(linhas)
-
-    moeda = 'R$ #,##0.00'
-    inteiro = '#,##0'
-    pct_fmt = '0.0"%"'
-    column_formats = {
-        "Receita Realizada": moeda,
-        "Meta de Receita": moeda,
-        "Receita (% da Meta)": pct_fmt,
-        "Clientes Ativos": inteiro,
-        "Meta de Clientes Ativos": inteiro,
-        "Clientes Ativos (% da Meta)": pct_fmt,
-        "RPA Realizado": moeda,
-        "Meta de RPA": moeda,
-        "RPA (% da Meta)": pct_fmt,
-        "Multimarca % Realizado": pct_fmt,
-        "Meta Multimarca %": pct_fmt,
-        "Multimarca (% da Meta)": pct_fmt,
-        "Cabelo % Realizado": pct_fmt,
-        "Meta Cabelo %": pct_fmt,
-        "Cabelo (% da Meta)": pct_fmt,
-        "Make % Realizado": pct_fmt,
-        "Meta Make %": pct_fmt,
-        "Make (% da Meta)": pct_fmt,
-    }
-
-    buffer = io.BytesIO()
-    if df.is_empty():
-        df.write_excel(buffer, worksheet="Metas")
-    else:
-        df.write_excel(
-            buffer,
-            worksheet="Metas",
-            autofit=True,
-            column_formats={k: v for k, v in column_formats.items() if k in df.columns},
-            header_format={"bold": True, "bg_color": "#6D28D9", "font_color": "#FFFFFF", "border": 1},
+        pl.DataFrame({"Aviso": ["Nenhum setor com meta cadastrada"]}).write_excel(
+            workbook=workbook, worksheet=sheet
         )
-    buffer.seek(0)
-    return buffer.getvalue()
+        return 0
+    df = pl.DataFrame(linhas)
+    df.write_excel(
+        workbook=workbook,
+        worksheet=sheet,
+        autofit=True,
+        column_formats={k: v for k, v in _METAS_COLUMN_FORMATS.items() if k in df.columns},
+        header_format=_METAS_HEADER_FORMAT,
+    )
+    return len(linhas)
 
 
 def exportar_csv(df: pl.DataFrame) -> bytes:
