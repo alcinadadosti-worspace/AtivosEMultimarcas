@@ -160,19 +160,19 @@ def is_makeup_product(nome_produto: str) -> bool:
         'BAT SEMIMATE', 'BAT SEMI MATE', 'MAK BAT', 'BATIOM',
         'LIPSTICK', 'LIP TINT', 'LIP OIL', 'LIP GLOSS',
         'LIP KIT', 'GLAM LIP', ' LIP ',
-        # Gloss / labiais
-        'GLOSS', 'LABIAL',
+        # Gloss / labiais (inclui abreviação 'GLOS' sem S e a linha Sweet Lab da QDB)
+        'GLOSS', 'GLOS ', 'LABIAL', 'SWEET LAB', 'MOCHI BLUR',
         # Olhos
         'SOMBRA', 'PALETA SOMBRA', 'PALETTE SOMBRA', 'PLT SOMBRA',
         'RIMEL', 'RIMÉL', 'MÁSCARA CILIOS', 'MASCARA CILIOS',
-        'MÁSC CILIOS', 'MASC CILIOS', 'DELINEADOR',
+        'MÁSC CILIOS', 'MASC CILIOS', 'CILIO', 'DELINEADOR',
         'LAP OLHO', 'LAPIS OLHO', 'LÁPIS OLHO',
         'LAP SOBR', 'LAPIS SOBR', 'LÁPIS SOBR',
         # Boca
         'LAP BOCA', 'LAPIS BOCA', 'LÁPIS BOCA',
         # Rosto / base
         'BLUSH', 'BRONZER', 'ILUMINADOR', 'PRIMER', 'CORRETIVO',
-        'PO COMPACTO', 'PÓ COMPACTO', 'PO FACIAL', 'PÓ FACIAL',
+        'PO COMPACTO', 'PÓ COMPACTO', 'PO COMP ', 'PÓ COMP ', 'PO FACIAL', 'PÓ FACIAL',
         'CONTORNO', 'BASE LIQ', 'BASE LÍQ', 'BASE STICK',
         'BASE PO', 'BASE PÓ', 'BASE FACIAL',
         # Linhas/marcas de maquiagem
