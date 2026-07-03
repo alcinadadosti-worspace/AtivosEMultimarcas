@@ -69,6 +69,8 @@ SLACK_DEFAULT_USER_ID = os.getenv("SLACK_DEFAULT_USER_ID", "U0895CZ8HU7")
 # POR CIMA e sobrescreve estas entradas.
 _DEFAULT_SLACK_USER_MAP = {
     "GESSICA": "U09G04R3CNP",
+    "ANALUIZA": "U08ERHMN6F9",   # Platina / Penedo (ciclo 10)
+    "RODRIGO": "U0922F5KB7U",    # Bronze 4 / Penedo (ciclo 10)
 }
 
 _raw_map = os.getenv("SLACK_USER_MAP", "{}")
