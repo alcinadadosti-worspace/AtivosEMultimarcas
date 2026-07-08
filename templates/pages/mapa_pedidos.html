@@ -256,6 +256,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build zf-4</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
                 <div class="mode-toggle">
@@ -649,8 +650,13 @@ function mapaPedidos() {
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18,
             }).addTo(this._map);
-            // Garantia extra: recoloca as rosquinhas nos centróides após cada zoom.
-            this._map.on('zoomend', ()=>{ if (this.mapMode==='composicao') this._renderPies(); });
+            // Trava: força as rosquinhas a seguirem a cidade em QUALQUER
+            // evento de zoom/movimento (reprojeta cada marker no seu latlng) e
+            // recria os centróides ao fim do zoom.
+            this._map.on('zoom move', ()=>{
+                if (this._pieLayer) this._pieLayer.eachLayer(m=>{ if (m.update) m.update(); });
+            });
+            this._map.on('zoomend viewreset', ()=>{ if (this.mapMode==='composicao') this._renderPies(); });
             this._carregarGeoJson();
         },
         async _carregarGeoJson(){

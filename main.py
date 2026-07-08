@@ -234,7 +234,11 @@ async def page_mapa_pedidos(
     request: Request,
 ):
     """Order map page — geographic distribution of resellers and orders."""
-    return templates.TemplateResponse(request, "pages/mapa_pedidos.html", {"page": "mapa_pedidos"})
+    resp = templates.TemplateResponse(request, "pages/mapa_pedidos.html", {"page": "mapa_pedidos"})
+    # Evita o navegador servir HTML/JS antigo desta página após um deploy.
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 @app.get("/meta-setor", response_class=HTMLResponse)
