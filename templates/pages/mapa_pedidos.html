@@ -55,6 +55,12 @@
 .metric-chip i { width:13px; height:13px; }
 .map-legend { display:flex; align-items:center; gap:8px; padding:9px 20px; font-size:.77rem; color:var(--text-muted); border-top:1px solid rgba(139,92,246,.1); }
 .legend-bar { height:9px; width:130px; border-radius:4px; background:linear-gradient(to right,#1a1a3e,#4c1d95,#7c3aed,#a78bfa); }
+.map-subbar { display:flex; align-items:center; gap:10px; padding:10px 20px; border-bottom:1px solid rgba(139,92,246,.12); flex-wrap:wrap; }
+.map-subbar-label { font-size:.78rem; color:var(--text-muted); font-weight:500; }
+.mode-toggle { display:flex; gap:6px; margin-left:auto; }
+.seg-legend { display:inline-flex; align-items:center; gap:5px; font-size:.75rem; color:var(--text-secondary); }
+.pie-marker { border-radius:50%; box-shadow:0 2px 9px rgba(0,0,0,.55); cursor:pointer; transition:transform .15s; }
+.pie-marker:hover { transform:scale(1.08); }
 
 /* Segment bars */
 .seg-list { padding:16px 20px; display:flex; flex-direction:column; gap:11px; }
@@ -250,7 +256,21 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span class="sub" x-text="'· por ' + metricaLabel"></span>
+                <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
+                <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
+                <div class="mode-toggle">
+                    <button class="metric-chip" :class="mapMode==='intensidade' ? 'active' : ''" @click="setMapMode('intensidade')">
+                        <i data-lucide="flame"></i> Intensidade
+                    </button>
+                    <button class="metric-chip" :class="mapMode==='composicao' ? 'active' : ''" @click="setMapMode('composicao')">
+                        <i data-lucide="pie-chart"></i> Composição
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sub-bar: métrica (só no modo Intensidade) -->
+            <div class="map-subbar" x-show="mapMode==='intensidade'">
+                <span class="map-subbar-label">Colorir por:</span>
                 <div class="metric-chips">
                     <template x-for="m in metricas" :key="m.key">
                         <button class="metric-chip" :class="metrica===m.key ? 'active' : ''" @click="setMetrica(m.key)">
@@ -259,12 +279,22 @@
                     </template>
                 </div>
             </div>
+
             <div id="mapa-pedidos"></div>
-            <div class="map-legend">
+
+            <!-- Legenda: intensidade -->
+            <div class="map-legend" x-show="mapMode==='intensidade'">
                 <span>Menos</span>
                 <div class="legend-bar"></div>
                 <span x-text="'Mais ' + metricaLabel.toLowerCase()"></span>
                 <span style="margin-left:auto; font-style:italic;">Cidade de moradia · clique num município para focar</span>
+            </div>
+            <!-- Legenda: composição (cores das segmentações) -->
+            <div class="map-legend" x-show="mapMode==='composicao'" style="flex-wrap:wrap; gap:12px;">
+                <template x-for="s in segmentosPresentes" :key="s">
+                    <span class="seg-legend"><span class="seg-dot" :style="'background:'+corSegmento(s)"></span><span x-text="s"></span></span>
+                </template>
+                <span style="margin-left:auto; font-style:italic;">Rosquinha = mix de segmentação · cor da cidade = segmento predominante</span>
             </div>
         </div>
 
@@ -405,10 +435,11 @@ function mapaPedidos() {
         // State
         hasData:false, loading:true, uploading:false,
         selectedFile:null, fileName:'', avisos:[], ciclo:'',
-        resumo:{}, cidades:[], segmentos:[], visitantes:[],
+        resumo:{}, cidades:[], segmentos:[], visitantes:[], composicao:[],
         filterOptions:{ segmentos:[], unidades:[], cidades:[] },
         filtros:{ unidade:'', segmento:'', tipo:'' },
         metrica:'revendedores',
+        mapMode:'intensidade',   // 'intensidade' | 'composicao'
         metricas:[
             { key:'revendedores', label:'Revendedores', icon:'users' },
             { key:'itens',        label:'Itens',        icon:'package' },
@@ -420,7 +451,7 @@ function mapaPedidos() {
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
-        _map:null, _layer:null,
+        _map:null, _layer:null, _pieLayer:null, _cityLayers:{},
 
         // ── Computed ──
         get metricaLabel(){ return (this.metricas.find(m=>m.key===this.metrica)||{}).label || ''; },
@@ -431,6 +462,7 @@ function mapaPedidos() {
         get maxCidadeMetrica(){ return Math.max(...this.cidades.map(c=>c[this.metrica]||0), 1); },
         get maxSegRev(){ return Math.max(...this.segmentos.map(s=>s.revendedores||0), 1); },
         get maxVisitas(){ return Math.max(...this.visitantes.map(v=>v.visitas||0), 1); },
+        get segmentosPresentes(){ return this.segmentos.filter(s=>s.revendedores>0).map(s=>s.segmento); },
 
         // ── Init ──
         async init(){
@@ -485,19 +517,29 @@ function mapaPedidos() {
             return p;
         },
 
+        // params do mapa: só unidade+tipo (composição ignora o filtro de segmento)
+        _paramsMapa(){
+            const p = new URLSearchParams();
+            if (this.filtros.unidade) p.set('unidade', this.filtros.unidade);
+            if (this.filtros.tipo)    p.set('tipo', this.filtros.tipo);
+            return p;
+        },
+
         async carregarTudo(comFiltros){
             const reqs = [
                 fetch('/api/pedidos/resumo?'+this._params()).then(r=>r.json()),
                 fetch('/api/pedidos/cidades?'+this._params()).then(r=>r.json()),
                 fetch('/api/pedidos/segmentos?'+this._params()).then(r=>r.json()),
                 fetch('/api/pedidos/visitantes?'+this._params()).then(r=>r.json()),
+                fetch('/api/pedidos/composicao?'+this._paramsMapa()).then(r=>r.json()),
             ];
             if (comFiltros) reqs.push(fetch('/api/pedidos/filtros').then(r=>r.json()));
-            const [resumo, cid, seg, vis, filtros] = await Promise.all(reqs);
+            const [resumo, cid, seg, vis, comp, filtros] = await Promise.all(reqs);
             this.resumo = resumo.resumo || this.resumo;
             this.cidades = cid.cidades || [];
             this.segmentos = seg.segmentos || [];
             this.visitantes = vis.visitantes || [];
+            this.composicao = comp.composicao || [];
             if (filtros) this.filterOptions = filtros;
             // reset accordions on data change
             this.expandida = ''; this._detCache = {};
@@ -514,6 +556,7 @@ function mapaPedidos() {
         },
 
         setMetrica(k){ this.metrica = k; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); },
+        setMapMode(mode){ this.mapMode = mode; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); },
 
         // ── Sort ──
         toggleSort(campo){
@@ -618,16 +661,10 @@ function mapaPedidos() {
                     style: f => self._estilo(f),
                     onEachFeature(feature, layer){
                         const nome = feature.properties.nome;
+                        self._cityLayers[self._norm(nome)] = layer;
                         layer.bindTooltip('', { sticky:true, className:'mapa-tooltip' });
                         layer.on('mouseover', ()=>{
-                            const i = self._info(nome);
-                            layer.setTooltipContent(
-                                `<strong>${nome}</strong><br>`+
-                                `Revendedores: ${self.fmtNum(i.revendedores)}<br>`+
-                                `Pedidos: ${self.fmtNum(i.pedidos)} · Itens: ${self.fmtNum(i.itens)}<br>`+
-                                `Faturamento: ${self.fmtMoeda(i.valor)}<br>`+
-                                `Visitas à unidade: ${self.fmtNum(i.visitaram_unidade)}`
-                            );
+                            layer.setTooltipContent(self._tooltipCidade(nome));
                         });
                         layer.on('click', ()=>{
                             const i = self._info(nome);
@@ -638,7 +675,21 @@ function mapaPedidos() {
                         });
                     },
                 }).addTo(this._map);
+                this._atualizarMapa();
             } catch(e){ console.error('GeoJSON IBGE:', e); }
+        },
+        _tooltipCidade(nome){
+            const i = this._info(nome);
+            let base = `<strong>${nome}</strong><br>`+
+                `Revendedores: ${this.fmtNum(i.revendedores)}<br>`+
+                `Pedidos: ${this.fmtNum(i.pedidos)} · Itens: ${this.fmtNum(i.itens)}<br>`+
+                `Faturamento: ${this.fmtMoeda(i.valor)}<br>`+
+                `Visitas à unidade: ${this.fmtNum(i.visitaram_unidade)}`;
+            if (this.mapMode==='composicao'){
+                const ci = this._composInfo(nome);
+                if (ci) base += `<br><span style="color:#a78bfa;">Predominante: ${ci.dominante}</span>`;
+            }
+            return base;
         },
         expandirDoMapa(cidade){
             const c = this.cidades.find(x=>this._norm(x.cidade)===this._norm(cidade));
@@ -648,9 +699,21 @@ function mapaPedidos() {
             if (!this._layer) return;
             this._layer.eachLayer(l=>{ try{ l.closeTooltip(); }catch(e){} });
             this._layer.setStyle(f=>this._estilo(f));
+            if (this.mapMode==='composicao') this._renderPies();
+            else this._clearPies();
         },
         _estilo(feature){
             const nome = feature.properties.nome;
+            // Modo composição: pinta a cidade com a cor do segmento predominante.
+            if (this.mapMode==='composicao'){
+                const ci = this._composInfo(nome);
+                if (ci){
+                    const cor = this.corSegmento(ci.dominante);
+                    return { fillColor:cor, fillOpacity:0.5, color:cor, weight:1 };
+                }
+                return { fillColor:'#1a1a3e', fillOpacity:0.10, color:'rgba(139,92,246,.2)', weight:0.5 };
+            }
+            // Modo intensidade: escala de cor pela métrica selecionada.
             const info = this._info(nome);
             const max = Math.max(...this.cidades.map(c=>c[this.metrica]||0), 1);
             const val = info[this.metrica] || 0;
@@ -660,6 +723,49 @@ function mapaPedidos() {
                 fillOpacity: val > 0 ? 0.78 : 0.12,
                 color: 'rgba(139,92,246,.4)', weight:1,
             };
+        },
+        // ── Composição: rosquinhas por cidade ──
+        _composInfo(nome){ const n=this._norm(nome); return this.composicao.find(c=>this._norm(c.cidade)===n); },
+        _clearPies(){ if (this._pieLayer){ try{ this._map.removeLayer(this._pieLayer); }catch(e){} this._pieLayer=null; } },
+        _renderPies(){
+            this._clearPies();
+            if (!this._map || !this.composicao.length) return;
+            this._pieLayer = L.layerGroup().addTo(this._map);
+            const max = Math.max(...this.composicao.map(c=>c.total||0), 1);
+            for (const c of this.composicao){
+                const layer = this._cityLayers[this._norm(c.cidade)];
+                if (!layer || !c.total) continue;
+                const center = layer.getBounds().getCenter();
+                const d = Math.round(22 + Math.sqrt(c.total/max)*34);   // 22..56 px
+                const icon = L.divIcon({ html:this._pieHtml(c,d), className:'', iconSize:[d,d], iconAnchor:[d/2,d/2] });
+                const m = L.marker(center, { icon });
+                m.bindTooltip(this._pieTooltip(c), { className:'mapa-tooltip', sticky:true });
+                m.on('click', ()=> this.expandirDoMapa(c.cidade));
+                m.addTo(this._pieLayer);
+            }
+        },
+        _pieHtml(c, d){
+            let acc=0; const stops=[];
+            for (const s of c.segmentos){
+                const pct = c.total ? (s.revendedores/c.total*100) : 0;
+                const col = this.corSegmento(s.segmento);
+                stops.push(`${col} ${acc.toFixed(2)}% ${(acc+pct).toFixed(2)}%`);
+                acc += pct;
+            }
+            const grad = stops.length ? `conic-gradient(${stops.join(',')})` : '#4b5563';
+            const hole = Math.round(d*0.44);
+            const fs = Math.max(8, Math.round(d*0.24));
+            return `<div class="pie-marker" style="width:${d}px;height:${d}px;background:${grad};position:relative;">
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${hole}px;height:${hole}px;border-radius:50%;background:#0f0f1e;display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:700;color:#e2e0ff;">${c.total}</div>
+            </div>`;
+        },
+        _pieTooltip(c){
+            const rows = c.segmentos.map(s=>{
+                const col=this.corSegmento(s.segmento);
+                const pct = c.total ? Math.round(s.revendedores/c.total*100) : 0;
+                return `<div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${this._esc(s.segmento)}: <b>${s.revendedores}</b> <span style="color:var(--text-muted);">(${pct}%)</span></div>`;
+            }).join('');
+            return `<strong>${this._esc(c.cidade)}</strong> · ${c.total} revendedores<br>${rows}`;
         },
         _cor(r){
             if (r === 0)  return '#1a1a3e';
@@ -685,9 +791,9 @@ function mapaPedidos() {
         async limparDados(){
             if (!confirm('Remover a planilha de pedidos desta sessão?')) return;
             await fetch('/api/pedidos/clear', { method:'POST' });
-            this.hasData=false; this.cidades=[]; this.segmentos=[]; this.visitantes=[];
+            this.hasData=false; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
             this.resumo={}; this.ciclo=''; this.expandida=''; this._detCache={};
-            if (this._map){ this._map.remove(); this._map=null; } this._layer=null;
+            if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._pieLayer=null; this._cityLayers={};
         },
     };
 }

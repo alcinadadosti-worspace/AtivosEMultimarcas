@@ -96,6 +96,7 @@ from app.services.pedidos import (
     calcular_resumo as ped_calcular_resumo,
     calcular_por_cidade as ped_por_cidade,
     calcular_por_segmento as ped_por_segmento,
+    calcular_composicao_cidades as ped_composicao,
     calcular_visitantes_unidade as ped_visitantes,
     calcular_detalhe_cidade as ped_detalhe_cidade,
     obter_filtros as ped_obter_filtros,
@@ -2462,6 +2463,20 @@ async def pedidos_segmentos(
     if df is None:
         return {"segmentos": []}
     return {"segmentos": ped_por_segmento(df, **_ped_filtros(unidade, None, tipo, cidade))}
+
+
+@api_router.get("/pedidos/composicao")
+async def pedidos_composicao(
+    unidade: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    """Composição de segmentação por cidade (rosquinhas do mapa)."""
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"composicao": []}
+    return {"composicao": ped_composicao(df, **_ped_filtros(unidade, None, tipo))}
 
 
 @api_router.get("/pedidos/visitantes")

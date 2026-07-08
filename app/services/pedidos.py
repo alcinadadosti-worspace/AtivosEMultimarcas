@@ -323,6 +323,47 @@ def calcular_por_segmento(df: pl.DataFrame, **filtros) -> List[Dict[str, Any]]:
     return rows
 
 
+def calcular_composicao_cidades(df: pl.DataFrame, **filtros) -> List[Dict[str, Any]]:
+    """
+    Composição de segmentação (Papel) por cidade — base do modo "Composição"
+    do mapa (rosquinha por cidade + cor do segmento predominante).
+
+    Ignora o filtro de segmento (a composição é sempre sobre todos os papéis).
+    """
+    filtros = {**filtros, "segmento": None}
+    df = _aplicar_filtros(df, **filtros)
+    if df.is_empty():
+        return []
+
+    g = (
+        df.group_by(["_cidade_moradia", "_segmento"])
+        .agg(
+            pl.col(PED_COL_PESSOA).filter(pl.col(PED_COL_PESSOA) != "").n_unique().alias("rev")
+        )
+    )
+    ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
+    por_cidade: Dict[str, Dict[str, int]] = {}
+    for row in g.iter_rows(named=True):
+        por_cidade.setdefault(row["_cidade_moradia"], {})[row["_segmento"]] = int(row["rev"])
+
+    out: List[Dict[str, Any]] = []
+    for cidade, segs in por_cidade.items():
+        seg_list = sorted(
+            [{"segmento": s, "revendedores": v} for s, v in segs.items()],
+            key=lambda r: ordem.get(r["segmento"], 999),
+        )
+        total = sum(s["revendedores"] for s in seg_list)
+        dominante = max(seg_list, key=lambda r: r["revendedores"])["segmento"] if seg_list else ""
+        out.append({
+            "cidade": cidade,
+            "total": total,
+            "dominante": dominante,
+            "segmentos": seg_list,
+        })
+    out.sort(key=lambda r: r["total"], reverse=True)
+    return out
+
+
 def calcular_visitantes_unidade(df: pl.DataFrame, **filtros) -> List[Dict[str, Any]]:
     """Cidades cujos revendedores mais vão retirar na unidade (visitas)."""
     filtros = {**filtros, "tipo_visita": "unidade"}
