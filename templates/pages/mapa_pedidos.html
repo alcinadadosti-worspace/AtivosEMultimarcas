@@ -256,7 +256,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build zf-4</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-5</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
                 <div class="mode-toggle">
@@ -452,7 +452,8 @@ function mapaPedidos() {
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
-        _map:null, _layer:null, _pieLayer:null, _cityLayers:{},
+        _map:null, _layer:null, _cityLayers:{},
+        _pieG:null, _pieData:null, _pieTip:null,
 
         // ── Computed ──
         get metricaLabel(){ return (this.metricas.find(m=>m.key===this.metrica)||{}).label || ''; },
@@ -640,23 +641,14 @@ function mapaPedidos() {
         iniciarMapa(){
             if (this._map) return;
             if (!document.getElementById('mapa-pedidos')){ setTimeout(()=>this.iniciarMapa(),150); return; }
-            // zoomAnimation:false -> o zoom reposiciona tiles, polígonos e
-            // rosquinhas num único quadro sincronizado. Sem frame animado
-            // intermediário, os markers nunca "descolam" da cidade.
-            this._map = L.map('mapa-pedidos', {
-                center:[-9.62,-36.7], zoom:8,
-                zoomAnimation:false, markerZoomAnimation:false,
-            });
+            this._map = L.map('mapa-pedidos', { center:[-9.62,-36.7], zoom:8 });
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18,
             }).addTo(this._map);
-            // Trava: força as rosquinhas a seguirem a cidade em QUALQUER
-            // evento de zoom/movimento (reprojeta cada marker no seu latlng) e
-            // recria os centróides ao fim do zoom.
-            this._map.on('zoom move', ()=>{
-                if (this._pieLayer) this._pieLayer.eachLayer(m=>{ if (m.update) m.update(); });
-            });
-            this._map.on('zoomend viewreset', ()=>{ if (this.mapMode==='composicao') this._renderPies(); });
+            // As rosquinhas são desenhadas em SVG na MESMA camada dos polígonos,
+            // então acompanham a cidade no zoom/arrasto igual ao contorno dela.
+            // Só reposiciono os centróides ao fim do zoom (os pontos de camada mudam).
+            this._map.on('zoomend viewreset', ()=>{ this._positionPies(); });
             this._carregarGeoJson();
         },
         async _carregarGeoJson(){
@@ -738,42 +730,94 @@ function mapaPedidos() {
                 color: 'rgba(139,92,246,.4)', weight:1,
             };
         },
-        // ── Composição: rosquinhas por cidade ──
+        // ── Composição: rosquinhas em SVG, na mesma camada dos polígonos ──
         _composInfo(nome){ const n=this._norm(nome); return this.composicao.find(c=>this._norm(c.cidade)===n); },
-        _clearPies(){ if (this._pieLayer){ try{ this._map.removeLayer(this._pieLayer); }catch(e){} this._pieLayer=null; } },
+        // Pega o <g> raiz do renderer SVG que já desenha os polígonos.
+        _svgRoot(){
+            if (!this._layer) return null;
+            for (const l of this._layer.getLayers()){
+                if (l._renderer && l._renderer._rootGroup) return l._renderer._rootGroup;
+            }
+            return null;
+        },
+        _clearPies(){
+            if (this._pieTip){ try{ this._map.removeLayer(this._pieTip); }catch(e){} this._pieTip=null; }
+            if (this._pieG){ this._pieG.remove(); this._pieG=null; }
+            this._pieData=null;
+        },
         _renderPies(){
             this._clearPies();
-            if (!this._map || !this.composicao.length) return;
-            this._pieLayer = L.layerGroup().addTo(this._map);
+            const root = this._svgRoot();
+            if (!root || !this.composicao.length) return;
+            const NS='http://www.w3.org/2000/svg';
+            this._pieG = document.createElementNS(NS,'g');
+            this._pieG.setAttribute('class','pie-svg');
+            root.appendChild(this._pieG);
             const max = Math.max(...this.composicao.map(c=>c.total||0), 1);
+            this._pieData = [];
             for (const c of this.composicao){
                 const layer = this._cityLayers[this._norm(c.cidade)];
                 if (!layer || !c.total) continue;
-                const center = layer.getBounds().getCenter();
-                const d = Math.round(22 + Math.sqrt(c.total/max)*34);   // 22..56 px
-                const icon = L.divIcon({ html:this._pieHtml(c,d), className:'', iconSize:[d,d], iconAnchor:[d/2,d/2] });
-                const m = L.marker(center, { icon });
-                m.bindTooltip(this._pieTooltip(c), { className:'mapa-tooltip', sticky:true });
-                m.on('click', ()=> this.expandirDoMapa(c.cidade));
-                m.addTo(this._pieLayer);
+                const ro = 11 + Math.sqrt(c.total/max)*16;   // raio externo 11..27 px
+                const ri = ro*0.46;                          // furo (donut)
+                const g = document.createElementNS(NS,'g');
+                g.style.cursor='pointer';
+                let a0 = -Math.PI/2;
+                for (const s of c.segmentos){
+                    const a1 = a0 + (s.revendedores/c.total)*Math.PI*2;
+                    const p = document.createElementNS(NS,'path');
+                    p.setAttribute('d', this._slicePath(ri, ro, a0, a1));
+                    p.setAttribute('fill', this.corSegmento(s.segmento));
+                    p.setAttribute('stroke', 'rgba(8,8,20,.75)');
+                    p.setAttribute('stroke-width', '0.6');
+                    g.appendChild(p);
+                    a0 = a1;
+                }
+                const t = document.createElementNS(NS,'text');
+                t.setAttribute('text-anchor','middle'); t.setAttribute('dy','0.34em');
+                t.setAttribute('font-size', Math.max(7, ro*0.55).toFixed(0));
+                t.setAttribute('font-weight','700');
+                t.setAttribute('paint-order','stroke');
+                t.setAttribute('stroke','rgba(10,10,25,.92)'); t.setAttribute('stroke-width','2.6');
+                t.setAttribute('fill','#e8e6ff');
+                t.textContent = c.total;
+                g.appendChild(t);
+                const latlng = layer.getBounds().getCenter();
+                g.addEventListener('click', ()=> this.expandirDoMapa(c.cidade));
+                g.addEventListener('mouseenter', ()=>{
+                    if (this._pieTip){ try{ this._map.removeLayer(this._pieTip); }catch(e){} }
+                    this._pieTip = L.tooltip({ className:'mapa-tooltip', direction:'top', offset:[0,-ro] })
+                        .setLatLng(latlng).setContent(this._pieTipHTML(c)).addTo(this._map);
+                });
+                g.addEventListener('mouseleave', ()=>{
+                    if (this._pieTip){ try{ this._map.removeLayer(this._pieTip); }catch(e){} this._pieTip=null; }
+                });
+                this._pieG.appendChild(g);
+                this._pieData.push({ g, latlng });
+            }
+            this._positionPies();
+        },
+        _positionPies(){
+            if (!this._pieData || !this._map) return;
+            for (const p of this._pieData){
+                const pt = this._map.latLngToLayerPoint(p.latlng);
+                p.g.setAttribute('transform', `translate(${pt.x.toFixed(1)},${pt.y.toFixed(1)})`);
             }
         },
-        _pieHtml(c, d){
-            let acc=0; const stops=[];
-            for (const s of c.segmentos){
-                const pct = c.total ? (s.revendedores/c.total*100) : 0;
-                const col = this.corSegmento(s.segmento);
-                stops.push(`${col} ${acc.toFixed(2)}% ${(acc+pct).toFixed(2)}%`);
-                acc += pct;
+        // caminho de uma fatia de donut (divide em duas metades se for 100%)
+        _slicePath(ri, ro, a0, a1){
+            if (a1 - a0 >= Math.PI*2 - 1e-6){
+                const mid = a0 + Math.PI;
+                return this._wedge(ri,ro,a0,mid) + ' ' + this._wedge(ri,ro,mid,a1);
             }
-            const grad = stops.length ? `conic-gradient(${stops.join(',')})` : '#4b5563';
-            const hole = Math.round(d*0.44);
-            const fs = Math.max(8, Math.round(d*0.24));
-            return `<div class="pie-marker" style="width:${d}px;height:${d}px;background:${grad};position:relative;">
-                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${hole}px;height:${hole}px;border-radius:50%;background:#0f0f1e;display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:700;color:#e2e0ff;">${c.total}</div>
-            </div>`;
+            return this._wedge(ri,ro,a0,a1);
         },
-        _pieTooltip(c){
+        _wedge(ri, ro, a0, a1){
+            const large = (a1-a0) > Math.PI ? 1 : 0;
+            const P = (r,a)=> (r*Math.cos(a)).toFixed(2)+','+(r*Math.sin(a)).toFixed(2);
+            return `M${P(ro,a0)} A${ro},${ro} 0 ${large} 1 ${P(ro,a1)} L${P(ri,a1)} A${ri},${ri} 0 ${large} 0 ${P(ri,a0)} Z`;
+        },
+        _pieTipHTML(c){
             const rows = c.segmentos.map(s=>{
                 const col=this.corSegmento(s.segmento);
                 const pct = c.total ? Math.round(s.revendedores/c.total*100) : 0;
@@ -807,7 +851,8 @@ function mapaPedidos() {
             await fetch('/api/pedidos/clear', { method:'POST' });
             this.hasData=false; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
             this.resumo={}; this.ciclo=''; this.expandida=''; this._detCache={};
-            if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._pieLayer=null; this._cityLayers={};
+            this._clearPies();
+            if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },
     };
 }
