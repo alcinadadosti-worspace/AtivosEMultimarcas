@@ -91,6 +91,15 @@ from app.services.geo import (
     obter_cidades_geo,
     obter_bairros_geo,
 )
+from app.services.pedidos import (
+    processar_planilha_pedidos,
+    calcular_resumo as ped_calcular_resumo,
+    calcular_por_cidade as ped_por_cidade,
+    calcular_por_segmento as ped_por_segmento,
+    calcular_visitantes_unidade as ped_visitantes,
+    calcular_detalhe_cidade as ped_detalhe_cidade,
+    obter_filtros as ped_obter_filtros,
+)
 
 
 # Router for API endpoints
@@ -2338,6 +2347,199 @@ async def export_geo_clientes(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=clientes_geografico.xlsx"},
         )
+
+
+# =============================================================================
+# MAPA DE PEDIDOS (ConsultaPedidos) — importado on-demand, vive só na sessão
+# =============================================================================
+
+def _ped_filtros(
+    unidade: Optional[str],
+    segmento: Optional[str],
+    tipo: Optional[str],
+    cidade: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Monta o dicionário de filtros para as funções do serviço de pedidos."""
+    return {
+        "unidade": unidade or None,
+        "segmento": segmento or None,
+        "tipo_visita": tipo or None,
+        "cidade": cidade or None,
+    }
+
+
+def _get_df_pedidos(session_data: Dict[str, Any]):
+    df = session_data.get("df_pedidos")
+    if df is None or df.is_empty():
+        return None
+    return df
+
+
+@api_router.post("/pedidos/upload")
+async def upload_pedidos(
+    file: UploadFile = File(...),
+    session: tuple = Depends(get_user_session),
+):
+    """Importa a planilha ConsultaPedidos (fica apenas na sessão do usuário)."""
+    session_id, _ = session
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
+    if not file.filename.lower().endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Formato inválido. Use CSV ou Excel (.xlsx, .xls)",
+        )
+
+    try:
+        content = await file.read()
+        resultado = processar_planilha_pedidos(content, file.filename)
+
+        set_session_value(session_id, "df_pedidos", resultado["df"])
+        set_session_value(session_id, "df_pedidos_stats", resultado["estatisticas"])
+
+        return create_response_with_session({
+            "success": True,
+            "message": "Planilha de pedidos importada com sucesso",
+            "estatisticas": resultado["estatisticas"],
+            "avisos": resultado["avisos"],
+        }, session_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
+
+
+@api_router.get("/pedidos/status")
+async def pedidos_status(session: tuple = Depends(get_user_session)):
+    """Indica se há planilha de pedidos carregada na sessão."""
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    return create_response_with_session({
+        "has_data": df is not None,
+        "estatisticas": session_data.get("df_pedidos_stats") or {},
+    }, session_id)
+
+
+@api_router.get("/pedidos/resumo")
+async def pedidos_resumo(
+    unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"resumo": {}}
+    return {"resumo": ped_calcular_resumo(df, **_ped_filtros(unidade, segmento, tipo, cidade))}
+
+
+@api_router.get("/pedidos/cidades")
+async def pedidos_cidades(
+    unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"cidades": []}
+    return {"cidades": ped_por_cidade(df, **_ped_filtros(unidade, segmento, tipo))}
+
+
+@api_router.get("/pedidos/segmentos")
+async def pedidos_segmentos(
+    unidade: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    cidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"segmentos": []}
+    return {"segmentos": ped_por_segmento(df, **_ped_filtros(unidade, None, tipo, cidade))}
+
+
+@api_router.get("/pedidos/visitantes")
+async def pedidos_visitantes(
+    unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"visitantes": []}
+    return {"visitantes": ped_visitantes(df, **_ped_filtros(unidade, segmento, None))}
+
+
+@api_router.get("/pedidos/cidade/detalhe")
+async def pedidos_cidade_detalhe(
+    cidade: str = Query(...),
+    unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"bairros": [], "revendedores": []}
+    filtros = _ped_filtros(unidade, segmento, tipo)
+    filtros.pop("cidade", None)
+    return ped_detalhe_cidade(df, cidade, **filtros)
+
+
+@api_router.get("/pedidos/filtros")
+async def pedidos_filtros(session: tuple = Depends(get_user_session)):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        return {"segmentos": [], "unidades": [], "cidades": []}
+    return ped_obter_filtros(df)
+
+
+@api_router.post("/pedidos/clear")
+async def pedidos_clear(session: tuple = Depends(get_user_session)):
+    session_id, _ = session
+    set_session_value(session_id, "df_pedidos", None)
+    set_session_value(session_id, "df_pedidos_stats", None)
+    return create_response_with_session({"success": True}, session_id)
+
+
+@api_router.get("/pedidos/export/cidades")
+async def pedidos_export_cidades(
+    formato: str = Query("xlsx", pattern="^(csv|xlsx)$"),
+    unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df = _get_df_pedidos(session_data)
+    if df is None:
+        raise HTTPException(status_code=400, detail="Sem dados para exportar")
+
+    rows = ped_por_cidade(df, **_ped_filtros(unidade, segmento, tipo))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
+    df_export = pl.DataFrame(rows)
+
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=mapa_pedidos_cidades.csv"},
+        )
+    return Response(
+        content=exportar_excel(df_export, "Cidades"),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=mapa_pedidos_cidades.xlsx"},
+    )
 
 
 # =============================================================================

@@ -229,12 +229,12 @@ async def page_ranking(
     return templates.TemplateResponse(request, "pages/ranking.html", {"page": "ranking", "has_data": has_data})
 
 
-@app.get("/bairros", response_class=HTMLResponse)
-async def page_bairros(
+@app.get("/mapa-pedidos", response_class=HTMLResponse)
+async def page_mapa_pedidos(
     request: Request,
 ):
-    """Geographic analysis page — neighborhoods, cities and heat map."""
-    return templates.TemplateResponse(request, "pages/bairros.html", {"page": "bairros"})
+    """Order map page — geographic distribution of resellers and orders."""
+    return templates.TemplateResponse(request, "pages/mapa_pedidos.html", {"page": "mapa_pedidos"})
 
 
 @app.get("/meta-setor", response_class=HTMLResponse)

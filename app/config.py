@@ -163,3 +163,45 @@ GEO_UNIDADE_FILIAL = "1515"   # Filial Palmeira dos Índios
 # Persistent geo data (survives server restarts via Render Disk)
 GEO_PARQUET_PATH = str(PERSISTENT_DIR / "clientes_geo.parquet")
 GEO_STATS_PATH   = str(PERSISTENT_DIR / "clientes_geo_stats.json")
+
+# =============================================================================
+# ORDERS SPREADSHEET COLUMNS (ConsultaPedidos — "Mapa de Pedidos")
+# =============================================================================
+# Importada on-demand na sessão; NÃO é persistida no disco do Render.
+PED_COL_PESSOA = "Pessoa"                         # id do revendedor
+PED_COL_NOME = "NomePessoa"                        # nome do revendedor
+PED_COL_PAPEL = "Papel"                            # segmentação (Bronze/Prata/Ouro/...)
+PED_COL_QTDE_MATERIAIS = "QtdeMateriais"           # itens vendidos
+PED_COL_VALOR = "ValorPraticado"                   # valor praticado do pedido
+PED_COL_TIPO_ENTREGA = "Tipo de Entrega"           # Retirar na central / No endereço de entrega
+PED_COL_CICLO = "Ciclo Marketing"                  # "10/2026" -> ciclo 10
+PED_COL_ESTRUTURA_PAI = "EstruturaPai"             # 13707=Penedo / 13706=Palmeira
+PED_COL_COD_ESTRUTURA = "Cód Estrutura"            # setor que atendeu
+PED_COL_ESTRUTURA = "Estrutura"                    # nome do setor
+PED_COL_TELEFONE = "Telefone"
+# Cadastro (onde o revendedor é cadastrado)
+PED_COL_LOGRADOURO = "Logradouro"
+PED_COL_BAIRRO = "Bairro"
+PED_COL_CIDADE = "Cidade"
+# Entrega / retirada
+PED_COL_LOGRADOURO_ENTREGA = "LogradouroEntrega"
+PED_COL_BAIRRO_ENTREGA = "BairroEntregaRetirada"
+PED_COL_CIDADE_ENTREGA = "CidadeEntregaRetirada"
+
+PED_TIPO_RETIRADA = "Retirar na central de serviços"   # veio à unidade
+PED_TIPO_ENTREGA_CASA = "No endereço de entrega"       # recebeu em casa
+
+PED_REQUIRED_COLUMNS = [
+    PED_COL_PESSOA,
+    PED_COL_PAPEL,
+    PED_COL_QTDE_MATERIAIS,
+    PED_COL_VALOR,
+    PED_COL_TIPO_ENTREGA,
+    PED_COL_CIDADE_ENTREGA,
+]
+
+# EstruturaPai prefixo -> unidade gerenciadora
+PED_UNIDADES = {
+    "13707": "Penedo",
+    "13706": "Palmeira dos Índios",
+}

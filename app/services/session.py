@@ -27,6 +27,9 @@ def _create_empty_session() -> Dict[str, Any]:
         "df_vendas": None,
         "df_clientes": None,
         "df_iaf": None,
+        # Mapa de Pedidos — importado on-demand, vive só na sessão (não persiste).
+        "df_pedidos": None,
+        "df_pedidos_stats": None,
         "created_at": datetime.utcnow(),
         "last_access": datetime.utcnow(),
     }
