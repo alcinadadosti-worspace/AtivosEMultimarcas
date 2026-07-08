@@ -28,10 +28,11 @@
 
 /* Stats */
 .ped-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:22px; }
-.ped-stat { background:linear-gradient(145deg,rgba(40,40,55,.9),rgba(25,25,40,.95)); border:1px solid rgba(139,92,246,.2); border-radius:12px; padding:15px 18px; }
+.ped-stat { background:linear-gradient(145deg,rgba(40,40,55,.9),rgba(25,25,40,.95)); border:1px solid rgba(139,92,246,.2); border-radius:12px; padding:15px 18px; min-width:0; overflow:hidden; }
 .ped-stat-top { display:flex; align-items:center; gap:7px; color:var(--text-muted); font-size:.74rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
 .ped-stat-top i { width:14px; height:14px; }
-.ped-stat-value { font-size:1.55rem; font-weight:700; color:var(--text-primary); line-height:1; }
+.ped-stat-value { font-size:1.5rem; font-weight:700; color:var(--text-primary); line-height:1.1; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ped-stat-value.money { font-size:clamp(0.95rem, 1.4vw, 1.2rem); }
 .ped-stat-value.accent { color:#a78bfa; }
 
 /* Filters */
@@ -198,11 +199,11 @@
             </div>
             <div class="ped-stat">
                 <div class="ped-stat-top"><i data-lucide="dollar-sign"></i> Faturamento</div>
-                <div class="ped-stat-value accent" x-text="fmtMoeda(resumo.faturamento)"></div>
+                <div class="ped-stat-value accent money" :title="fmtMoeda(resumo.faturamento)" x-text="fmtMoedaCard(resumo.faturamento)"></div>
             </div>
             <div class="ped-stat">
                 <div class="ped-stat-top"><i data-lucide="receipt"></i> Ticket médio</div>
-                <div class="ped-stat-value" x-text="fmtMoeda(resumo.ticket_medio)"></div>
+                <div class="ped-stat-value money" x-text="fmtMoeda(resumo.ticket_medio)"></div>
             </div>
             <div class="ped-stat">
                 <div class="ped-stat-top"><i data-lucide="store"></i> Retiraram na unidade</div>
@@ -256,9 +257,9 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-7</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-9</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
-                <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
+                <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <div class="mode-toggle">
                     <button class="metric-chip" :class="mapMode==='intensidade' ? 'active' : ''" @click="setMapMode('intensidade')">
                         <i data-lucide="flame"></i> Intensidade
@@ -269,9 +270,9 @@
                 </div>
             </div>
 
-            <!-- Sub-bar: métrica (só no modo Intensidade) -->
-            <div class="map-subbar" x-show="mapMode==='intensidade'">
-                <span class="map-subbar-label">Colorir por:</span>
+            <!-- Sub-bar: métrica (Intensidade = escala de cor; Composição = define o segmento predominante) -->
+            <div class="map-subbar">
+                <span class="map-subbar-label" x-text="mapMode==='composicao' ? 'Predominância por:' : 'Colorir por:'"></span>
                 <div class="metric-chips">
                     <template x-for="m in metricas" :key="m.key">
                         <button class="metric-chip" :class="metrica===m.key ? 'active' : ''" @click="setMetrica(m.key)">
@@ -295,7 +296,7 @@
                 <template x-for="s in segmentosPresentes" :key="s">
                     <span class="seg-legend"><span class="seg-dot" :style="'background:'+corSegmento(s)"></span><span x-text="s"></span></span>
                 </template>
-                <span style="margin-left:auto; font-style:italic;">Rosquinha = mix de segmentação · cor da cidade = segmento predominante</span>
+                <span style="margin-left:auto; font-style:italic;" x-text="'Rosquinha e cor da cidade = por ' + metricaLabel.toLowerCase()"></span>
             </div>
         </div>
 
@@ -712,12 +713,16 @@ function mapaPedidos() {
         },
         _estilo(feature){
             const nome = feature.properties.nome;
-            // Modo composição: pinta a cidade com a cor do segmento predominante.
+            // Modo composição: pinta a cidade com a cor do segmento predominante
+            // NA MÉTRICA selecionada (revendedores/itens/faturamento/visitas).
             if (this.mapMode==='composicao'){
                 const ci = this._composInfo(nome);
                 if (ci){
-                    const cor = this.corSegmento(ci.dominante);
-                    return { fillColor:cor, fillOpacity:0.5, color:cor, weight:1 };
+                    const { total, dominante } = this._composTotais(ci);
+                    if (total > 0){
+                        const cor = this.corSegmento(dominante);
+                        return { fillColor:cor, fillOpacity:0.5, color:cor, weight:1 };
+                    }
                 }
                 return { fillColor:'#1a1a3e', fillOpacity:0.10, color:'rgba(139,92,246,.2)', weight:0.5 };
             }
@@ -734,6 +739,21 @@ function mapaPedidos() {
         },
         // ── Composição: rosquinhas em SVG, na mesma camada dos polígonos ──
         _composInfo(nome){ const n=this._norm(nome); return this.composicao.find(c=>this._norm(c.cidade)===n); },
+        // qual campo do segmento usar conforme a métrica selecionada
+        _segMetric(){ return {revendedores:'revendedores', itens:'itens', valor:'valor', visitaram_unidade:'visitas'}[this.metrica] || 'revendedores'; },
+        // total + segmento predominante da cidade, pela métrica escolhida
+        _composTotais(c){
+            const k=this._segMetric(); let total=0, dom=null, dv=-1;
+            for (const s of c.segmentos){ const v=s[k]||0; total+=v; if (v>dv){ dv=v; dom=s.segmento; } }
+            return { total, dominante:dom, key:k };
+        },
+        // número curto pro centro da rosquinha (ex.: 4.4k, 1,3M, R$ 280k)
+        _compact(v, money){
+            v = v||0; const pre = money ? 'R$ ' : '';
+            if (v>=1e6) return pre + (v/1e6).toFixed(1).replace('.',',') + 'M';
+            if (v>=1e4) return pre + Math.round(v/1000) + 'k';
+            return pre + Math.round(v).toLocaleString('pt-BR');
+        },
         // Pega o <g> raiz do renderer SVG que já desenha os polígonos.
         _svgRoot(){
             if (!this._layer) return null;
@@ -755,12 +775,17 @@ function mapaPedidos() {
             this._pieG = document.createElementNS(NS,'g');
             this._pieG.setAttribute('class','pie-svg');
             root.appendChild(this._pieG);
-            const max = Math.max(...this.composicao.map(c=>c.total||0), 1);
+            const k = this._segMetric();
+            const isMoney = k==='valor';
+            const totalDe = c => c.segmentos.reduce((a,s)=>a+(s[k]||0), 0);
+            const max = Math.max(...this.composicao.map(totalDe), 1);
             this._pieData = [];
             for (const c of this.composicao){
                 const layer = this._cityLayers[this._norm(c.cidade)];
-                if (!layer || !c.total) continue;
-                const ro = 11 + Math.sqrt(c.total/max)*16;   // raio externo 11..27 px
+                if (!layer) continue;
+                const total = totalDe(c);
+                if (!total) continue;
+                const ro = 11 + Math.sqrt(total/max)*16;     // raio externo 11..27 px
                 const ri = ro*0.46;                          // furo (donut)
                 const g = document.createElementNS(NS,'g');
                 // Transparente ao mouse: o hover/clique caem no polígono da
@@ -768,7 +793,9 @@ function mapaPedidos() {
                 g.style.pointerEvents='none';
                 let a0 = -Math.PI/2;
                 for (const s of c.segmentos){
-                    const a1 = a0 + (s.revendedores/c.total)*Math.PI*2;
+                    const v = s[k]||0;
+                    if (!v) continue;
+                    const a1 = a0 + (v/total)*Math.PI*2;
                     const p = document.createElementNS(NS,'path');
                     p.setAttribute('d', this._slicePath(ri, ro, a0, a1));
                     p.setAttribute('fill', this.corSegmento(s.segmento));
@@ -779,12 +806,12 @@ function mapaPedidos() {
                 }
                 const t = document.createElementNS(NS,'text');
                 t.setAttribute('text-anchor','middle'); t.setAttribute('dy','0.34em');
-                t.setAttribute('font-size', Math.max(7, ro*0.55).toFixed(0));
+                t.setAttribute('font-size', Math.max(7, ro*0.5).toFixed(0));
                 t.setAttribute('font-weight','700');
                 t.setAttribute('paint-order','stroke');
                 t.setAttribute('stroke','rgba(10,10,25,.92)'); t.setAttribute('stroke-width','2.6');
                 t.setAttribute('fill','#e8e6ff');
-                t.textContent = c.total;
+                t.textContent = this._compact(total, isMoney);
                 g.appendChild(t);
                 const latlng = layer.getBounds().getCenter();
                 this._pieG.appendChild(g);
@@ -813,14 +840,18 @@ function mapaPedidos() {
             return `M${P(ro,a0)} A${ro},${ro} 0 ${large} 1 ${P(ro,a1)} L${P(ri,a1)} A${ri},${ri} 0 ${large} 0 ${P(ri,a0)} Z`;
         },
         _pieTipHTML(c){
-            const rows = c.segmentos.map(s=>{
+            const k = this._segMetric();
+            const isMoney = k==='valor';
+            const label = {revendedores:'revendedores', itens:'itens', valor:'faturamento', visitas:'visitas à unidade'}[k];
+            const fmt = v => isMoney ? this.fmtMoeda(v) : this.fmtNum(v);
+            const rows = c.segmentos.filter(s=>(s[k]||0)>0).map(s=>{
                 const col=this.corSegmento(s.segmento);
                 return `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;line-height:1.55;">`+
                        `<span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${this._esc(s.segmento)}</span>`+
-                       `<b>${s.revendedores}</b></div>`;
-            }).join('');
+                       `<b>${fmt(s[k]||0)}</b></div>`;
+            }).join('') || `<div style="color:var(--text-muted);">sem dados nesta métrica</div>`;
             return `<strong>${this._esc(c.cidade)}</strong>`+
-                   `<div style="font-size:.72rem;color:var(--text-muted);margin:1px 0 4px;">revendedores por segmento</div>${rows}`;
+                   `<div style="font-size:.72rem;color:var(--text-muted);margin:1px 0 4px;">${label} por segmento</div>${rows}`;
         },
         _cor(r){
             if (r === 0)  return '#1a1a3e';
@@ -841,6 +872,7 @@ function mapaPedidos() {
         corSegmento(s){ return SEG_CORES[s] || '#a78bfa'; },
         fmtNum(v){ return (v==null?0:v).toLocaleString('pt-BR'); },
         fmtMoeda(v){ return 'R$ ' + (v==null?0:v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); },
+        fmtMoedaCard(v){ return 'R$ ' + Math.round(v==null?0:v).toLocaleString('pt-BR'); },
         exportUrl(fmt){ return '/api/pedidos/export/cidades?' + this._params({ formato:fmt }).toString(); },
 
         async limparDados(){

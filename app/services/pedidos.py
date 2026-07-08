@@ -337,21 +337,29 @@ def calcular_composicao_cidades(df: pl.DataFrame, **filtros) -> List[Dict[str, A
 
     g = (
         df.group_by(["_cidade_moradia", "_segmento"])
-        .agg(
-            pl.col(PED_COL_PESSOA).filter(pl.col(PED_COL_PESSOA) != "").n_unique().alias("rev")
-        )
+        .agg([
+            pl.col(PED_COL_PESSOA).filter(pl.col(PED_COL_PESSOA) != "").n_unique().alias("revendedores"),
+            pl.col("_itens").sum().alias("itens"),
+            pl.col("_valor").sum().alias("valor"),
+            (pl.col("_tipo_visita") == "Retirou na unidade").sum().alias("visitas"),
+        ])
     )
     ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
-    por_cidade: Dict[str, Dict[str, int]] = {}
+    por_cidade: Dict[str, List[Dict[str, Any]]] = {}
     for row in g.iter_rows(named=True):
-        por_cidade.setdefault(row["_cidade_moradia"], {})[row["_segmento"]] = int(row["rev"])
+        por_cidade.setdefault(row["_cidade_moradia"], []).append({
+            "segmento": row["_segmento"],
+            "revendedores": int(row["revendedores"]),
+            "itens": int(row["itens"]),
+            "valor": round(float(row["valor"]), 2),
+            "visitas": int(row["visitas"]),
+        })
 
     out: List[Dict[str, Any]] = []
-    for cidade, segs in por_cidade.items():
-        seg_list = sorted(
-            [{"segmento": s, "revendedores": v} for s, v in segs.items()],
-            key=lambda r: ordem.get(r["segmento"], 999),
-        )
+    for cidade, seg_list in por_cidade.items():
+        seg_list.sort(key=lambda r: ordem.get(r["segmento"], 999))
+        # `total`/`dominante` por revendedores mantidos por compatibilidade;
+        # o front recalcula por métrica selecionada usando os 4 campos acima.
         total = sum(s["revendedores"] for s in seg_list)
         dominante = max(seg_list, key=lambda r: r["revendedores"])["segmento"] if seg_list else ""
         out.append({
