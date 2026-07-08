@@ -256,7 +256,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-5</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-6</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
                 <div class="mode-toggle">
@@ -820,10 +820,12 @@ function mapaPedidos() {
         _pieTipHTML(c){
             const rows = c.segmentos.map(s=>{
                 const col=this.corSegmento(s.segmento);
-                const pct = c.total ? Math.round(s.revendedores/c.total*100) : 0;
-                return `<div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${this._esc(s.segmento)}: <b>${s.revendedores}</b> <span style="color:var(--text-muted);">(${pct}%)</span></div>`;
+                return `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;line-height:1.55;">`+
+                       `<span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0;"></span>${this._esc(s.segmento)}</span>`+
+                       `<b>${s.revendedores}</b></div>`;
             }).join('');
-            return `<strong>${this._esc(c.cidade)}</strong> · ${c.total} revendedores<br>${rows}`;
+            return `<strong>${this._esc(c.cidade)}</strong>`+
+                   `<div style="font-size:.72rem;color:var(--text-muted);margin:1px 0 4px;">revendedores por segmento</div>${rows}`;
         },
         _cor(r){
             if (r === 0)  return '#1a1a3e';
