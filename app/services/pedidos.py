@@ -42,8 +42,8 @@ from app.services.venda import ler_planilha
 
 # Ordem canônica das segmentações (metais + demais papéis), do topo para a base.
 SEGMENTOS_ORDEM = [
-    "Diamante GB",
-    "Esmeralda GB",
+    "Diamante",
+    "Esmeralda",
     "Rubi",
     "Platina",
     "Ouro",
@@ -187,11 +187,17 @@ def processar_planilha_pedidos(content: bytes, filename: str) -> Dict[str, Any]:
         .alias("_cidade_moradia")
     )
 
-    # Segmento (Papel), com fallback.
+    # Segmento (Papel), com fallback. Padroniza tirando o sufixo " GB"
+    # (Diamante GB -> Diamante, Esmeralda GB -> Esmeralda; funde com os puros).
+    _papel = (
+        pl.col(PED_COL_PAPEL)
+        .str.replace(r"(?i)\s*GB\s*$", "")
+        .str.strip_chars()
+    )
     df = df.with_columns(
-        pl.when(pl.col(PED_COL_PAPEL) == "")
+        pl.when(_papel == "")
         .then(pl.lit("Sem papel"))
-        .otherwise(pl.col(PED_COL_PAPEL))
+        .otherwise(_papel)
         .alias("_segmento")
     )
 
