@@ -256,7 +256,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-6</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-7</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'">· composição por segmentação</span>
                 <div class="mode-toggle">
@@ -685,17 +685,19 @@ function mapaPedidos() {
             } catch(e){ console.error('GeoJSON IBGE:', e); }
         },
         _tooltipCidade(nome){
+            // Composição: mostra a quantidade de revendedores por segmento.
+            if (this.mapMode==='composicao'){
+                const ci = this._composInfo(nome);
+                if (ci) return this._pieTipHTML(ci);
+                return `<strong>${this._esc(nome)}</strong><br><span style="color:var(--text-muted);">sem revendedores</span>`;
+            }
+            // Intensidade: números gerais da cidade.
             const i = this._info(nome);
-            let base = `<strong>${nome}</strong><br>`+
+            return `<strong>${this._esc(nome)}</strong><br>`+
                 `Revendedores: ${this.fmtNum(i.revendedores)}<br>`+
                 `Pedidos: ${this.fmtNum(i.pedidos)} · Itens: ${this.fmtNum(i.itens)}<br>`+
                 `Faturamento: ${this.fmtMoeda(i.valor)}<br>`+
                 `Visitas à unidade: ${this.fmtNum(i.visitaram_unidade)}`;
-            if (this.mapMode==='composicao'){
-                const ci = this._composInfo(nome);
-                if (ci) base += `<br><span style="color:#a78bfa;">Predominante: ${ci.dominante}</span>`;
-            }
-            return base;
         },
         expandirDoMapa(cidade){
             const c = this.cidades.find(x=>this._norm(x.cidade)===this._norm(cidade));
@@ -761,7 +763,9 @@ function mapaPedidos() {
                 const ro = 11 + Math.sqrt(c.total/max)*16;   // raio externo 11..27 px
                 const ri = ro*0.46;                          // furo (donut)
                 const g = document.createElementNS(NS,'g');
-                g.style.cursor='pointer';
+                // Transparente ao mouse: o hover/clique caem no polígono da
+                // cidade (que já mostra o breakdown por segmento e abre o detalhe).
+                g.style.pointerEvents='none';
                 let a0 = -Math.PI/2;
                 for (const s of c.segmentos){
                     const a1 = a0 + (s.revendedores/c.total)*Math.PI*2;
@@ -783,15 +787,6 @@ function mapaPedidos() {
                 t.textContent = c.total;
                 g.appendChild(t);
                 const latlng = layer.getBounds().getCenter();
-                g.addEventListener('click', ()=> this.expandirDoMapa(c.cidade));
-                g.addEventListener('mouseenter', ()=>{
-                    if (this._pieTip){ try{ this._map.removeLayer(this._pieTip); }catch(e){} }
-                    this._pieTip = L.tooltip({ className:'mapa-tooltip', direction:'top', offset:[0,-ro] })
-                        .setLatLng(latlng).setContent(this._pieTipHTML(c)).addTo(this._map);
-                });
-                g.addEventListener('mouseleave', ()=>{
-                    if (this._pieTip){ try{ this._map.removeLayer(this._pieTip); }catch(e){} this._pieTip=null; }
-                });
                 this._pieG.appendChild(g);
                 this._pieData.push({ g, latlng });
             }
