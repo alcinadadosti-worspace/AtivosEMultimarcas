@@ -639,13 +639,18 @@ function mapaPedidos() {
         iniciarMapa(){
             if (this._map) return;
             if (!document.getElementById('mapa-pedidos')){ setTimeout(()=>this.iniciarMapa(),150); return; }
-            // markerZoomAnimation:false evita que as rosquinhas "descolem" da
-            // cidade durante a animação de zoom — elas somem por um instante e
-            // reaparecem exatamente sobre o município no fim do zoom.
-            this._map = L.map('mapa-pedidos', { center:[-9.62,-36.7], zoom:8, markerZoomAnimation:false });
+            // zoomAnimation:false -> o zoom reposiciona tiles, polígonos e
+            // rosquinhas num único quadro sincronizado. Sem frame animado
+            // intermediário, os markers nunca "descolam" da cidade.
+            this._map = L.map('mapa-pedidos', {
+                center:[-9.62,-36.7], zoom:8,
+                zoomAnimation:false, markerZoomAnimation:false,
+            });
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18,
             }).addTo(this._map);
+            // Garantia extra: recoloca as rosquinhas nos centróides após cada zoom.
+            this._map.on('zoomend', ()=>{ if (this.mapMode==='composicao') this._renderPies(); });
             this._carregarGeoJson();
         },
         async _carregarGeoJson(){
