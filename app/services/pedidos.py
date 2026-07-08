@@ -328,9 +328,9 @@ def calcular_composicao_cidades(df: pl.DataFrame, **filtros) -> List[Dict[str, A
     Composição de segmentação (Papel) por cidade — base do modo "Composição"
     do mapa (rosquinha por cidade + cor do segmento predominante).
 
-    Ignora o filtro de segmento (a composição é sempre sobre todos os papéis).
+    Respeita todos os filtros (unidade/tipo/segmento). Com um segmento
+    selecionado, cada cidade fica com uma rosquinha de um único segmento.
     """
-    filtros = {**filtros, "segmento": None}
     df = _aplicar_filtros(df, **filtros)
     if df.is_empty():
         return []

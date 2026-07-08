@@ -2468,6 +2468,7 @@ async def pedidos_segmentos(
 @api_router.get("/pedidos/composicao")
 async def pedidos_composicao(
     unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
     tipo: Optional[str] = Query(None),
     session: tuple = Depends(get_user_session),
 ):
@@ -2476,7 +2477,7 @@ async def pedidos_composicao(
     df = _get_df_pedidos(session_data)
     if df is None:
         return {"composicao": []}
-    return {"composicao": ped_composicao(df, **_ped_filtros(unidade, None, tipo))}
+    return {"composicao": ped_composicao(df, **_ped_filtros(unidade, segmento, tipo))}
 
 
 @api_router.get("/pedidos/visitantes")
