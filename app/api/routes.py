@@ -2581,9 +2581,15 @@ async def upload_revendedores(request: Request, file: UploadFile = File(...)):
     try:
         content = await file.read()
         resultado = rev_svc.processar_planilha_revendedores(content, file.filename)
-        resultado["df"].write_parquet(REV_PARQUET_PATH)
-        with open(REV_STATS_PATH, "w", encoding="utf-8") as fh:
+        # Gravação atômica (temp + rename) para não deixar arquivo pela metade
+        # se o processo reiniciar no meio da escrita.
+        tmp_parquet = REV_PARQUET_PATH + ".tmp"
+        resultado["df"].write_parquet(tmp_parquet)
+        os.replace(tmp_parquet, REV_PARQUET_PATH)
+        tmp_stats = REV_STATS_PATH + ".tmp"
+        with open(tmp_stats, "w", encoding="utf-8") as fh:
             _json.dump(resultado["estatisticas"], fh, ensure_ascii=False)
+        os.replace(tmp_stats, REV_STATS_PATH)
         request.app.state.df_revendedores = resultado["df"]
         request.app.state.df_revendedores_stats = resultado["estatisticas"]
         return {
@@ -2643,12 +2649,16 @@ async def cobertura_resumo(
 
 
 @api_router.get("/pedidos/cobertura/ciclos")
-async def cobertura_ciclos(request: Request, session: tuple = Depends(get_user_session)):
+async def cobertura_ciclos(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
     session_id, session_data = session
     df_rev, df_ped = _cobertura_ctx(request, session_data)
     if df_ped is None:
         return {"ciclos": []}
-    return {"ciclos": rev_svc.cobertura_por_ciclo(df_ped)}
+    return {"ciclos": rev_svc.cobertura_por_ciclo(df_ped, unidade=unidade or None)}
 
 
 @api_router.get("/pedidos/cobertura/frequencia")

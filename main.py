@@ -110,15 +110,18 @@ async def lifespan(app: FastAPI):
     if os.path.exists(REV_PARQUET_PATH):
         try:
             app.state.df_revendedores = pl.read_parquet(REV_PARQUET_PATH)
-            app.state.df_revendedores_stats = {}
+            print(f"[INFO] Reseller base loaded: {len(app.state.df_revendedores)} resellers")
+        except Exception as e:
+            print(f"[WARN] Failed to load reseller base parquet: {e}")
+            app.state.df_revendedores = None
+        # Stats em bloco separado: um JSON ruim não deve descartar a base válida.
+        app.state.df_revendedores_stats = {}
+        try:
             if os.path.exists(REV_STATS_PATH):
                 with open(REV_STATS_PATH, encoding="utf-8") as f:
                     app.state.df_revendedores_stats = json.load(f)
-            print(f"[INFO] Reseller base loaded: {len(app.state.df_revendedores)} resellers")
         except Exception as e:
-            print(f"[WARN] Failed to load reseller base: {e}")
-            app.state.df_revendedores = None
-            app.state.df_revendedores_stats = {}
+            print(f"[WARN] Failed to load reseller base stats: {e}")
     else:
         app.state.df_revendedores = None
         app.state.df_revendedores_stats = {}

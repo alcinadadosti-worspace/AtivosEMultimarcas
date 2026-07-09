@@ -148,10 +148,11 @@ def _filtrar_unidade(df: pl.DataFrame, unidade: Optional[str]) -> pl.DataFrame:
 
 
 def ciclos_do_arquivo(df_ped: pl.DataFrame) -> List[str]:
-    return sorted(
-        df_ped.select(pl.col(PED_COL_CICLO).cast(pl.Utf8))
+    vals = (
+        df_ped.select(pl.col(PED_COL_CICLO).cast(pl.Utf8).str.strip_chars())
         .to_series().drop_nulls().unique().to_list()
     )
+    return sorted(c for c in vals if c)
 
 
 def cobertura_resumo(df_rev: pl.DataFrame, df_ped: pl.DataFrame, unidade: Optional[str] = None) -> Dict[str, Any]:
@@ -179,8 +180,11 @@ def cobertura_resumo(df_rev: pl.DataFrame, df_ped: pl.DataFrame, unidade: Option
     }
 
 
-def cobertura_por_ciclo(df_ped: pl.DataFrame) -> List[Dict[str, Any]]:
-    d = df_ped.with_columns([
+def cobertura_por_ciclo(df_ped: pl.DataFrame, unidade: Optional[str] = None) -> List[Dict[str, Any]]:
+    d = df_ped
+    if unidade and "_cod_unidade" in d.columns:
+        d = d.filter(pl.col("_cod_unidade") == str(unidade))
+    d = d.with_columns([
         _norm_cod(PED_COL_PESSOA).alias("_cod"),
         pl.col(PED_COL_CICLO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_ciclo"),
     ]).filter((pl.col("_cod") != "") & (pl.col("_ciclo") != ""))
@@ -231,10 +235,13 @@ def cobertura_revendedores(
     compras = _ped_compras(df_ped)
     joined = rev.join(compras, on="_cod", how="left").with_columns([
         pl.col("qtd_ciclos").fill_null(0),
+        pl.col("pedidos").fill_null(0),
         pl.col("itens").fill_null(0),
         pl.col("valor").fill_null(0.0),
     ])
-    joined = joined.with_columns((pl.col("qtd_ciclos") > 0).alias("_comprou"))
+    # "comprou" = presente nos pedidos (mesma definição do resumo), robusto a
+    # ciclos em branco (que zerariam qtd_ciclos sem zerar a presença).
+    joined = joined.with_columns((pl.col("pedidos") > 0).alias("_comprou"))
 
     if filtro == "compraram":
         joined = joined.filter(pl.col("_comprou"))

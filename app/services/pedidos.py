@@ -201,16 +201,21 @@ def processar_planilha_pedidos(content: bytes, filename: str) -> Dict[str, Any]:
         .alias("_segmento")
     )
 
-    # Ciclo legível: "10/2026" -> "10".
-    ciclo_serie = (
+    # Ciclos presentes no arquivo (pode ter 1 ou vários: 01/2026..10/2026).
+    ciclos_norm = sorted(
         df.select(pl.col(PED_COL_CICLO).str.extract(r"^(\d+)", 1))
-        .to_series()
-        .drop_nulls()
+        .to_series().drop_nulls().unique().to_list()
     )
-    ciclo = ciclo_serie[0] if len(ciclo_serie) else ""
+    ciclos_norm = [c for c in ciclos_norm if c]
+    n_ciclos = len(ciclos_norm)
+    if n_ciclos <= 1:
+        ciclo = ciclos_norm[0] if ciclos_norm else ""
+    else:
+        ciclo = f"{ciclos_norm[0]}–{ciclos_norm[-1]}"   # ex.: "01–10"
 
     estatisticas = _resumo(df)
     estatisticas["ciclo"] = ciclo
+    estatisticas["n_ciclos"] = n_ciclos
     estatisticas["arquivo"] = filename
 
     return {"df": df, "estatisticas": estatisticas, "avisos": avisos, "ciclo": ciclo}
@@ -300,19 +305,40 @@ def calcular_por_cidade(df: pl.DataFrame, **filtros) -> List[Dict[str, Any]]:
     ]
 
 
+def _atribuir_segmento_atual(df: pl.DataFrame, chaves: List[str]) -> pl.DataFrame:
+    """
+    Anexa `_seg_rev` = segmento do pedido MAIS RECENTE de cada revendedor
+    (agrupado por `chaves`, ex.: [Pessoa] ou [cidade, Pessoa]).
+
+    Sem isto, um revendedor que mudou de Papel entre ciclos seria contado em
+    mais de um segmento (a soma dos segmentos ficaria maior que o nº real de
+    revendedores). Pedidos sem Pessoa mantêm o próprio `_segmento`.
+    """
+    atual = (
+        df.filter(pl.col(PED_COL_PESSOA) != "")
+        .group_by(chaves)
+        .agg(pl.col("_segmento").sort_by(PED_COL_CICLO).last().alias("_seg_rev"))
+    )
+    return df.join(atual, on=chaves, how="left").with_columns(
+        pl.coalesce([pl.col("_seg_rev"), pl.col("_segmento")]).alias("_seg_rev")
+    )
+
+
 def calcular_por_segmento(df: pl.DataFrame, **filtros) -> List[Dict[str, Any]]:
-    """Distribuição por segmentação (Papel)."""
+    """Distribuição por segmentação (Papel). Cada revendedor conta em 1 segmento."""
     df = _aplicar_filtros(df, **filtros)
     if df.is_empty():
         return []
+    df = _atribuir_segmento_atual(df, [PED_COL_PESSOA])
     result = (
-        df.group_by("_segmento")
+        df.group_by("_seg_rev")
         .agg([
             pl.col(PED_COL_PESSOA).filter(pl.col(PED_COL_PESSOA) != "").n_unique().alias("revendedores"),
             pl.len().alias("pedidos"),
             pl.col("_itens").sum().alias("itens"),
             pl.col("_valor").sum().alias("valor"),
         ])
+        .rename({"_seg_rev": "_segmento"})
     )
     ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
     rows = [
@@ -341,14 +367,17 @@ def calcular_composicao_cidades(df: pl.DataFrame, **filtros) -> List[Dict[str, A
     if df.is_empty():
         return []
 
+    # Cada revendedor conta em 1 segmento por cidade (o do pedido mais recente).
+    df = _atribuir_segmento_atual(df, ["_cidade_moradia", PED_COL_PESSOA])
     g = (
-        df.group_by(["_cidade_moradia", "_segmento"])
+        df.group_by(["_cidade_moradia", "_seg_rev"])
         .agg([
             pl.col(PED_COL_PESSOA).filter(pl.col(PED_COL_PESSOA) != "").n_unique().alias("revendedores"),
             pl.col("_itens").sum().alias("itens"),
             pl.col("_valor").sum().alias("valor"),
             (pl.col("_tipo_visita") == "Retirou na unidade").sum().alias("visitas"),
         ])
+        .rename({"_seg_rev": "_segmento"})
     )
     ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
     por_cidade: Dict[str, List[Dict[str, Any]]] = {}

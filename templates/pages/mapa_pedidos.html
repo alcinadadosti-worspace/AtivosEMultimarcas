@@ -160,7 +160,7 @@
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
             <template x-if="hasData && ciclo">
-                <span class="ciclo-badge"><i data-lucide="calendar" style="width:13px;height:13px;"></i> Ciclo <span x-text="ciclo"></span></span>
+                <span class="ciclo-badge"><i data-lucide="calendar" style="width:13px;height:13px;"></i> <span x-text="cicloLabel"></span></span>
             </template>
             <template x-if="hasData">
                 <button @click="limparDados()" class="clear-btn">
@@ -296,7 +296,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-12</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-13</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <div class="mode-toggle">
@@ -601,7 +601,7 @@ function mapaPedidos() {
     return {
         // State
         hasData:false, loading:true, uploading:false,
-        selectedFile:null, fileName:'', avisos:[], ciclo:'',
+        selectedFile:null, fileName:'', avisos:[], ciclo:'', nCiclos:1,
         resumo:{}, cidades:[], segmentos:[], visitantes:[], composicao:[],
         filterOptions:{ segmentos:[], unidades:[], cidades:[] },
         filtros:{ unidade:'', segmento:'', tipo:'' },
@@ -629,6 +629,7 @@ function mapaPedidos() {
 
         // ── Computed ──
         get metricaLabel(){ return (this.metricas.find(m=>m.key===this.metrica)||{}).label || ''; },
+        get cicloLabel(){ return this.nCiclos > 1 ? (this.nCiclos + ' ciclos (' + this.ciclo + ')') : ('Ciclo ' + this.ciclo); },
         get cidadesSorted(){
             const dir = this.sortDir==='desc'?-1:1;
             return [...this.cidades].sort((a,b)=>((a[this.sortBy]||0)-(b[this.sortBy]||0))*dir);
@@ -652,7 +653,7 @@ function mapaPedidos() {
                 const data = await res.json();
                 this.hasData = data.has_data;
                 this.resumo = data.estatisticas || {};
-                this.ciclo = (data.estatisticas||{}).ciclo || '';
+                this.ciclo = (data.estatisticas||{}).ciclo || ''; this.nCiclos = (data.estatisticas||{}).n_ciclos || 1;
                 if (this.hasData) await this.carregarTudo(true);
             } catch(e){ console.error('status pedidos:', e); }
             finally {
@@ -672,9 +673,11 @@ function mapaPedidos() {
                 const data = await res.json();
                 if (!res.ok){ showToast(data.detail || 'Erro ao processar arquivo', 'error'); return; }
                 this.resumo = data.estatisticas || {};
-                this.ciclo = (data.estatisticas||{}).ciclo || '';
+                this.ciclo = (data.estatisticas||{}).ciclo || ''; this.nCiclos = (data.estatisticas||{}).n_ciclos || 1;
                 this.avisos = data.avisos || [];
                 this.hasData = true;
+                this.aba = 'mapa';
+                this._resetCobertura();   // nova planilha -> cobertura recarrega ao abrir
                 showToast('Planilha importada com sucesso!', 'success');
                 await this.carregarTudo(true);
                 this.$nextTick(()=>{ this.iniciarMapa(); lucide.createIcons(); });
@@ -1065,7 +1068,7 @@ function mapaPedidos() {
             if (!this.revBase.has_data) return;
             const [res, cic, fre] = await Promise.all([
                 fetch('/api/pedidos/cobertura/resumo?'+this._covParams()).then(r=>r.json()),
-                fetch('/api/pedidos/cobertura/ciclos').then(r=>r.json()),
+                fetch('/api/pedidos/cobertura/ciclos?'+this._covParams()).then(r=>r.json()),
                 fetch('/api/pedidos/cobertura/frequencia?'+this._covParams()).then(r=>r.json()),
             ]);
             this.covResumo = res.resumo || {};
@@ -1104,11 +1107,15 @@ function mapaPedidos() {
             this.$nextTick(()=>lucide.createIcons());
         },
 
+        _resetCobertura(){
+            this._covLoaded=false; this.covResumo={}; this.covCiclos=[]; this.covFreq=[]; this.covRevs=[];
+        },
         async limparDados(){
             if (!confirm('Remover a planilha de pedidos desta sessão?')) return;
             await fetch('/api/pedidos/clear', { method:'POST' });
-            this.hasData=false; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
-            this.resumo={}; this.ciclo=''; this.expandida=''; this._detCache={};
+            this.hasData=false; this.aba='mapa'; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
+            this.resumo={}; this.ciclo=''; this.nCiclos=1; this.expandida=''; this._detCache={};
+            this._resetCobertura();
             this._clearPies();
             if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },
