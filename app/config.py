@@ -205,3 +205,28 @@ PED_UNIDADES = {
     "13707": "Penedo",
     "13706": "Palmeira dos Índios",
 }
+
+# =============================================================================
+# RESELLER BASE (ConsultaRevendedores) — base permanente de cadastro
+# =============================================================================
+# 2 abas: 13707 (Penedo) e 13706 (Palmeira). Persistida no disco do Render.
+REV_SHEETS = {"13707": "Penedo", "13706": "Palmeira dos Índios"}
+REV_COL_CODIGO = "CodigoRevendedor"          # chave de cruzamento (~ Pessoa nos pedidos)
+REV_COL_NOME = "Nome"
+REV_COL_SITUACAO = "Situacao"                # Ativo / Inativo
+REV_COL_CICLOS_INATIVIDADE = "CiclosInatividade"
+REV_COL_PAPEL = "Papel"
+REV_COL_COD_SETOR = "CodigoEstruturaComercial"
+REV_COL_SETOR = "EstruturaComercial"
+REV_COL_CICLO_PRIMEIRO = "CicloPrimeiroPedido"
+REV_COL_CICLO_REATIVACAO = "CicloReativacao"
+REV_COL_CICLO_CESSAMENTO = "CicloCessamento"
+REV_COL_MOTIVO_CESSAMENTO = "MotivoCessamento"
+REV_COL_TELEFONE = "TelCelular"
+REV_COL_CIDADE = "CidadeResidencial"
+
+REV_REQUIRED_COLUMNS = [REV_COL_CODIGO, REV_COL_SITUACAO]
+
+# Persistente (sobrevive a restart/deploy via Render Disk)
+REV_PARQUET_PATH = str(PERSISTENT_DIR / "revendedores_base.parquet")
+REV_STATS_PATH   = str(PERSISTENT_DIR / "revendedores_base_stats.json")

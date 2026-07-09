@@ -105,6 +105,24 @@ async def lifespan(app: FastAPI):
         app.state.df_geo = None
         app.state.df_geo_stats = {}
 
+    # Load persistent reseller base (ConsultaRevendedores)
+    from app.config import REV_PARQUET_PATH, REV_STATS_PATH
+    if os.path.exists(REV_PARQUET_PATH):
+        try:
+            app.state.df_revendedores = pl.read_parquet(REV_PARQUET_PATH)
+            app.state.df_revendedores_stats = {}
+            if os.path.exists(REV_STATS_PATH):
+                with open(REV_STATS_PATH, encoding="utf-8") as f:
+                    app.state.df_revendedores_stats = json.load(f)
+            print(f"[INFO] Reseller base loaded: {len(app.state.df_revendedores)} resellers")
+        except Exception as e:
+            print(f"[WARN] Failed to load reseller base: {e}")
+            app.state.df_revendedores = None
+            app.state.df_revendedores_stats = {}
+    else:
+        app.state.df_revendedores = None
+        app.state.df_revendedores_stats = {}
+
     yield
 
     # Shutdown

@@ -101,6 +101,8 @@ from app.services.pedidos import (
     calcular_detalhe_cidade as ped_detalhe_cidade,
     obter_filtros as ped_obter_filtros,
 )
+from app.services import revendedores as rev_svc
+from app.config import REV_PARQUET_PATH, REV_STATS_PATH
 
 
 # Router for API endpoints
@@ -2555,6 +2557,163 @@ async def pedidos_export_cidades(
         content=exportar_excel(df_export, "Cidades"),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=mapa_pedidos_cidades.xlsx"},
+    )
+
+
+# =============================================================================
+# BASE DE REVENDEDORES (ConsultaRevendedores) — permanente + cruzamento (Cobertura)
+# =============================================================================
+
+def _get_df_rev(request: Request):
+    df = getattr(request.app.state, "df_revendedores", None)
+    if df is None or df.is_empty():
+        return None
+    return df
+
+
+@api_router.post("/revendedores/upload")
+async def upload_revendedores(request: Request, file: UploadFile = File(...)):
+    """Importa a base permanente de revendedores (abas 13707/13706)."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Use o Excel da Consulta de Revendedores (.xlsx)")
+    try:
+        content = await file.read()
+        resultado = rev_svc.processar_planilha_revendedores(content, file.filename)
+        resultado["df"].write_parquet(REV_PARQUET_PATH)
+        with open(REV_STATS_PATH, "w", encoding="utf-8") as fh:
+            _json.dump(resultado["estatisticas"], fh, ensure_ascii=False)
+        request.app.state.df_revendedores = resultado["df"]
+        request.app.state.df_revendedores_stats = resultado["estatisticas"]
+        return {
+            "success": True,
+            "message": "Base de revendedores salva com sucesso",
+            "estatisticas": resultado["estatisticas"],
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar base: {str(e)}")
+
+
+@api_router.get("/revendedores/status")
+async def revendedores_status(request: Request):
+    df = _get_df_rev(request)
+    return {
+        "has_data": df is not None,
+        "estatisticas": getattr(request.app.state, "df_revendedores_stats", {}) or {},
+        "unidades": rev_svc.obter_unidades(df) if df is not None else [],
+    }
+
+
+@api_router.post("/revendedores/clear")
+async def revendedores_clear(request: Request):
+    request.app.state.df_revendedores = None
+    request.app.state.df_revendedores_stats = {}
+    for path in (REV_PARQUET_PATH, REV_STATS_PATH):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    return {"success": True}
+
+
+def _cobertura_ctx(request: Request, session_data: Dict[str, Any]):
+    """Retorna (df_rev, df_ped) ou levanta o motivo faltante."""
+    df_rev = _get_df_rev(request)
+    df_ped = _get_df_pedidos(session_data)
+    return df_rev, df_ped
+
+
+@api_router.get("/pedidos/cobertura/resumo")
+async def cobertura_resumo(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df_rev, df_ped = _cobertura_ctx(request, session_data)
+    return {
+        "tem_base": df_rev is not None,
+        "tem_pedidos": df_ped is not None,
+        "resumo": rev_svc.cobertura_resumo(df_rev, df_ped, unidade=unidade or None)
+                  if (df_rev is not None and df_ped is not None) else {},
+    }
+
+
+@api_router.get("/pedidos/cobertura/ciclos")
+async def cobertura_ciclos(request: Request, session: tuple = Depends(get_user_session)):
+    session_id, session_data = session
+    df_rev, df_ped = _cobertura_ctx(request, session_data)
+    if df_ped is None:
+        return {"ciclos": []}
+    return {"ciclos": rev_svc.cobertura_por_ciclo(df_ped)}
+
+
+@api_router.get("/pedidos/cobertura/frequencia")
+async def cobertura_frequencia(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df_rev, df_ped = _cobertura_ctx(request, session_data)
+    if df_rev is None or df_ped is None:
+        return {"frequencia": []}
+    return {"frequencia": rev_svc.cobertura_frequencia(df_rev, df_ped, unidade=unidade or None)}
+
+
+@api_router.get("/pedidos/cobertura/revendedores")
+async def cobertura_revendedores(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    filtro: str = Query("todos"),
+    ordenar: str = Query("inatividade"),
+    limite: int = Query(500, ge=1, le=5000),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df_rev, df_ped = _cobertura_ctx(request, session_data)
+    if df_rev is None or df_ped is None:
+        return {"revendedores": []}
+    return {"revendedores": rev_svc.cobertura_revendedores(
+        df_rev, df_ped, unidade=unidade or None, filtro=filtro, ordenar=ordenar, limite=limite
+    )}
+
+
+@api_router.get("/pedidos/cobertura/export")
+async def cobertura_export(
+    request: Request,
+    formato: str = Query("xlsx", pattern="^(csv|xlsx)$"),
+    unidade: Optional[str] = Query(None),
+    filtro: str = Query("todos"),
+    ordenar: str = Query("inatividade"),
+    session: tuple = Depends(get_user_session),
+):
+    session_id, session_data = session
+    df_rev, df_ped = _cobertura_ctx(request, session_data)
+    if df_rev is None or df_ped is None:
+        raise HTTPException(status_code=400, detail="Falta a base de revendedores ou a planilha de pedidos")
+    rows = rev_svc.cobertura_revendedores(
+        df_rev, df_ped, unidade=unidade or None, filtro=filtro, ordenar=ordenar, limite=100000
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Nenhum revendedor encontrado")
+    # "ciclos" (lista) -> string legível para exportação
+    for r in rows:
+        r["ciclos"] = ", ".join(r.get("ciclos") or [])
+    df_export = pl.DataFrame(rows)
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=cobertura_revendedores.csv"},
+        )
+    return Response(
+        content=exportar_excel(df_export, "Cobertura"),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=cobertura_revendedores.xlsx"},
     )
 
 
