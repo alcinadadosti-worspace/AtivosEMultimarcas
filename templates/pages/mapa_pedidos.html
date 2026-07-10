@@ -209,21 +209,8 @@
     <template x-if="hasData && !loading">
     <div>
 
-        <!-- Page tabs -->
-        <div class="ptabs">
-            <button class="ptab" :class="aba==='mapa' ? 'active' : ''" @click="aba='mapa'; $nextTick(()=>{ if(this._map) this._map.invalidateSize(); lucide.createIcons(); })">
-                <i data-lucide="map-pinned"></i> Mapa de Pedidos
-            </button>
-            <button class="ptab" :class="aba==='cobertura' ? 'active' : ''" @click="abrirCobertura()">
-                <i data-lucide="users-round"></i> Cobertura de Revendedores
-            </button>
-        </div>
-
-        <!-- ══════════════ ABA: MAPA ══════════════ -->
-        <div x-show="aba==='mapa'">
-
-        <!-- Stats -->
-        <div class="ped-stats">
+        <!-- Stats (ocultas no modo Alerta) -->
+        <div class="ped-stats" x-show="mapMode!=='alerta'">
             <div class="ped-stat">
                 <div class="ped-stat-top"><i data-lucide="users"></i> Revendedores</div>
                 <div class="ped-stat-value accent" x-text="fmtNum(resumo.revendedores)"></div>
@@ -258,8 +245,8 @@
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="ped-filters">
+        <!-- Filters (ocultos no modo Alerta) -->
+        <div class="ped-filters" x-show="mapMode!=='alerta'">
             <div class="filter-group">
                 <label>Unidade:</label>
                 <select x-model="filtros.unidade" @change="aplicarFiltros()">
@@ -296,9 +283,10 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-13</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-14</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
+                <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;">· clientes 5–7 ciclos sem comprar</span>
                 <div class="mode-toggle">
                     <button class="metric-chip" :class="mapMode==='intensidade' ? 'active' : ''" @click="setMapMode('intensidade')">
                         <i data-lucide="flame"></i> Intensidade
@@ -306,11 +294,14 @@
                     <button class="metric-chip" :class="mapMode==='composicao' ? 'active' : ''" @click="setMapMode('composicao')">
                         <i data-lucide="pie-chart"></i> Composição
                     </button>
+                    <button class="metric-chip" :class="mapMode==='alerta' ? 'active' : ''" @click="setMapMode('alerta')" style="border-color:rgba(251,191,36,.4);">
+                        <i data-lucide="alert-triangle"></i> Alerta
+                    </button>
                 </div>
             </div>
 
             <!-- Sub-bar: métrica (Intensidade = escala de cor; Composição = define o segmento predominante) -->
-            <div class="map-subbar">
+            <div class="map-subbar" x-show="mapMode!=='alerta'">
                 <span class="map-subbar-label" x-text="mapMode==='composicao' ? 'Predominância por:' : 'Colorir por:'"></span>
                 <div class="metric-chips">
                     <template x-for="m in metricas" :key="m.key">
@@ -337,7 +328,17 @@
                 </template>
                 <span style="margin-left:auto; font-style:italic;" x-text="'Rosquinha e cor da cidade = por ' + metricaLabel.toLowerCase()"></span>
             </div>
+            <!-- Legenda: alerta -->
+            <div class="map-legend" x-show="mapMode==='alerta'">
+                <span>Poucos</span>
+                <div class="legend-bar" style="background:linear-gradient(to right,#2a1a0a,#92400e,#d97706,#f87171);"></div>
+                <span>Muitos em alerta</span>
+                <span style="margin-left:auto; font-style:italic;">5 a 7 ciclos sem comprar · clique numa cidade para ver os clientes</span>
+            </div>
         </div>
+
+        <!-- ══ Painéis do modo Pedidos (ocultos no Alerta) ══ -->
+        <div x-show="mapMode!=='alerta'">
 
         <!-- Segment distribution -->
         <div class="card">
@@ -455,17 +456,17 @@
             </div>
         </div>
 
-        </div><!-- /aba mapa -->
+        </div><!-- /paineis pedidos -->
 
-        <!-- ══════════════ ABA: COBERTURA DE REVENDEDORES ══════════════ -->
-        <div x-show="aba==='cobertura'">
+        <!-- ══════════════ MODO ALERTA (clientes 5–7 ciclos sem comprar) ══════════════ -->
+        <div x-show="mapMode==='alerta'">
 
             <!-- Base ainda não carregada -->
             <template x-if="!revBase.has_data">
                 <div class="upload-card" style="margin:10px auto 0;">
-                    <div class="upload-icon"><i data-lucide="users-round" style="width:28px;height:28px;"></i></div>
-                    <h3>Base de revendedores (permanente)</h3>
-                    <p>Suba a planilha <strong>Consulta de Revendedores</strong> (com as abas 13707 e 13706).<br>Ela fica <span style="color:#4ade80;">salva no servidor</span> — só re-suba quando quiser atualizar.</p>
+                    <div class="upload-icon"><i data-lucide="alert-triangle" style="width:28px;height:28px;"></i></div>
+                    <h3>Base de revendedores (para o Alerta)</h3>
+                    <p>Suba a planilha <strong>Consulta de Revendedores</strong> (abas 13707 e 13706).<br>É dela que sai quem está sem comprar. Fica <span style="color:#4ade80;">salva no servidor</span> — só re-suba pra atualizar.</p>
                     <div class="upload-input-row">
                         <label class="file-label"><i data-lucide="file-spreadsheet" style="width:14px;height:14px;"></i> Escolher arquivo
                             <input type="file" accept=".xlsx,.xls" style="display:none" @change="onBaseFile($event)"></label>
@@ -479,107 +480,68 @@
                 </div>
             </template>
 
-            <!-- Base carregada: cruzamento -->
+            <!-- Base carregada -->
             <template x-if="revBase.has_data">
             <div>
+                <div class="ped-stats">
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="alert-triangle"></i> Em alerta (5–7)</div><div class="ped-stat-value" style="color:#fbbf24;" x-text="fmtNum(alertaResumo.total)"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> 5 ciclos</div><div class="ped-stat-value" x-text="fmtNum((alertaResumo.por_ciclo||{})[5])"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> 6 ciclos</div><div class="ped-stat-value" x-text="fmtNum((alertaResumo.por_ciclo||{})[6])"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-alert"></i> 7 ciclos (limite)</div><div class="ped-stat-value" style="color:#f87171;" x-text="fmtNum((alertaResumo.por_ciclo||{})[7])"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="map-pin"></i> Cidades</div><div class="ped-stat-value" x-text="fmtNum(alertaResumo.cidades)"></div></div>
+                </div>
+
                 <div class="ped-filters">
-                    <div class="filter-group"><i data-lucide="database" style="width:14px;height:14px;color:#a78bfa;"></i>
-                        <span style="font-size:.82rem;">Base: <b x-text="fmtNum(revBase.estatisticas?.total)"></b> revendedores
-                            (<span style="color:#4ade80;" x-text="fmtNum(revBase.estatisticas?.ativos)"></span> ativos)</span></div>
+                    <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#fbbf24;"></i>
+                        <span style="font-size:.82rem;">Clientes de <b>5 a 7 ciclos</b> sem comprar (base de cadastro)</span></div>
                     <div class="filter-group"><label>Unidade:</label>
-                        <select x-model="covUnidade" @change="carregarCobertura()">
+                        <select x-model="alertaUnidade" @change="carregarAlerta()">
                             <option value="">Todas</option>
                             <template x-for="u in revBase.unidades" :key="u.codigo"><option :value="u.codigo" x-text="u.nome"></option></template>
                         </select></div>
-                    <button @click="removerBase()" class="btn-sm" style="margin-left:auto;color:#f87171;border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);">
-                        <i data-lucide="refresh-ccw" style="width:11px;height:11px;"></i> Trocar base</button>
-                </div>
-
-                <div class="ped-stats">
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="target"></i> Cobertura</div><div class="ped-stat-value accent" x-text="(covResumo.cobertura_pct||0)+'%'"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="shopping-cart"></i> Compraram</div><div class="ped-stat-value" style="color:#4ade80;" x-text="fmtNum(covResumo.compraram)"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="user-x"></i> Nunca compraram</div><div class="ped-stat-value" style="color:#f87171;" x-text="fmtNum(covResumo.nunca_compraram)"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="alert-triangle"></i> Ativos sem comprar</div><div class="ped-stat-value" style="color:#fbbf24;" x-text="fmtNum(covResumo.ativos_nunca_compraram)"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="calendar-range"></i> Ciclos no arquivo</div><div class="ped-stat-value" x-text="fmtNum(covResumo.n_ciclos)"></div></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i data-lucide="calendar" style="color:#a78bfa;width:17px;height:17px;"></i> Revendedores que compraram por ciclo</div>
-                    <div class="cyc-list">
-                        <template x-for="c in covCiclos" :key="c.ciclo">
-                            <div class="cyc-row">
-                                <span class="cyc-name" x-text="c.ciclo"></span>
-                                <div class="cyc-track"><div class="cyc-fill" :style="'width:'+Math.round(c.revendedores/maxCicloRev*100)+'%'"></div></div>
-                                <span class="cyc-meta"><b x-text="fmtNum(c.revendedores)"></b> rev · <span x-text="fmtNum(c.itens)"></span> itens</span>
-                            </div>
-                        </template>
-                        <template x-if="covCiclos.length===0"><div class="empty-msg">Sem ciclos no arquivo.</div></template>
+                    <div class="export-row">
+                        <a :href="alertaExportUrl('csv')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
+                        <a :href="alertaExportUrl('xlsx')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>Excel</a>
+                        <button @click="removerBase()" class="btn-sm" style="color:#f87171;border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);"><i data-lucide="refresh-ccw" style="width:11px;height:11px;"></i> Trocar base</button>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header"><i data-lucide="repeat" style="color:#a78bfa;width:17px;height:17px;"></i> Fidelidade — em quantos ciclos cada revendedor comprou
-                        <span class="sub">· 0 = não comprou em nenhum</span></div>
-                    <div class="freq-grid">
-                        <template x-for="f in covFreq" :key="f.qtd_ciclos">
-                            <div class="freq-cell">
-                                <div class="n" x-text="fmtNum(f.revendedores)"></div>
-                                <div class="l" x-text="f.qtd_ciclos===0 ? 'nunca' : f.qtd_ciclos+(f.qtd_ciclos===1?' ciclo':' ciclos')"></div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header"><i data-lucide="list" style="color:#a78bfa;width:17px;height:17px;"></i> Revendedores
-                        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                            <select x-model="covFiltro" @change="carregarCovRevs()" class="cov-sel">
-                                <option value="todos">Todos</option>
-                                <option value="compraram">Compraram (≥1 ciclo)</option>
-                                <option value="nunca">Nunca compraram</option>
-                                <option value="ativos_nunca">Ativos que não compraram</option>
-                            </select>
-                            <select x-model="covOrdenar" @change="carregarCovRevs()" class="cov-sel">
-                                <option value="inatividade">Ordenar: + ciclos sem comprar</option>
-                                <option value="qtd_ciclos">Ordenar: mais fiéis</option>
-                                <option value="nome">Ordenar: nome A–Z</option>
-                            </select>
-                        </div>
-                        <div class="export-row">
-                            <a :href="covExportUrl('csv')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
-                            <a :href="covExportUrl('xlsx')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>Excel</a>
-                        </div>
-                    </div>
+                    <div class="card-header"><i data-lucide="alert-triangle" style="color:#fbbf24;width:17px;height:17px;"></i> Cidades com clientes em alerta
+                        <span class="sub" x-text="'(' + alertaCidades.length + ')'"></span>
+                        <span class="sub" style="margin-left:auto;">clique para ver os clientes</span></div>
                     <div class="tbl-scroll">
                         <table class="ftable">
                             <thead><tr>
-                                <th class="no-sort">Nome</th><th class="no-sort">Situação</th><th class="no-sort">Segmento</th>
-                                <th class="no-sort">Unidade</th><th class="num-cell no-sort">Ciclos s/ comprar</th>
-                                <th class="num-cell no-sort">Comprou em</th><th class="num-cell no-sort">Itens</th>
+                                <th class="no-sort">Cidade</th>
+                                <th class="num-cell no-sort">Em alerta</th>
+                                <th class="num-cell no-sort">Pior (ciclos)</th>
+                                <th class="no-sort" style="min-width:80px;">Distribuição</th>
                             </tr></thead>
-                            <tbody>
-                                <template x-for="r in covRevs" :key="r.codigo">
-                                    <tr>
-                                        <td style="max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;" :title="r.nome" x-text="r.nome"></td>
-                                        <td><span :class="(r.situacao||'').toLowerCase()==='ativo' ? 'sit-badge sit-ativo' : 'sit-badge sit-inativo'" x-text="r.situacao || '—'"></span></td>
-                                        <td style="color:var(--text-muted);" x-text="r.segmento || '—'"></td>
-                                        <td style="color:var(--text-muted);" x-text="r.unidade"></td>
-                                        <td class="num-cell" :class="r.inatividade>=4?'inat-high':r.inatividade>=2?'inat-mid':''" x-text="fmtNum(r.inatividade)"></td>
-                                        <td class="num-cell" x-text="r.qtd_ciclos + '/' + (covResumo.n_ciclos||0)"></td>
-                                        <td class="num-cell" x-text="fmtNum(r.itens)"></td>
+                            <template x-for="c in alertaCidades" :key="c.cidade">
+                                <tbody>
+                                    <tr class="click-row" :class="alertaExpandida===c.cidade?'expanded':''" @click="toggleAlertaCidade(c)">
+                                        <td><span class="expand-icon" :class="alertaExpandida===c.cidade?'open':''">▶</span> <span x-text="c.cidade" style="margin-left:6px;"></span></td>
+                                        <td class="num-cell" style="color:#fbbf24;font-weight:700;" x-text="fmtNum(c.total)"></td>
+                                        <td class="num-cell" :class="c.pior>=7?'inat-high':c.pior>=6?'inat-mid':''" x-text="c.pior"></td>
+                                        <td><div class="bar-bg"><div class="bar-fill2" style="background:linear-gradient(to right,#92400e,#f87171);" :style="'width:'+Math.round(c.total/maxAlerta*100)+'%'"></div></div></td>
                                     </tr>
-                                </template>
-                                <tr x-show="covRevs.length===0"><td colspan="7" class="empty-msg">Nenhum revendedor neste filtro.</td></tr>
-                            </tbody>
+                                    <tr x-show="alertaExpandida===c.cidade">
+                                        <td colspan="4" style="padding:0;">
+                                            <div x-show="alertaDetLoading && alertaExpandida===c.cidade" style="padding:18px;text-align:center;color:var(--text-muted);font-size:.84rem;">
+                                                <span class="loading-spinner" style="border-top-color:#a78bfa;"></span> Carregando...</div>
+                                            <div :id="'alerta-'+safeId(c.cidade)"></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </template>
+                            <tbody x-show="alertaCidades.length===0"><tr><td colspan="4" class="empty-msg">Nenhum cliente em alerta nesta faixa.</td></tr></tbody>
                         </table>
-                    </div>
-                    <div x-show="covRevs.length>=500" style="padding:8px 18px;font-size:.75rem;color:var(--text-muted);font-style:italic;">
-                        Mostrando os primeiros 500 — use o Excel para a lista completa.
                     </div>
                 </div>
             </div>
             </template>
-        </div><!-- /aba cobertura -->
+        </div><!-- /alerta -->
 
     </div>
     </template>
@@ -615,12 +577,11 @@ function mapaPedidos() {
         ],
         // Sort
         sortBy:'revendedores', sortDir:'desc',
-        // Page tab + Cobertura de revendedores
-        aba:'mapa',
+        // Base de revendedores (permanente) + modo Alerta
         revBase:{ has_data:false, estatisticas:{}, unidades:[] },
         baseFile:null, baseFileName:'', baseUploading:false,
-        covResumo:{}, covCiclos:[], covFreq:[], covRevs:[],
-        covUnidade:'', covFiltro:'todos', covOrdenar:'inatividade', _covLoaded:false,
+        alertaResumo:{}, alertaCidades:[], alertaUnidade:'',
+        alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
@@ -638,7 +599,7 @@ function mapaPedidos() {
         get maxSegRev(){ return Math.max(...this.segmentos.map(s=>s.revendedores||0), 1); },
         get maxVisitas(){ return Math.max(...this.visitantes.map(v=>v.visitas||0), 1); },
         get segmentosPresentes(){ return this.segmentos.filter(s=>s.revendedores>0).map(s=>s.segmento); },
-        get maxCicloRev(){ return Math.max(...this.covCiclos.map(c=>c.revendedores||0), 1); },
+        get maxAlerta(){ return Math.max(...this.alertaCidades.map(c=>c.total||0), 1); },
 
         // ── Init ──
         async init(){
@@ -676,8 +637,6 @@ function mapaPedidos() {
                 this.ciclo = (data.estatisticas||{}).ciclo || ''; this.nCiclos = (data.estatisticas||{}).n_ciclos || 1;
                 this.avisos = data.avisos || [];
                 this.hasData = true;
-                this.aba = 'mapa';
-                this._resetCobertura();   // nova planilha -> cobertura recarrega ao abrir
                 showToast('Planilha importada com sucesso!', 'success');
                 await this.carregarTudo(true);
                 this.$nextTick(()=>{ this.iniciarMapa(); lucide.createIcons(); });
@@ -726,7 +685,12 @@ function mapaPedidos() {
         },
 
         setMetrica(k){ this.metrica = k; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); },
-        setMapMode(mode){ this.mapMode = mode; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); },
+        setMapMode(mode){
+            this.mapMode = mode;
+            if (mode==='alerta' && !this._alertaLoaded){ this._alertaLoaded=true; this.carregarAlerta(); }
+            else { this._atualizarMapa(); }
+            this.$nextTick(()=>lucide.createIcons());
+        },
 
         // ── Sort ──
         toggleSort(campo){
@@ -841,6 +805,11 @@ function mapaPedidos() {
                             layer.setTooltipContent(self._tooltipCidade(nome));
                         });
                         layer.on('click', ()=>{
+                            if (self.mapMode==='alerta'){
+                                const a = self._alertaInfo(nome);
+                                if (a){ self._map.fitBounds(layer.getBounds(), { padding:[40,40] }); self.expandirAlertaDoMapa(a.cidade); }
+                                return;
+                            }
                             const i = self._info(nome);
                             if (i.revendedores > 0){
                                 self._map.fitBounds(layer.getBounds(), { padding:[40,40] });
@@ -853,6 +822,12 @@ function mapaPedidos() {
             } catch(e){ console.error('GeoJSON IBGE:', e); }
         },
         _tooltipCidade(nome){
+            // Alerta: quantos clientes em alerta (5–7 ciclos sem comprar).
+            if (this.mapMode==='alerta'){
+                const a = this._alertaInfo(nome);
+                if (a) return `<strong>${this._esc(nome)}</strong><br><span style="color:#fbbf24;">${this.fmtNum(a.total)} em alerta</span> · pior: ${a.pior} ciclos`;
+                return `<strong>${this._esc(nome)}</strong><br><span style="color:var(--text-muted);">sem clientes em alerta</span>`;
+            }
             // Composição: mostra a quantidade de revendedores por segmento.
             if (this.mapMode==='composicao'){
                 const ci = this._composInfo(nome);
@@ -880,6 +855,17 @@ function mapaPedidos() {
         },
         _estilo(feature){
             const nome = feature.properties.nome;
+            // Modo alerta: pinta a cidade pela quantidade de clientes em alerta.
+            if (this.mapMode==='alerta'){
+                const a = this._alertaInfo(nome);
+                const max = Math.max(...this.alertaCidades.map(c=>c.total||0), 1);
+                const val = a ? a.total : 0;
+                return {
+                    fillColor: this._corAlerta(val/max),
+                    fillOpacity: val>0 ? 0.82 : 0.10,
+                    color: val>0 ? 'rgba(251,191,36,.5)' : 'rgba(139,92,246,.2)', weight: val>0?1:0.5,
+                };
+            }
             // Modo composição: pinta a cidade com a cor do segmento predominante
             // NA MÉTRICA selecionada (revendedores/itens/faturamento/visitas).
             if (this.mapMode==='composicao'){
@@ -1028,6 +1014,18 @@ function mapaPedidos() {
             if (r < 0.75) return '#7c3aed';
             return '#a78bfa';
         },
+        _corAlerta(r){   // escala \u00e2mbar -> vermelho (urg\u00eancia)
+            if (r === 0)  return '#1a1a3e';
+            if (r < 0.15) return '#3a2410';
+            if (r < 0.35) return '#78350f';
+            if (r < 0.6)  return '#b45309';
+            if (r < 0.8)  return '#ea9a2e';
+            return '#f87171';
+        },
+        expandirAlertaDoMapa(cidade){
+            const c = this.alertaCidades.find(x=>this._norm(x.cidade)===this._norm(cidade));
+            if (c){ this.toggleAlertaCidade(c); this.$nextTick(()=>document.getElementById('alerta-'+this.safeId(c.cidade))?.scrollIntoView({behavior:'smooth', block:'center'})); }
+        },
         _norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); },
         _info(nome){
             const n = this._norm(nome);
@@ -1042,48 +1040,73 @@ function mapaPedidos() {
         fmtMoedaCard(v){ return 'R$ ' + Math.round(v==null?0:v).toLocaleString('pt-BR'); },
         exportUrl(fmt){ return '/api/pedidos/export/cidades?' + this._params({ formato:fmt }).toString(); },
 
-        // ── Cobertura de Revendedores ──
-        async abrirCobertura(){
-            this.aba='cobertura';
-            if (!this._covLoaded){
-                await this.verificarBase();
-                if (this.revBase.has_data) await this.carregarCobertura();
-                this._covLoaded = true;
-            }
-            this.$nextTick(()=>lucide.createIcons());
-        },
+        // ── Base de revendedores (permanente) + modo Alerta ──
         async verificarBase(){
-            try {
-                const res = await fetch('/api/revendedores/status');
-                this.revBase = await res.json();
-            } catch(e){ console.error('base status:', e); }
+            try { const res = await fetch('/api/revendedores/status'); this.revBase = await res.json(); }
+            catch(e){ console.error('base status:', e); }
         },
-        _covParams(extra){
+        _alertaParams(extra){
             const p = new URLSearchParams();
-            if (this.covUnidade) p.set('unidade', this.covUnidade);
+            if (this.alertaUnidade) p.set('unidade', this.alertaUnidade);
             for (const k in (extra||{})) p.set(k, extra[k]);
             return p;
         },
-        async carregarCobertura(){
-            if (!this.revBase.has_data) return;
-            const [res, cic, fre] = await Promise.all([
-                fetch('/api/pedidos/cobertura/resumo?'+this._covParams()).then(r=>r.json()),
-                fetch('/api/pedidos/cobertura/ciclos?'+this._covParams()).then(r=>r.json()),
-                fetch('/api/pedidos/cobertura/frequencia?'+this._covParams()).then(r=>r.json()),
+        async carregarAlerta(){
+            await this.verificarBase();
+            if (!this.revBase.has_data){ this.alertaResumo={}; this.alertaCidades=[]; this._atualizarMapa(); return; }
+            const [res, cid] = await Promise.all([
+                fetch('/api/revendedores/alerta/resumo?'+this._alertaParams()).then(r=>r.json()),
+                fetch('/api/revendedores/alerta/cidades?'+this._alertaParams()).then(r=>r.json()),
             ]);
-            this.covResumo = res.resumo || {};
-            this.covCiclos = cic.ciclos || [];
-            this.covFreq = fre.frequencia || [];
-            await this.carregarCovRevs();
+            this.alertaResumo = res.resumo || {};
+            this.alertaCidades = cid.cidades || [];
+            this.alertaExpandida=''; this._alertaDetCache={};
+            this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
         },
-        async carregarCovRevs(){
-            if (!this.revBase.has_data) return;
-            const res = await fetch('/api/pedidos/cobertura/revendedores?'+this._covParams({ filtro:this.covFiltro, ordenar:this.covOrdenar, limite:500 }));
-            this.covRevs = (await res.json()).revendedores || [];
-            this.$nextTick(()=>lucide.createIcons());
+        async toggleAlertaCidade(c){
+            if (this.alertaExpandida===c.cidade){ this.alertaExpandida=''; return; }
+            this.alertaExpandida = c.cidade;
+            if (this._alertaDetCache[c.cidade]){ await this.$nextTick(); this._injAlerta(c.cidade, this._alertaDetCache[c.cidade]); return; }
+            this.alertaDetLoading = true;
+            try {
+                const res = await fetch('/api/revendedores/alerta/detalhe?'+this._alertaParams({ cidade:c.cidade }));
+                const cli = (await res.json()).clientes || [];
+                const html = this._buildAlertaDet(cli);
+                this._alertaDetCache[c.cidade]=html;
+                this.alertaDetLoading=false;
+                await this.$nextTick();
+                this._injAlerta(c.cidade, html);
+            } catch(e){ console.error(e); this.alertaDetLoading=false; }
         },
-        covExportUrl(fmt){ return '/api/pedidos/cobertura/export?'+this._covParams({ formato:fmt, filtro:this.covFiltro, ordenar:this.covOrdenar }).toString(); },
+        _injAlerta(cidade, html){ const el=document.getElementById('alerta-'+this.safeId(cidade)); if(el){ el.innerHTML=html; lucide.createIcons(); } },
+        _buildAlertaDet(cli){
+            const rows = cli.length ? cli.map(r=>{
+                const cc = r.inatividade>=7?'inat-high':r.inatividade>=6?'inat-mid':'';
+                const sb = (r.situacao||'').toLowerCase()==='ativo'?'sit-badge sit-ativo':'sit-badge sit-inativo';
+                return `<tr>
+                    <td style="padding:7px 12px 7px 30px;font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.nome)}</td>
+                    <td class="num-cell ${cc}" style="padding:7px 12px;font-weight:700;">${r.inatividade}</td>
+                    <td style="padding:7px 12px;"><span class="${sb}">${this._esc(r.situacao||'—')}</span></td>
+                    <td style="padding:7px 12px;color:var(--text-muted);">${this._esc(r.segmento||'—')}</td>
+                    <td style="padding:7px 12px;font-family:monospace;font-size:.8rem;color:#a78bfa;">${this._esc(r.telefone||'—')}</td>
+                    <td style="padding:7px 12px;color:var(--text-muted);font-size:.79rem;">${this._esc(r.unidade)}</td>
+                </tr>`; }).join('') : `<tr><td colspan="6" class="empty-msg" style="padding:14px;">Sem clientes.</td></tr>`;
+            return `<div style="background:rgba(10,10,25,.6);border-top:1px solid rgba(139,92,246,.1);overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+                    <thead><tr style="background:rgba(10,10,28,.7);">
+                        <th style="padding:7px 12px 7px 30px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Nome</th>
+                        <th style="padding:7px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Ciclos s/ comprar</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Situação</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Segmento</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Telefone</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Unidade</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        },
+        alertaExportUrl(fmt){ return '/api/revendedores/alerta/export?'+this._alertaParams({ formato:fmt }).toString(); },
+        _alertaInfo(nome){ const n=this._norm(nome); return this.alertaCidades.find(c=>this._norm(c.cidade)===n); },
         onBaseFile(e){ const f=e.target.files[0]; if(f){ this.baseFile=f; this.baseFileName=f.name; } },
         async uploadBase(){
             if (!this.baseFile || this.baseUploading) return;
@@ -1094,8 +1117,7 @@ function mapaPedidos() {
                 const data = await res.json();
                 if (!res.ok){ showToast(data.detail || 'Erro ao salvar base', 'error'); return; }
                 showToast('Base salva com sucesso!', 'success');
-                await this.verificarBase();
-                await this.carregarCobertura();
+                await this.carregarAlerta();
             } catch(e){ showToast('Erro ao enviar base', 'error'); }
             finally { this.baseUploading=false; this.baseFile=null; this.baseFileName=''; this.$nextTick(()=>lucide.createIcons()); }
         },
@@ -1103,19 +1125,16 @@ function mapaPedidos() {
             if (!confirm('Trocar/remover a base de revendedores salva?')) return;
             await fetch('/api/revendedores/clear', { method:'POST' });
             this.revBase = { has_data:false, estatisticas:{}, unidades:[] };
-            this.covResumo={}; this.covCiclos=[]; this.covFreq=[]; this.covRevs=[];
+            this.alertaResumo={}; this.alertaCidades=[]; this.alertaExpandida=''; this._alertaDetCache={};
+            this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
         },
 
-        _resetCobertura(){
-            this._covLoaded=false; this.covResumo={}; this.covCiclos=[]; this.covFreq=[]; this.covRevs=[];
-        },
         async limparDados(){
             if (!confirm('Remover a planilha de pedidos desta sessão?')) return;
             await fetch('/api/pedidos/clear', { method:'POST' });
-            this.hasData=false; this.aba='mapa'; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
+            this.hasData=false; this.mapMode='intensidade'; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
             this.resumo={}; this.ciclo=''; this.nCiclos=1; this.expandida=''; this._detCache={};
-            this._resetCobertura();
             this._clearPies();
             if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },

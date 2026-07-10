@@ -2728,6 +2728,83 @@ async def cobertura_export(
 
 
 # =============================================================================
+# ALERTA DE INATIVIDADE — clientes X ciclos sem comprar (modo do mapa)
+# =============================================================================
+
+@api_router.get("/revendedores/alerta/resumo")
+async def alerta_resumo(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    min_ciclos: int = Query(5, ge=1, le=30),
+    max_ciclos: int = Query(7, ge=1, le=30),
+):
+    df = _get_df_rev(request)
+    if df is None:
+        return {"tem_base": False, "resumo": {}}
+    return {"tem_base": True, "resumo": rev_svc.alerta_resumo(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+
+
+@api_router.get("/revendedores/alerta/cidades")
+async def alerta_cidades(
+    request: Request,
+    unidade: Optional[str] = Query(None),
+    min_ciclos: int = Query(5, ge=1, le=30),
+    max_ciclos: int = Query(7, ge=1, le=30),
+):
+    df = _get_df_rev(request)
+    if df is None:
+        return {"cidades": []}
+    return {"cidades": rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+
+
+@api_router.get("/revendedores/alerta/detalhe")
+async def alerta_detalhe(
+    request: Request,
+    cidade: str = Query(...),
+    unidade: Optional[str] = Query(None),
+    min_ciclos: int = Query(5, ge=1, le=30),
+    max_ciclos: int = Query(7, ge=1, le=30),
+):
+    df = _get_df_rev(request)
+    if df is None:
+        return {"clientes": []}
+    return {"clientes": rev_svc.alerta_detalhe_cidade(df, cidade, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+
+
+@api_router.get("/revendedores/alerta/export")
+async def alerta_export(
+    request: Request,
+    formato: str = Query("xlsx", pattern="^(csv|xlsx)$"),
+    unidade: Optional[str] = Query(None),
+    min_ciclos: int = Query(5, ge=1, le=30),
+    max_ciclos: int = Query(7, ge=1, le=30),
+):
+    df = _get_df_rev(request)
+    if df is None:
+        raise HTTPException(status_code=400, detail="Base de revendedores não carregada")
+    # todas as cidades em alerta, cliente a cliente
+    cidades = rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)
+    linhas = []
+    for c in cidades:
+        for cli in rev_svc.alerta_detalhe_cidade(df, c["cidade"], unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos):
+            linhas.append({"cidade": c["cidade"], **cli})
+    if not linhas:
+        raise HTTPException(status_code=404, detail="Nenhum cliente em alerta")
+    df_export = pl.DataFrame(linhas)
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=clientes_alerta.csv"},
+        )
+    return Response(
+        content=exportar_excel(df_export, "Alerta"),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=clientes_alerta.xlsx"},
+    )
+
+
+# =============================================================================
 # SLACK
 # =============================================================================
 

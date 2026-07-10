@@ -278,6 +278,68 @@ def cobertura_revendedores(
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Alerta de inatividade — clientes há X ciclos sem comprar (base)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _filtro_alerta(df_rev: pl.DataFrame, unidade, min_c: int, max_c: int) -> pl.DataFrame:
+    d = _filtrar_unidade(df_rev, unidade)
+    return d.filter((pl.col("_inatividade") >= min_c) & (pl.col("_inatividade") <= max_c))
+
+
+def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> Dict[str, Any]:
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
+    return {
+        "total": d.height,
+        "por_ciclo": {
+            int(c): int(d.filter(pl.col("_inatividade") == c).height)
+            for c in range(min_c, max_c + 1)
+        },
+        "cidades": d.select("_cidade").filter(pl.col("_cidade") != "").n_unique(),
+        "min": min_c, "max": max_c,
+    }
+
+
+def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> List[Dict[str, Any]]:
+    """Quantidade de clientes em alerta por cidade de cadastro (residencial)."""
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
+    if d.is_empty():
+        return []
+    d = d.with_columns(
+        pl.when(pl.col("_cidade") == "").then(pl.lit("Não informado")).otherwise(pl.col("_cidade")).alias("_cid")
+    )
+    g = (
+        d.group_by("_cid").agg([
+            pl.len().alias("total"),
+            pl.col("_inatividade").max().alias("pior"),
+        ]).sort("total", descending=True)
+    )
+    return [
+        {"cidade": r["_cid"], "total": int(r["total"]), "pior": int(r["pior"])}
+        for r in g.iter_rows(named=True)
+    ]
+
+
+def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max_c: int = 7) -> List[Dict[str, Any]]:
+    """Lista de clientes em alerta de uma cidade (ordenados do pior ao menos)."""
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
+    d = d.filter(pl.col("_cidade").str.to_lowercase() == cidade.strip().lower())
+    d = d.sort("_inatividade", descending=True)
+    return [
+        {
+            "codigo": r["_cod"],
+            "nome": r["_nome"] or "—",
+            "inatividade": int(r["_inatividade"]),
+            "situacao": r["_situacao"],
+            "segmento": r["_segmento"],
+            "setor": r["_setor"],
+            "unidade": r["_unidade"],
+            "telefone": r["_telefone"],
+        }
+        for r in d.iter_rows(named=True)
+    ]
+
+
 def obter_unidades(df_rev: pl.DataFrame) -> List[Dict[str, str]]:
     u = df_rev.select(["_cod_unidade", "_unidade"]).unique().sort("_unidade")
     return [{"codigo": r["_cod_unidade"], "nome": r["_unidade"]} for r in u.iter_rows(named=True)]
