@@ -283,7 +283,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-14</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-16</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;">· clientes 5–7 ciclos sem comprar</span>
@@ -499,6 +499,11 @@
                             <option value="">Todas</option>
                             <template x-for="u in revBase.unidades" :key="u.codigo"><option :value="u.codigo" x-text="u.nome"></option></template>
                         </select></div>
+                    <div class="filter-group"><label>Segmentação:</label>
+                        <select x-model="alertaSegmento" @change="carregarAlerta()">
+                            <option value="">Todas</option>
+                            <template x-for="s in (revBase.segmentos||[])" :key="s"><option :value="s" x-text="s"></option></template>
+                        </select></div>
                     <div class="export-row">
                         <a :href="alertaExportUrl('csv')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
                         <a :href="alertaExportUrl('xlsx')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>Excel</a>
@@ -568,7 +573,7 @@ function mapaPedidos() {
         filterOptions:{ segmentos:[], unidades:[], cidades:[] },
         filtros:{ unidade:'', segmento:'', tipo:'' },
         metrica:'revendedores',
-        mapMode:'intensidade',   // 'intensidade' | 'composicao'
+        mapMode:'intensidade',   // 'intensidade' | 'composicao' | 'alerta'
         metricas:[
             { key:'revendedores', label:'Revendedores', icon:'users' },
             { key:'itens',        label:'Itens',        icon:'package' },
@@ -578,9 +583,9 @@ function mapaPedidos() {
         // Sort
         sortBy:'revendedores', sortDir:'desc',
         // Base de revendedores (permanente) + modo Alerta
-        revBase:{ has_data:false, estatisticas:{}, unidades:[] },
+        revBase:{ has_data:false, estatisticas:{}, unidades:[], segmentos:[] },
         baseFile:null, baseFileName:'', baseUploading:false,
-        alertaResumo:{}, alertaCidades:[], alertaUnidade:'',
+        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'',
         alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
@@ -676,7 +681,7 @@ function mapaPedidos() {
         },
 
         async aplicarFiltros(){
-            await this.carregarTudo(false);
+            try { await this.carregarTudo(false); } catch(e){ console.error('aplicarFiltros:', e); }
             this._atualizarMapa();
         },
         limparFiltros(){
@@ -687,8 +692,8 @@ function mapaPedidos() {
         setMetrica(k){ this.metrica = k; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); },
         setMapMode(mode){
             this.mapMode = mode;
+            this._atualizarMapa();   // sincrono: já limpa donuts / aplica a cor do modo
             if (mode==='alerta' && !this._alertaLoaded){ this._alertaLoaded=true; this.carregarAlerta(); }
-            else { this._atualizarMapa(); }
             this.$nextTick(()=>lucide.createIcons());
         },
 
@@ -1042,27 +1047,36 @@ function mapaPedidos() {
 
         // ── Base de revendedores (permanente) + modo Alerta ──
         async verificarBase(){
-            try { const res = await fetch('/api/revendedores/status'); this.revBase = await res.json(); }
-            catch(e){ console.error('base status:', e); }
+            try {
+                const res = await fetch('/api/revendedores/status');
+                const d = await res.json();
+                this.revBase = { has_data: !!d.has_data, estatisticas: d.estatisticas||{}, unidades: d.unidades||[], segmentos: d.segmentos||[] };
+            } catch(e){ console.error('base status:', e); }
         },
         _alertaParams(extra){
             const p = new URLSearchParams();
             if (this.alertaUnidade) p.set('unidade', this.alertaUnidade);
+            if (this.alertaSegmento) p.set('segmento', this.alertaSegmento);
             for (const k in (extra||{})) p.set(k, extra[k]);
             return p;
         },
         async carregarAlerta(){
-            await this.verificarBase();
-            if (!this.revBase.has_data){ this.alertaResumo={}; this.alertaCidades=[]; this._atualizarMapa(); return; }
-            const [res, cid] = await Promise.all([
-                fetch('/api/revendedores/alerta/resumo?'+this._alertaParams()).then(r=>r.json()),
-                fetch('/api/revendedores/alerta/cidades?'+this._alertaParams()).then(r=>r.json()),
-            ]);
-            this.alertaResumo = res.resumo || {};
-            this.alertaCidades = cid.cidades || [];
-            this.alertaExpandida=''; this._alertaDetCache={};
-            this._atualizarMapa();
-            this.$nextTick(()=>lucide.createIcons());
+            try {
+                await this.verificarBase();
+                if (!this.revBase.has_data){ this.alertaResumo={}; this.alertaCidades=[]; this._atualizarMapa(); return; }
+                const [res, cid] = await Promise.all([
+                    fetch('/api/revendedores/alerta/resumo?'+this._alertaParams()).then(r=>r.json()),
+                    fetch('/api/revendedores/alerta/cidades?'+this._alertaParams()).then(r=>r.json()),
+                ]);
+                this.alertaResumo = res.resumo || {};
+                this.alertaCidades = cid.cidades || [];
+                this.alertaExpandida=''; this._alertaDetCache={};
+                this._atualizarMapa();
+                this.$nextTick(()=>lucide.createIcons());
+            } catch(e){
+                console.error('carregarAlerta:', e);
+                this._alertaLoaded = false;   // libera nova tentativa ao reabrir o modo
+            }
         },
         async toggleAlertaCidade(c){
             if (this.alertaExpandida===c.cidade){ this.alertaExpandida=''; return; }
@@ -1124,8 +1138,9 @@ function mapaPedidos() {
         async removerBase(){
             if (!confirm('Trocar/remover a base de revendedores salva?')) return;
             await fetch('/api/revendedores/clear', { method:'POST' });
-            this.revBase = { has_data:false, estatisticas:{}, unidades:[] };
+            this.revBase = { has_data:false, estatisticas:{}, unidades:[], segmentos:[] };
             this.alertaResumo={}; this.alertaCidades=[]; this.alertaExpandida=''; this._alertaDetCache={};
+            this.alertaUnidade=''; this.alertaSegmento=''; this._alertaLoaded=false;
             this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
         },
@@ -1135,6 +1150,8 @@ function mapaPedidos() {
             await fetch('/api/pedidos/clear', { method:'POST' });
             this.hasData=false; this.mapMode='intensidade'; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
             this.resumo={}; this.ciclo=''; this.nCiclos=1; this.expandida=''; this._detCache={};
+            // Alerta usa a base persistente (não a planilha); só força re-carregar ao reabrir.
+            this._alertaLoaded=false; this.alertaResumo={}; this.alertaCidades=[];
             this._clearPies();
             if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },

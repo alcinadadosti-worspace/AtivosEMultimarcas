@@ -2610,6 +2610,7 @@ async def revendedores_status(request: Request):
         "has_data": df is not None,
         "estatisticas": getattr(request.app.state, "df_revendedores_stats", {}) or {},
         "unidades": rev_svc.obter_unidades(df) if df is not None else [],
+        "segmentos": rev_svc.obter_segmentos_base(df) if df is not None else [],
     }
 
 
@@ -2735,26 +2736,28 @@ async def cobertura_export(
 async def alerta_resumo(
     request: Request,
     unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
 ):
     df = _get_df_rev(request)
     if df is None:
         return {"tem_base": False, "resumo": {}}
-    return {"tem_base": True, "resumo": rev_svc.alerta_resumo(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+    return {"tem_base": True, "resumo": rev_svc.alerta_resumo(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None)}
 
 
 @api_router.get("/revendedores/alerta/cidades")
 async def alerta_cidades(
     request: Request,
     unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
 ):
     df = _get_df_rev(request)
     if df is None:
         return {"cidades": []}
-    return {"cidades": rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+    return {"cidades": rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None)}
 
 
 @api_router.get("/revendedores/alerta/detalhe")
@@ -2762,13 +2765,14 @@ async def alerta_detalhe(
     request: Request,
     cidade: str = Query(...),
     unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
 ):
     df = _get_df_rev(request)
     if df is None:
         return {"clientes": []}
-    return {"clientes": rev_svc.alerta_detalhe_cidade(df, cidade, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)}
+    return {"clientes": rev_svc.alerta_detalhe_cidade(df, cidade, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None)}
 
 
 @api_router.get("/revendedores/alerta/export")
@@ -2776,6 +2780,7 @@ async def alerta_export(
     request: Request,
     formato: str = Query("xlsx", pattern="^(csv|xlsx)$"),
     unidade: Optional[str] = Query(None),
+    segmento: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
 ):
@@ -2783,10 +2788,10 @@ async def alerta_export(
     if df is None:
         raise HTTPException(status_code=400, detail="Base de revendedores não carregada")
     # todas as cidades em alerta, cliente a cliente
-    cidades = rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos)
+    cidades = rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None)
     linhas = []
     for c in cidades:
-        for cli in rev_svc.alerta_detalhe_cidade(df, c["cidade"], unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos):
+        for cli in rev_svc.alerta_detalhe_cidade(df, c["cidade"], unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None):
             linhas.append({"cidade": c["cidade"], **cli})
     if not linhas:
         raise HTTPException(status_code=404, detail="Nenhum cliente em alerta")

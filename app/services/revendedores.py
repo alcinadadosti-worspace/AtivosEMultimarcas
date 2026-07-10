@@ -282,13 +282,15 @@ def cobertura_revendedores(
 # Alerta de inatividade — clientes há X ciclos sem comprar (base)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _filtro_alerta(df_rev: pl.DataFrame, unidade, min_c: int, max_c: int) -> pl.DataFrame:
+def _filtro_alerta(df_rev: pl.DataFrame, unidade, min_c: int, max_c: int, segmento=None) -> pl.DataFrame:
     d = _filtrar_unidade(df_rev, unidade)
+    if segmento:
+        d = d.filter(pl.col("_segmento") == segmento)
     return d.filter((pl.col("_inatividade") >= min_c) & (pl.col("_inatividade") <= max_c))
 
 
-def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> Dict[str, Any]:
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
+def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> Dict[str, Any]:
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
     return {
         "total": d.height,
         "por_ciclo": {
@@ -300,9 +302,9 @@ def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> Dict[
     }
 
 
-def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> List[Dict[str, Any]]:
+def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> List[Dict[str, Any]]:
     """Quantidade de clientes em alerta por cidade de cadastro (residencial)."""
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
     if d.is_empty():
         return []
     d = d.with_columns(
@@ -320,10 +322,14 @@ def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7) -> L
     ]
 
 
-def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max_c: int = 7) -> List[Dict[str, Any]]:
+def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> List[Dict[str, Any]]:
     """Lista de clientes em alerta de uma cidade (ordenados do pior ao menos)."""
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c)
-    d = d.filter(pl.col("_cidade").str.to_lowercase() == cidade.strip().lower())
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
+    alvo = cidade.strip().lower()
+    if alvo == "não informado":   # cidade agrupada no ranking = _cidade vazia
+        d = d.filter(pl.col("_cidade") == "")
+    else:
+        d = d.filter(pl.col("_cidade").str.to_lowercase() == alvo)
     d = d.sort("_inatividade", descending=True)
     return [
         {
@@ -343,3 +349,11 @@ def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max
 def obter_unidades(df_rev: pl.DataFrame) -> List[Dict[str, str]]:
     u = df_rev.select(["_cod_unidade", "_unidade"]).unique().sort("_unidade")
     return [{"codigo": r["_cod_unidade"], "nome": r["_unidade"]} for r in u.iter_rows(named=True)]
+
+
+def obter_segmentos_base(df_rev: pl.DataFrame) -> List[str]:
+    """Segmentos (Papel) presentes na base, na ordem canônica."""
+    from app.services.pedidos import SEGMENTOS_ORDEM
+    segs = df_rev.select("_segmento").unique().to_series().to_list()
+    ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
+    return sorted([s for s in segs if s], key=lambda s: ordem.get(s, 999))
