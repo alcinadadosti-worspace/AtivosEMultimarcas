@@ -2768,11 +2768,17 @@ async def alerta_detalhe(
     segmento: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
+    session: tuple = Depends(get_user_session),
 ):
+    session_id, session_data = session
     df = _get_df_rev(request)
+    df_ped = _get_df_pedidos(session_data)   # histórico de ciclos vem dos pedidos
     if df is None:
-        return {"clientes": []}
-    return {"clientes": rev_svc.alerta_detalhe_cidade(df, cidade, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None)}
+        return {"clientes": [], "ciclos": []}
+    return rev_svc.alerta_detalhe_cidade(
+        df, cidade, df_ped=df_ped, unidade=unidade or None,
+        min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None,
+    )
 
 
 @api_router.get("/revendedores/alerta/export")

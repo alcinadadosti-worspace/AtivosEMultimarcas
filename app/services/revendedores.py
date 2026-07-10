@@ -322,8 +322,22 @@ def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segm
     ]
 
 
-def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> List[Dict[str, Any]]:
-    """Lista de clientes em alerta de uma cidade (ordenados do pior ao menos)."""
+def _ciclos_comprados_por_cod(df_ped) -> Dict[str, set]:
+    """Do arquivo de pedidos: por revendedor (código normalizado), o conjunto de
+    ciclos em que comprou. Usado para o histórico (comprou/não por ciclo)."""
+    d = (
+        df_ped.with_columns([
+            _norm_cod(PED_COL_PESSOA).alias("_cod"),
+            pl.col(PED_COL_CICLO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_ciclo"),
+        ]).filter((pl.col("_cod") != "") & (pl.col("_ciclo") != ""))
+        .group_by("_cod").agg(pl.col("_ciclo").unique().alias("ciclos"))
+    )
+    return {r["_cod"]: set(r["ciclos"]) for r in d.iter_rows(named=True)}
+
+
+def alerta_detalhe_cidade(df_rev, cidade: str, df_ped=None, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> Dict[str, Any]:
+    """Clientes em alerta de uma cidade + histórico de compras por ciclo (do
+    arquivo de pedidos), pra distinguir inatividade intercalada de consecutiva."""
     d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
     alvo = cidade.strip().lower()
     if alvo == "não informado":   # cidade agrupada no ranking = _cidade vazia
@@ -331,8 +345,14 @@ def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max
     else:
         d = d.filter(pl.col("_cidade").str.to_lowercase() == alvo)
     d = d.sort("_inatividade", descending=True)
-    return [
-        {
+
+    ciclos = ciclos_do_arquivo(df_ped) if df_ped is not None else []
+    compras = _ciclos_comprados_por_cod(df_ped) if df_ped is not None else {}
+
+    clientes = []
+    for r in d.iter_rows(named=True):
+        comprou = compras.get(r["_cod"], set())
+        clientes.append({
             "codigo": r["_cod"],
             "nome": r["_nome"] or "—",
             "inatividade": int(r["_inatividade"]),
@@ -341,9 +361,10 @@ def alerta_detalhe_cidade(df_rev, cidade: str, unidade=None, min_c: int = 5, max
             "setor": r["_setor"],
             "unidade": r["_unidade"],
             "telefone": r["_telefone"],
-        }
-        for r in d.iter_rows(named=True)
-    ]
+            # histórico: por ciclo do arquivo, True se comprou naquele ciclo
+            "historico": [{"ciclo": c, "comprou": c in comprou} for c in ciclos],
+        })
+    return {"clientes": clientes, "ciclos": ciclos}
 
 
 def obter_unidades(df_rev: pl.DataFrame) -> List[Dict[str, str]]:

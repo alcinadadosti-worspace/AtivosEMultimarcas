@@ -283,10 +283,10 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-16</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-17</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
-                <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;">· clientes 5–7 ciclos sem comprar</span>
+                <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;" x-text="'· clientes ' + alertaFaixa + ' sem comprar'"></span>
                 <div class="mode-toggle">
                     <button class="metric-chip" :class="mapMode==='intensidade' ? 'active' : ''" @click="setMapMode('intensidade')">
                         <i data-lucide="flame"></i> Intensidade
@@ -333,7 +333,7 @@
                 <span>Poucos</span>
                 <div class="legend-bar" style="background:linear-gradient(to right,#2a1a0a,#92400e,#d97706,#f87171);"></div>
                 <span>Muitos em alerta</span>
-                <span style="margin-left:auto; font-style:italic;">5 a 7 ciclos sem comprar · clique numa cidade para ver os clientes</span>
+                <span style="margin-left:auto; font-style:italic;" x-text="alertaFaixa + ' sem comprar · clique numa cidade para ver os clientes'"></span>
             </div>
         </div>
 
@@ -484,16 +484,17 @@
             <template x-if="revBase.has_data">
             <div>
                 <div class="ped-stats">
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="alert-triangle"></i> Em alerta (5–7)</div><div class="ped-stat-value" style="color:#fbbf24;" x-text="fmtNum(alertaResumo.total)"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> 5 ciclos</div><div class="ped-stat-value" x-text="fmtNum((alertaResumo.por_ciclo||{})[5])"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> 6 ciclos</div><div class="ped-stat-value" x-text="fmtNum((alertaResumo.por_ciclo||{})[6])"></div></div>
-                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-alert"></i> 7 ciclos (limite)</div><div class="ped-stat-value" style="color:#f87171;" x-text="fmtNum((alertaResumo.por_ciclo||{})[7])"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="alert-triangle"></i> Em alerta</div><div class="ped-stat-value" style="color:#fbbf24;" x-text="fmtNum(alertaResumo.total)"></div></div>
                     <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="map-pin"></i> Cidades</div><div class="ped-stat-value" x-text="fmtNum(alertaResumo.cidades)"></div></div>
+                    <template x-for="p in alertaPorCiclo" :key="p.ciclo">
+                        <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> <span x-text="p.ciclo + (p.ciclo===1?' ciclo':' ciclos')"></span></div>
+                            <div class="ped-stat-value" :style="p.ciclo>=7 ? 'color:#f87171;' : ''" x-text="fmtNum(p.n)"></div></div>
+                    </template>
                 </div>
 
                 <div class="ped-filters">
                     <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#fbbf24;"></i>
-                        <span style="font-size:.82rem;">Clientes de <b>5 a 7 ciclos</b> sem comprar (base de cadastro)</span></div>
+                        <span style="font-size:.82rem;">Clientes de <b x-text="alertaFaixa"></b> sem comprar (base de cadastro)</span></div>
                     <div class="filter-group"><label>Unidade:</label>
                         <select x-model="alertaUnidade" @change="carregarAlerta()">
                             <option value="">Todas</option>
@@ -503,6 +504,13 @@
                         <select x-model="alertaSegmento" @change="carregarAlerta()">
                             <option value="">Todas</option>
                             <template x-for="s in (revBase.segmentos||[])" :key="s"><option :value="s" x-text="s"></option></template>
+                        </select></div>
+                    <div class="filter-group"><label>Ciclos sem comprar:</label>
+                        <select x-model.number="alertaMin" @change="carregarAlerta()">
+                            <template x-for="n in [1,2,3,4,5,6,7]" :key="'mn'+n"><option :value="n" x-text="'de ' + n"></option></template>
+                        </select>
+                        <select x-model.number="alertaMax" @change="carregarAlerta()">
+                            <template x-for="n in [1,2,3,4,5,6,7]" :key="'mx'+n"><option :value="n" x-text="'a ' + n"></option></template>
                         </select></div>
                     <div class="export-row">
                         <a :href="alertaExportUrl('csv')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
@@ -585,8 +593,8 @@ function mapaPedidos() {
         // Base de revendedores (permanente) + modo Alerta
         revBase:{ has_data:false, estatisticas:{}, unidades:[], segmentos:[] },
         baseFile:null, baseFileName:'', baseUploading:false,
-        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'',
-        alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false,
+        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaMin:5, alertaMax:7,
+        alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false, _alertaSeq:0,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
@@ -605,6 +613,10 @@ function mapaPedidos() {
         get maxVisitas(){ return Math.max(...this.visitantes.map(v=>v.visitas||0), 1); },
         get segmentosPresentes(){ return this.segmentos.filter(s=>s.revendedores>0).map(s=>s.segmento); },
         get maxAlerta(){ return Math.max(...this.alertaCidades.map(c=>c.total||0), 1); },
+        get alertaLo(){ return Math.min(+this.alertaMin, +this.alertaMax); },
+        get alertaHi(){ return Math.max(+this.alertaMin, +this.alertaMax); },
+        get alertaFaixa(){ return this.alertaLo===this.alertaHi ? (this.alertaLo+' ciclos') : (this.alertaLo+' a '+this.alertaHi+' ciclos'); },
+        get alertaPorCiclo(){ return Object.entries(this.alertaResumo.por_ciclo||{}).map(([k,v])=>({ciclo:+k, n:v})).sort((a,b)=>a.ciclo-b.ciclo); },
 
         // ── Init ──
         async init(){
@@ -1057,17 +1069,23 @@ function mapaPedidos() {
             const p = new URLSearchParams();
             if (this.alertaUnidade) p.set('unidade', this.alertaUnidade);
             if (this.alertaSegmento) p.set('segmento', this.alertaSegmento);
+            const lo = Math.min(+this.alertaMin, +this.alertaMax);
+            const hi = Math.max(+this.alertaMin, +this.alertaMax);
+            p.set('min_ciclos', lo); p.set('max_ciclos', hi);
             for (const k in (extra||{})) p.set(k, extra[k]);
             return p;
         },
         async carregarAlerta(){
+            const seq = ++this._alertaSeq;   // só a requisição mais recente aplica o resultado
             try {
                 await this.verificarBase();
+                if (seq !== this._alertaSeq) return;
                 if (!this.revBase.has_data){ this.alertaResumo={}; this.alertaCidades=[]; this._atualizarMapa(); return; }
                 const [res, cid] = await Promise.all([
                     fetch('/api/revendedores/alerta/resumo?'+this._alertaParams()).then(r=>r.json()),
                     fetch('/api/revendedores/alerta/cidades?'+this._alertaParams()).then(r=>r.json()),
                 ]);
+                if (seq !== this._alertaSeq) return;   // uma requisição mais nova chegou primeiro
                 this.alertaResumo = res.resumo || {};
                 this.alertaCidades = cid.cidades || [];
                 this.alertaExpandida=''; this._alertaDetCache={};
@@ -1075,7 +1093,7 @@ function mapaPedidos() {
                 this.$nextTick(()=>lucide.createIcons());
             } catch(e){
                 console.error('carregarAlerta:', e);
-                this._alertaLoaded = false;   // libera nova tentativa ao reabrir o modo
+                if (seq === this._alertaSeq) this._alertaLoaded = false;   // libera retry
             }
         },
         async toggleAlertaCidade(c){
@@ -1094,27 +1112,42 @@ function mapaPedidos() {
             } catch(e){ console.error(e); this.alertaDetLoading=false; }
         },
         _injAlerta(cidade, html){ const el=document.getElementById('alerta-'+this.safeId(cidade)); if(el){ el.innerHTML=html; lucide.createIcons(); } },
+        _timelineHTML(hist){
+            return `<div style="display:flex;gap:2px;flex-wrap:nowrap;">` + (hist||[]).map(h=>{
+                const lbl = (h.ciclo||'').split('/')[0];
+                const bg = h.comprou ? 'rgba(34,197,94,.28)' : 'rgba(239,68,68,.13)';
+                const cl = h.comprou ? '#4ade80' : '#f87171';
+                const tt = this._esc(h.ciclo) + (h.comprou ? ' — comprou' : ' — não comprou');
+                return `<span title="${tt}" style="min-width:19px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;background:${bg};color:${cl};">${lbl}</span>`;
+            }).join('') + `</div>`;
+        },
         _buildAlertaDet(cli){
             const rows = cli.length ? cli.map(r=>{
                 const cc = r.inatividade>=7?'inat-high':r.inatividade>=6?'inat-mid':'';
                 const sb = (r.situacao||'').toLowerCase()==='ativo'?'sit-badge sit-ativo':'sit-badge sit-inativo';
                 return `<tr>
-                    <td style="padding:7px 12px 7px 30px;font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.nome)}</td>
+                    <td style="padding:7px 12px 7px 30px;font-weight:500;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.nome)}</td>
                     <td class="num-cell ${cc}" style="padding:7px 12px;font-weight:700;">${r.inatividade}</td>
+                    <td style="padding:7px 12px;">${this._timelineHTML(r.historico)}</td>
                     <td style="padding:7px 12px;"><span class="${sb}">${this._esc(r.situacao||'—')}</span></td>
-                    <td style="padding:7px 12px;color:var(--text-muted);">${this._esc(r.segmento||'—')}</td>
                     <td style="padding:7px 12px;font-family:monospace;font-size:.8rem;color:#a78bfa;">${this._esc(r.telefone||'—')}</td>
-                    <td style="padding:7px 12px;color:var(--text-muted);font-size:.79rem;">${this._esc(r.unidade)}</td>
-                </tr>`; }).join('') : `<tr><td colspan="6" class="empty-msg" style="padding:14px;">Sem clientes.</td></tr>`;
+                    <td style="padding:7px 12px;color:var(--text-muted);font-size:.79rem;">${this._esc(r.segmento||'—')}</td>
+                </tr>`; }).join('') : `<tr><td colspan="6" class="empty-msg" style="padding:14px;">Sem clientes nesta faixa.</td></tr>`;
             return `<div style="background:rgba(10,10,25,.6);border-top:1px solid rgba(139,92,246,.1);overflow-x:auto;">
+                <div style="padding:8px 14px 4px 30px;font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span>Histórico por ciclo:</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(34,197,94,.28);display:inline-block;"></span>comprou</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.13);display:inline-block;"></span>não comprou</span>
+                    <span style="font-style:italic;">— gaps consecutivos = churn; intercalado = comprador irregular</span>
+                </div>
                 <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
                     <thead><tr style="background:rgba(10,10,28,.7);">
                         <th style="padding:7px 12px 7px 30px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Nome</th>
                         <th style="padding:7px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Ciclos s/ comprar</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Histórico (ciclos)</th>
                         <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Situação</th>
-                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Segmento</th>
                         <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Telefone</th>
-                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Unidade</th>
+                        <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Segmento</th>
                     </tr></thead>
                     <tbody>${rows}</tbody>
                 </table></div>`;
