@@ -283,7 +283,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-21</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-22</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;" x-text="'· clientes ' + alertaFaixa + ' sem comprar'"></span>
@@ -505,8 +505,8 @@
                             <option value="">Todas</option>
                             <template x-for="s in (revBase.segmentos||[])" :key="s"><option :value="s" x-text="s"></option></template>
                         </select></div>
-                    <div class="filter-group"><label>Setor:</label>
-                        <select x-model="alertaSetor" @change="carregarAlerta()" style="max-width:230px;">
+                    <div class="filter-group"><label title="Ao escolher um setor com nome de segmento (ex.: PLATINA / Penedo), a Segmentação se ajusta sozinha pra esse segmento. Você pode trocar pra 'Todas' depois pra ver o setor inteiro.">Setor: <span style="opacity:.5;font-size:.7rem;">ⓘ</span></label>
+                        <select x-model="alertaSetor" @change="aplicarSetorAlerta()" style="max-width:230px;">
                             <option value="">Todos</option>
                             <template x-for="s in alertaSetores" :key="s.cod"><option :value="s.cod" x-text="s.nome"></option></template>
                         </select></div>
@@ -1097,6 +1097,15 @@ function mapaPedidos() {
         },
         trocarUnidadeAlerta(){   // ao trocar unidade, o setor selecionado pode não pertencer mais a ela
             this.alertaSetor=''; this.carregarAlerta();
+        },
+        aplicarSetorAlerta(){   // escolher um setor combina com a Segmentação: se o nome tem um segmento, filtra por ele
+            if (this.alertaSetor){
+                const s = this.alertaSetores.find(x=>x.cod===this.alertaSetor);
+                const nomeU = (s && s.nome || '').toUpperCase();
+                const seg = (this.revBase.segmentos||[]).find(g => nomeU.includes(g.toUpperCase()));
+                this.alertaSegmento = seg || '';   // setor "PLATINA/..." -> Platina; setor sem segmento no nome -> Todas
+            }
+            this.carregarAlerta();
         },
         async carregarAlerta(){
             const seq = ++this._alertaSeq;   // só a requisição mais recente aplica o resultado
