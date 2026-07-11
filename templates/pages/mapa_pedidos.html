@@ -283,7 +283,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-17</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-18</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;" x-text="'· clientes ' + alertaFaixa + ' sem comprar'"></span>
@@ -506,11 +506,16 @@
                             <template x-for="s in (revBase.segmentos||[])" :key="s"><option :value="s" x-text="s"></option></template>
                         </select></div>
                     <div class="filter-group"><label>Ciclos sem comprar:</label>
-                        <select x-model.number="alertaMin" @change="carregarAlerta()">
-                            <template x-for="n in [1,2,3,4,5,6,7]" :key="'mn'+n"><option :value="n" x-text="'de ' + n"></option></template>
-                        </select>
-                        <select x-model.number="alertaMax" @change="carregarAlerta()">
-                            <template x-for="n in [1,2,3,4,5,6,7]" :key="'mx'+n"><option :value="n" x-text="'a ' + n"></option></template>
+                        <select x-model="alertaFaixaSel" @change="aplicarFaixaAlerta()">
+                            <option value="5-7">5 a 7 (alerta)</option>
+                            <option value="1-7">1 a 7 (todos)</option>
+                            <option value="1-1">exatamente 1</option>
+                            <option value="2-2">exatamente 2</option>
+                            <option value="3-3">exatamente 3</option>
+                            <option value="4-4">exatamente 4</option>
+                            <option value="5-5">exatamente 5</option>
+                            <option value="6-6">exatamente 6</option>
+                            <option value="7-7">exatamente 7</option>
                         </select></div>
                     <div class="export-row">
                         <a :href="alertaExportUrl('csv')" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
@@ -593,7 +598,7 @@ function mapaPedidos() {
         // Base de revendedores (permanente) + modo Alerta
         revBase:{ has_data:false, estatisticas:{}, unidades:[], segmentos:[] },
         baseFile:null, baseFileName:'', baseUploading:false,
-        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaMin:5, alertaMax:7,
+        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaMin:5, alertaMax:7, alertaFaixaSel:'5-7',
         alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false, _alertaSeq:0,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
@@ -1075,6 +1080,11 @@ function mapaPedidos() {
             for (const k in (extra||{})) p.set(k, extra[k]);
             return p;
         },
+        aplicarFaixaAlerta(){
+            const [lo, hi] = (this.alertaFaixaSel||'5-7').split('-').map(Number);
+            this.alertaMin = lo; this.alertaMax = hi;
+            this.carregarAlerta();
+        },
         async carregarAlerta(){
             const seq = ++this._alertaSeq;   // só a requisição mais recente aplica o resultado
             try {
@@ -1104,6 +1114,7 @@ function mapaPedidos() {
             try {
                 const res = await fetch('/api/revendedores/alerta/detalhe?'+this._alertaParams({ cidade:c.cidade }));
                 const cli = (await res.json()).clientes || [];
+                if (this.alertaExpandida !== c.cidade) { this.alertaDetLoading=false; return; }  // filtro/cidade mudou -> descarta
                 const html = this._buildAlertaDet(cli);
                 this._alertaDetCache[c.cidade]=html;
                 this.alertaDetLoading=false;
@@ -1113,12 +1124,17 @@ function mapaPedidos() {
         },
         _injAlerta(cidade, html){ const el=document.getElementById('alerta-'+this.safeId(cidade)); if(el){ el.innerHTML=html; lucide.createIcons(); } },
         _timelineHTML(hist){
-            return `<div style="display:flex;gap:2px;flex-wrap:nowrap;">` + (hist||[]).map(h=>{
+            hist = hist||[];
+            let lastGreen = -1;
+            hist.forEach((h,i)=>{ if (h.comprou) lastGreen=i; });
+            return `<div style="display:flex;gap:2px;flex-wrap:nowrap;">` + hist.map((h,i)=>{
                 const lbl = (h.ciclo||'').split('/')[0];
-                const bg = h.comprou ? 'rgba(34,197,94,.28)' : 'rgba(239,68,68,.13)';
-                const cl = h.comprou ? '#4ade80' : '#f87171';
-                const tt = this._esc(h.ciclo) + (h.comprou ? ' — comprou' : ' — não comprou');
-                return `<span title="${tt}" style="min-width:19px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;background:${bg};color:${cl};">${lbl}</span>`;
+                const trailing = !h.comprou && i>lastGreen;   // vermelho do FINAL = gap que conta (= inatividade)
+                let bg, cl, extra='', st;
+                if (h.comprou){ bg='rgba(34,197,94,.28)'; cl='#4ade80'; st='comprou'; }
+                else if (trailing){ bg='rgba(239,68,68,.4)'; cl='#fecaca'; extra='box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);'; st='não comprou (gap seguido)'; }
+                else { bg='rgba(239,68,68,.09)'; cl='#f87171'; st='não comprou (intercalado)'; }
+                return `<span title="${this._esc(h.ciclo)} — ${st}" style="min-width:19px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;background:${bg};color:${cl};${extra}">${lbl}</span>`;
             }).join('') + `</div>`;
         },
         _buildAlertaDet(cli){
@@ -1137,8 +1153,9 @@ function mapaPedidos() {
                 <div style="padding:8px 14px 4px 30px;font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                     <span>Histórico por ciclo:</span>
                     <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(34,197,94,.28);display:inline-block;"></span>comprou</span>
-                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.13);display:inline-block;"></span>não comprou</span>
-                    <span style="font-style:italic;">— gaps consecutivos = churn; intercalado = comprador irregular</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.4);box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);display:inline-block;"></span>não comprou <b>seguido</b> (= a coluna "ciclos s/ comprar")</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.09);display:inline-block;"></span>pulou <b>intercalado</b> (mas voltou a comprar)</span>
+                    <span style="font-style:italic;">— gap seguido crescendo = largando a revenda</span>
                 </div>
                 <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
                     <thead><tr style="background:rgba(10,10,28,.7);">
