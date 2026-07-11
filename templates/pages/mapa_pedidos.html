@@ -283,7 +283,7 @@
             <div class="card-header">
                 <i data-lucide="map" style="color:#a78bfa; width:17px; height:17px;"></i>
                 Mapa de Alagoas
-                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-19</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:.62rem; font-weight:600; color:#4ade80; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:20px; padding:1px 7px;">build svg-20</span>
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;" x-text="'· clientes ' + alertaFaixa + ' sem comprar'"></span>
@@ -496,7 +496,7 @@
                     <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#fbbf24;"></i>
                         <span style="font-size:.82rem;">Clientes de <b x-text="alertaFaixa"></b> sem comprar (base de cadastro)</span></div>
                     <div class="filter-group"><label>Unidade:</label>
-                        <select x-model="alertaUnidade" @change="carregarAlerta()">
+                        <select x-model="alertaUnidade" @change="trocarUnidadeAlerta()">
                             <option value="">Todas</option>
                             <template x-for="u in revBase.unidades" :key="u.codigo"><option :value="u.codigo" x-text="u.nome"></option></template>
                         </select></div>
@@ -504,6 +504,11 @@
                         <select x-model="alertaSegmento" @change="carregarAlerta()">
                             <option value="">Todas</option>
                             <template x-for="s in (revBase.segmentos||[])" :key="s"><option :value="s" x-text="s"></option></template>
+                        </select></div>
+                    <div class="filter-group"><label>Setor:</label>
+                        <select x-model="alertaSetor" @change="carregarAlerta()" style="max-width:230px;">
+                            <option value="">Todos</option>
+                            <template x-for="s in alertaSetores" :key="s.cod"><option :value="s.cod" x-text="s.nome"></option></template>
                         </select></div>
                     <div class="filter-group"><label>Ciclos sem comprar:</label>
                         <select x-model="alertaFaixaSel" @change="aplicarFaixaAlerta()">
@@ -596,9 +601,9 @@ function mapaPedidos() {
         // Sort
         sortBy:'revendedores', sortDir:'desc',
         // Base de revendedores (permanente) + modo Alerta
-        revBase:{ has_data:false, estatisticas:{}, unidades:[], segmentos:[] },
+        revBase:{ has_data:false, estatisticas:{}, unidades:[], segmentos:[], setores:[] },
         baseFile:null, baseFileName:'', baseUploading:false,
-        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaMin:5, alertaMax:7, alertaFaixaSel:'5-7',
+        alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaSetor:'', alertaMin:5, alertaMax:7, alertaFaixaSel:'5-7',
         alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false, _alertaSeq:0,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
@@ -1067,13 +1072,14 @@ function mapaPedidos() {
             try {
                 const res = await fetch('/api/revendedores/status');
                 const d = await res.json();
-                this.revBase = { has_data: !!d.has_data, estatisticas: d.estatisticas||{}, unidades: d.unidades||[], segmentos: d.segmentos||[] };
+                this.revBase = { has_data: !!d.has_data, estatisticas: d.estatisticas||{}, unidades: d.unidades||[], segmentos: d.segmentos||[], setores: d.setores||[] };
             } catch(e){ console.error('base status:', e); }
         },
         _alertaParams(extra){
             const p = new URLSearchParams();
             if (this.alertaUnidade) p.set('unidade', this.alertaUnidade);
             if (this.alertaSegmento) p.set('segmento', this.alertaSegmento);
+            if (this.alertaSetor) p.set('setor', this.alertaSetor);
             const lo = Math.min(+this.alertaMin, +this.alertaMax);
             const hi = Math.max(+this.alertaMin, +this.alertaMax);
             p.set('min_ciclos', lo); p.set('max_ciclos', hi);
@@ -1084,6 +1090,13 @@ function mapaPedidos() {
             const [lo, hi] = (this.alertaFaixaSel||'5-7').split('-').map(Number);
             this.alertaMin = lo; this.alertaMax = hi;
             this.carregarAlerta();
+        },
+        get alertaSetores(){   // só os setores da unidade escolhida (setor é específico da unidade)
+            const all = this.revBase.setores || [];
+            return this.alertaUnidade ? all.filter(s=>s.unidade===this.alertaUnidade) : all;
+        },
+        trocarUnidadeAlerta(){   // ao trocar unidade, o setor selecionado pode não pertencer mais a ela
+            this.alertaSetor=''; this.carregarAlerta();
         },
         async carregarAlerta(){
             const seq = ++this._alertaSeq;   // só a requisição mais recente aplica o resultado

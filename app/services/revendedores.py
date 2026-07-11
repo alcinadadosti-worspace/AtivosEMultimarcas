@@ -282,15 +282,17 @@ def cobertura_revendedores(
 # Alerta de inatividade — clientes há X ciclos sem comprar (base)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _filtro_alerta(df_rev: pl.DataFrame, unidade, min_c: int, max_c: int, segmento=None) -> pl.DataFrame:
+def _filtro_alerta(df_rev: pl.DataFrame, unidade, min_c: int, max_c: int, segmento=None, setor=None) -> pl.DataFrame:
     d = _filtrar_unidade(df_rev, unidade)
     if segmento:
         d = d.filter(pl.col("_segmento") == segmento)
+    if setor:
+        d = d.filter(pl.col("_setor_cod") == str(setor))   # código único por setor (nome pode repetir entre unidades)
     return d.filter((pl.col("_inatividade") >= min_c) & (pl.col("_inatividade") <= max_c))
 
 
-def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> Dict[str, Any]:
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
+def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None, setor=None) -> Dict[str, Any]:
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento, setor)
     return {
         "total": d.height,
         "por_ciclo": {
@@ -302,9 +304,9 @@ def alerta_resumo(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento
     }
 
 
-def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> List[Dict[str, Any]]:
+def alerta_por_cidade(df_rev, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None, setor=None) -> List[Dict[str, Any]]:
     """Quantidade de clientes em alerta por cidade de cadastro (residencial)."""
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento, setor)
     if d.is_empty():
         return []
     d = d.with_columns(
@@ -335,10 +337,10 @@ def _ciclos_comprados_por_cod(df_ped) -> Dict[str, set]:
     return {r["_cod"]: set(r["ciclos"]) for r in d.iter_rows(named=True)}
 
 
-def alerta_detalhe_cidade(df_rev, cidade: str, df_ped=None, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None) -> Dict[str, Any]:
+def alerta_detalhe_cidade(df_rev, cidade: str, df_ped=None, unidade=None, min_c: int = 5, max_c: int = 7, segmento=None, setor=None) -> Dict[str, Any]:
     """Clientes em alerta de uma cidade + histórico de compras por ciclo (do
     arquivo de pedidos), pra distinguir inatividade intercalada de consecutiva."""
-    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento)
+    d = _filtro_alerta(df_rev, unidade, min_c, max_c, segmento, setor)
     alvo = cidade.strip().lower()
     if alvo == "não informado":   # cidade agrupada no ranking = _cidade vazia
         d = d.filter(pl.col("_cidade") == "")
@@ -378,3 +380,19 @@ def obter_segmentos_base(df_rev: pl.DataFrame) -> List[str]:
     segs = df_rev.select("_segmento").unique().to_series().to_list()
     ordem = {s: i for i, s in enumerate(SEGMENTOS_ORDEM)}
     return sorted([s for s in segs if s], key=lambda s: ordem.get(s, 999))
+
+
+def obter_setores_base(df_rev: pl.DataFrame) -> List[Dict[str, str]]:
+    """Setores (EstruturaComercial) da base, com o código da unidade a que
+    pertencem — o front usa isso pra mostrar só os setores da unidade escolhida.
+    Filtra por `_setor_cod` (único); o nome pode repetir entre unidades (ex.: SETOR PADRÃO)."""
+    s = (
+        df_rev.select(["_setor_cod", "_setor", "_cod_unidade"])
+        .filter(pl.col("_setor") != "")
+        .unique(subset=["_setor_cod"], keep="first")
+        .sort(["_cod_unidade", "_setor"])
+    )
+    return [
+        {"cod": r["_setor_cod"], "nome": r["_setor"], "unidade": r["_cod_unidade"]}
+        for r in s.iter_rows(named=True)
+    ]
