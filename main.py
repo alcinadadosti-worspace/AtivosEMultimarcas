@@ -126,6 +126,26 @@ async def lifespan(app: FastAPI):
         app.state.df_revendedores = None
         app.state.df_revendedores_stats = {}
 
+    # Load persistent market coverage table (Tabela - Cobertura por cidades)
+    from app.config import MERCADO_PARQUET_PATH, MERCADO_STATS_PATH
+    if os.path.exists(MERCADO_PARQUET_PATH):
+        try:
+            app.state.df_mercado = pl.read_parquet(MERCADO_PARQUET_PATH)
+            print(f"[INFO] Market coverage loaded: {len(app.state.df_mercado)} cities")
+        except Exception as e:
+            print(f"[WARN] Failed to load market coverage parquet: {e}")
+            app.state.df_mercado = None
+        app.state.df_mercado_stats = {}
+        try:
+            if os.path.exists(MERCADO_STATS_PATH):
+                with open(MERCADO_STATS_PATH, encoding="utf-8") as f:
+                    app.state.df_mercado_stats = json.load(f)
+        except Exception as e:
+            print(f"[WARN] Failed to load market coverage stats: {e}")
+    else:
+        app.state.df_mercado = None
+        app.state.df_mercado_stats = {}
+
     yield
 
     # Shutdown

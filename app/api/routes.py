@@ -102,7 +102,8 @@ from app.services.pedidos import (
     obter_filtros as ped_obter_filtros,
 )
 from app.services import revendedores as rev_svc
-from app.config import REV_PARQUET_PATH, REV_STATS_PATH
+from app.services import mercado as mercado_svc
+from app.config import REV_PARQUET_PATH, REV_STATS_PATH, MERCADO_PARQUET_PATH, MERCADO_STATS_PATH
 
 
 # Router for API endpoints
@@ -2822,6 +2823,108 @@ async def alerta_export(
         content=exportar_excel(df_export, "Alerta"),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=clientes_alerta.xlsx"},
+    )
+
+
+# =============================================================================
+# MERCADO — cobertura por cidade vs população (modo "Onde investir" do mapa)
+# =============================================================================
+
+def _get_df_mercado(request: Request):
+    df = getattr(request.app.state, "df_mercado", None)
+    if df is None or df.is_empty():
+        return None
+    return df
+
+
+@api_router.post("/mercado/upload")
+async def mercado_upload(request: Request, file: UploadFile = File(...)):
+    """Importa a Tabela de Cobertura por cidades (população/tier — persistente)."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Use o Excel da Tabela de Cobertura por cidades (.xlsx)")
+    try:
+        content = await file.read()
+        resultado = mercado_svc.processar_planilha_mercado(content, file.filename)
+        tmp_parquet = MERCADO_PARQUET_PATH + ".tmp"
+        resultado["df"].write_parquet(tmp_parquet)
+        os.replace(tmp_parquet, MERCADO_PARQUET_PATH)
+        tmp_stats = MERCADO_STATS_PATH + ".tmp"
+        with open(tmp_stats, "w", encoding="utf-8") as fh:
+            _json.dump(resultado["estatisticas"], fh, ensure_ascii=False)
+        os.replace(tmp_stats, MERCADO_STATS_PATH)
+        request.app.state.df_mercado = resultado["df"]
+        request.app.state.df_mercado_stats = resultado["estatisticas"]
+        return {"success": True, "message": "Tabela de cobertura salva", "estatisticas": resultado["estatisticas"]}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar tabela: {str(e)}")
+
+
+@api_router.get("/mercado/status")
+async def mercado_status(request: Request):
+    df = _get_df_mercado(request)
+    return {
+        "has_data": df is not None,
+        "estatisticas": getattr(request.app.state, "df_mercado_stats", {}) or {},
+    }
+
+
+@api_router.post("/mercado/clear")
+async def mercado_clear(request: Request):
+    request.app.state.df_mercado = None
+    request.app.state.df_mercado_stats = {}
+    for path in (MERCADO_PARQUET_PATH, MERCADO_STATS_PATH):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    return {"success": True}
+
+
+@api_router.get("/mercado/cidades")
+async def mercado_cidades(
+    request: Request,
+    session: tuple = Depends(get_user_session),
+):
+    """Cobertura viva por cidade: população da tabela × base de revendedores."""
+    _, session_data = session
+    df_mercado = _get_df_mercado(request)
+    df_rev = _get_df_rev(request)
+    if df_mercado is None:
+        return {"tem_tabela": False, "tem_base": df_rev is not None}
+    if df_rev is None:
+        return {"tem_tabela": True, "tem_base": False}
+    dados = mercado_svc.calcular_mercado(df_mercado, df_rev, df_ped=_get_df_pedidos(session_data))
+    return {"tem_tabela": True, "tem_base": True, **dados}
+
+
+@api_router.get("/mercado/export")
+async def mercado_export(
+    request: Request,
+    formato: str = Query("xlsx", pattern="^(csv|xlsx)$"),
+    session: tuple = Depends(get_user_session),
+):
+    _, session_data = session
+    df_mercado = _get_df_mercado(request)
+    df_rev = _get_df_rev(request)
+    if df_mercado is None or df_rev is None:
+        raise HTTPException(status_code=400, detail="Tabela de cobertura ou base de revendedores não carregada")
+    dados = mercado_svc.calcular_mercado(df_mercado, df_rev, df_ped=_get_df_pedidos(session_data))
+    linhas = [{k: v for k, v in c.items() if k != "chave"} for c in dados["cidades"]]
+    df_export = pl.DataFrame(linhas)
+    if formato == "csv":
+        return Response(
+            content=exportar_csv(df_export),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=onde_investir.csv"},
+        )
+    return Response(
+        content=exportar_excel(df_export, "OndeInvestir"),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=onde_investir.xlsx"},
     )
 
 

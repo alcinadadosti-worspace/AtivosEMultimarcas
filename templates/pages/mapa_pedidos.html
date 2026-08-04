@@ -287,6 +287,7 @@
                 <span class="sub" x-show="mapMode==='intensidade'" x-text="'· por ' + metricaLabel"></span>
                 <span class="sub" x-show="mapMode==='composicao'" x-text="'· cor = segmento com mais ' + metricaLabel.toLowerCase()"></span>
                 <span class="sub" x-show="mapMode==='alerta'" style="color:#fbbf24;" x-text="'· clientes ' + alertaFaixa + ' sem comprar'"></span>
+                <span class="sub" x-show="mapMode==='mercado'" style="color:#4ade80;" x-text="'· cobertura vs meta ' + (mercadoDados.meta||13) + '/mil habitantes'"></span>
                 <div class="mode-toggle">
                     <button class="metric-chip" :class="mapMode==='intensidade' ? 'active' : ''" @click="setMapMode('intensidade')">
                         <i data-lucide="flame"></i> Intensidade
@@ -297,11 +298,14 @@
                     <button class="metric-chip" :class="mapMode==='alerta' ? 'active' : ''" @click="setMapMode('alerta')" style="border-color:rgba(251,191,36,.4);">
                         <i data-lucide="alert-triangle"></i> Alerta
                     </button>
+                    <button class="metric-chip" :class="mapMode==='mercado' ? 'active' : ''" @click="setMapMode('mercado')" style="border-color:rgba(74,222,128,.4);">
+                        <i data-lucide="target"></i> Onde investir
+                    </button>
                 </div>
             </div>
 
             <!-- Sub-bar: métrica (Intensidade = escala de cor; Composição = define o segmento predominante) -->
-            <div class="map-subbar" x-show="mapMode!=='alerta'">
+            <div class="map-subbar" x-show="mapMode!=='alerta' && mapMode!=='mercado'">
                 <span class="map-subbar-label" x-text="mapMode==='composicao' ? 'Predominância por:' : 'Colorir por:'"></span>
                 <div class="metric-chips">
                     <template x-for="m in metricas" :key="m.key">
@@ -335,10 +339,17 @@
                 <span>Muitos em alerta</span>
                 <span style="margin-left:auto; font-style:italic;" x-text="alertaFaixa + ' sem comprar · clique numa cidade para ver os clientes'"></span>
             </div>
+            <!-- Legenda: onde investir (farol da meta) -->
+            <div class="map-legend" x-show="mapMode==='mercado'" style="flex-wrap:wrap; gap:12px;">
+                <span class="seg-legend"><span class="seg-dot" style="background:#f87171;"></span>fora do ritmo (precisa acelerar)</span>
+                <span class="seg-legend"><span class="seg-dot" style="background:#fbbf24;"></span>abaixo da meta, mas o ritmo atual alcança</span>
+                <span class="seg-legend"><span class="seg-dot" style="background:#4ade80;"></span>meta batida — manter</span>
+                <span style="margin-left:auto; font-style:italic;">meta até o fim do ano · clique numa cidade para achar na tabela</span>
+            </div>
         </div>
 
-        <!-- ══ Painéis do modo Pedidos (ocultos no Alerta) ══ -->
-        <div x-show="mapMode!=='alerta'">
+        <!-- ══ Painéis do modo Pedidos (ocultos no Alerta e no Onde investir) ══ -->
+        <div x-show="mapMode!=='alerta' && mapMode!=='mercado'">
 
         <!-- Segment distribution -->
         <div class="card">
@@ -573,6 +584,104 @@
             </template>
         </div><!-- /alerta -->
 
+        <!-- ══════════════ MODO ONDE INVESTIR (cobertura vs população) ══════════════ -->
+        <div x-show="mapMode==='mercado'">
+
+            <!-- Tabela de cobertura ainda não carregada -->
+            <template x-if="!mercado.has_data">
+                <div class="upload-card" style="margin:10px auto 0;">
+                    <div class="upload-icon"><i data-lucide="target" style="width:28px;height:28px;"></i></div>
+                    <h3>Tabela de cobertura por cidades</h3>
+                    <p>Suba a planilha <strong>Tabela - Cobertura por cidades</strong> (com População e Tier).<br>Dela usamos a <b>população</b> de cada cidade — que não muda. A cobertura é calculada ao vivo contra a base de revendedores, então fica <span style="color:#4ade80;">salva no servidor</span> e só precisa re-subir se as cidades mudarem.</p>
+                    <div class="upload-input-row">
+                        <label class="file-label"><i data-lucide="file-spreadsheet" style="width:14px;height:14px;"></i> Escolher arquivo
+                            <input type="file" accept=".xlsx,.xls" style="display:none" @change="onMercadoFile($event)"></label>
+                        <span class="file-name-display" x-text="mercadoFileName || 'Nenhum arquivo selecionado'"></span>
+                    </div>
+                    <button class="btn-upload" :disabled="!mercadoFile || mercadoUploading" @click="uploadMercado()">
+                        <template x-if="mercadoUploading"><span class="loading-spinner"></span></template>
+                        <i x-show="!mercadoUploading" data-lucide="database" style="width:15px;height:15px;"></i>
+                        <span x-text="mercadoUploading ? 'Salvando...' : 'Salvar tabela'"></span>
+                    </button>
+                </div>
+            </template>
+
+            <!-- Tem tabela mas falta a base de revendedores -->
+            <template x-if="mercado.has_data && !revBase.has_data">
+                <div class="upload-card" style="margin:10px auto 0;">
+                    <div class="upload-icon"><i data-lucide="alert-triangle" style="width:28px;height:28px;"></i></div>
+                    <h3>Falta a base de revendedores</h3>
+                    <p>A cobertura é calculada contra a <strong>Consulta de Revendedores</strong>. Suba a base na aba <b>Alerta</b> — depois volte aqui.</p>
+                </div>
+            </template>
+
+            <!-- Tudo carregado -->
+            <template x-if="mercado.has_data && revBase.has_data">
+            <div>
+                <div class="ped-stats">
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="user-plus"></i> Faltam no território</div><div class="ped-stat-value" style="color:#f87171;" x-text="fmtNum((mercadoDados.resumo||{}).deficit)"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="gauge"></i> Ritmo necessário</div><div class="ped-stat-value" x-text="fmtNum((mercadoDados.resumo||{}).ritmo_territorio) + '/ciclo'"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="trending-down"></i> Cidades abaixo</div><div class="ped-stat-value" style="color:#fbbf24;" x-text="fmtNum((mercadoDados.resumo||{}).cidades_abaixo)"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="check-circle"></i> Na meta</div><div class="ped-stat-value" style="color:#4ade80;" x-text="fmtNum((mercadoDados.resumo||{}).cidades_ok)"></div></div>
+                    <div class="ped-stat"><div class="ped-stat-top"><i data-lucide="circle-dot"></i> Ciclos restantes</div><div class="ped-stat-value" x-text="fmtNum(mercadoDados.ciclos_restantes)"></div></div>
+                </div>
+
+                <div class="ped-filters">
+                    <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#4ade80;"></i>
+                        <span style="font-size:.82rem;">Meta: base ≥ <b x-text="(mercadoDados.meta||13) + ' por mil habitantes'"></b> até o ciclo <b x-text="mercadoDados.ciclos_ano + '/' + ((mercadoDados.ciclo_ref||'').split('/')[1]||'')"></b>
+                            · agora: ciclo <b x-text="mercadoDados.ciclo_ref"></b>
+                            · a base viva vem da Consulta de Revendedores — re-suba a base (aba Alerta) a cada ciclo e este painel se atualiza sozinho.</span></div>
+                    <div class="export-row">
+                        <a href="/api/mercado/export?formato=csv" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
+                        <a href="/api/mercado/export?formato=xlsx" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>Excel</a>
+                        <button @click="removerMercado()" class="btn-sm" style="color:#f87171;border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);"><i data-lucide="refresh-ccw" style="width:11px;height:11px;"></i> Trocar tabela</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><i data-lucide="target" style="color:#4ade80;width:17px;height:17px;"></i> Onde investir — cidade a cidade
+                        <span class="sub" x-text="'(' + (mercadoDados.cidades||[]).length + ' cidades)'"></span>
+                        <span class="sub" style="margin-left:auto;">faltam = cadastros líquidos até a meta · paradas ≥ 3 ciclos s/ comprar (reativar não sobe cobertura, mas impede a queda)</span></div>
+                    <div class="tbl-scroll">
+                        <table class="ftable">
+                            <thead><tr>
+                                <th class="no-sort" style="width:34px;" title="verde: meta batida · amarelo: abaixo, mas o ritmo histórico alcança · vermelho: precisa acelerar">Farol</th>
+                                <th class="no-sort">Cidade</th>
+                                <th class="no-sort">Tier</th>
+                                <th class="num-cell no-sort">População</th>
+                                <th class="num-cell no-sort" title="Clientes na base de revendedores (viva)">Base</th>
+                                <th class="num-cell no-sort" title="Base × 1000 ÷ População">Cobertura</th>
+                                <th class="num-cell no-sort" title="Meta × População ÷ 1000">Alvo</th>
+                                <th class="num-cell no-sort" title="Cadastros líquidos que faltam até o alvo">Faltam</th>
+                                <th class="num-cell no-sort" title="Faltam ÷ ciclos restantes">Ritmo nec./ciclo</th>
+                                <th class="num-cell no-sort" title="Cadastros por ciclo nos últimos 6 ciclos (da própria base)">Ritmo atual</th>
+                                <th class="num-cell no-sort" title="Clientes ≥ 3 ciclos sem comprar — a lista está na aba Alerta">Paradas</th>
+                            </tr></thead>
+                            <tbody>
+                                <template x-for="c in (mercadoDados.cidades||[])" :key="c.chave">
+                                    <tr :id="'mercado-' + safeId(c.cidade)">
+                                        <td :title="c.farol==='verde'?'meta batida':(c.farol==='amarelo'?'abaixo da meta, ritmo atual alcança':'fora do ritmo — acelerar')"><span :style="'width:13px;height:13px;display:inline-block;border-radius:50%;background:'+corFarol(c.farol)+';box-shadow:0 0 6px '+corFarol(c.farol)+'55;'"></span></td>
+                                        <td style="font-weight:500;" x-text="c.cidade"></td>
+                                        <td style="color:var(--text-muted);font-size:.78rem;" x-text="c.tier || '—'"></td>
+                                        <td class="num-cell" x-text="fmtNum(c.pop)"></td>
+                                        <td class="num-cell" x-text="fmtNum(c.base)"></td>
+                                        <td class="num-cell" :style="c.faltam>0 ? 'color:#fbbf24;font-weight:700;' : 'color:#4ade80;font-weight:700;'" x-text="c.cobertura.toFixed(1).replace('.',',')"></td>
+                                        <td class="num-cell" x-text="fmtNum(c.alvo)"></td>
+                                        <td class="num-cell" :style="c.faltam>0 ? 'color:#f87171;font-weight:700;' : ''" x-text="c.faltam>0 ? fmtNum(c.faltam) : ('+' + fmtNum(c.excedente))"></td>
+                                        <td class="num-cell" x-text="c.faltam>0 ? fmtNum(c.ritmo_necessario) : '—'"></td>
+                                        <td class="num-cell" style="color:var(--text-muted);" x-text="c.ritmo_historico.toFixed(1).replace('.',',')"></td>
+                                        <td class="num-cell" style="color:#fbbf24;" x-text="fmtNum(c.paradas)"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="(mercadoDados.cidades||[]).length===0"><td colspan="11" class="empty-msg">Carregando cidades...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            </template>
+        </div><!-- /mercado -->
+
     </div>
     </template>
 
@@ -612,6 +721,9 @@ function mapaPedidos() {
         baseFile:null, baseFileName:'', baseUploading:false,
         alertaResumo:{}, alertaCidades:[], alertaUnidade:'', alertaSegmento:'', alertaSetor:'', alertaMin:5, alertaMax:7, alertaFaixaSel:'5-7',
         alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false, _alertaSeq:0,
+        // Onde investir (cobertura vs população)
+        mercado:{ has_data:false, estatisticas:{} },
+        mercadoDados:{}, mercadoFile:null, mercadoFileName:'', mercadoUploading:false, _mercadoLoaded:false,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
@@ -723,6 +835,7 @@ function mapaPedidos() {
             this.mapMode = mode;
             this._atualizarMapa();   // sincrono: já limpa donuts / aplica a cor do modo
             if (mode==='alerta' && !this._alertaLoaded){ this._alertaLoaded=true; this.carregarAlerta(); }
+            if (mode==='mercado' && !this._mercadoLoaded){ this._mercadoLoaded=true; this.carregarMercado(); }
             this.$nextTick(()=>lucide.createIcons());
         },
 
@@ -846,6 +959,10 @@ function mapaPedidos() {
                             layer.setTooltipContent(self._tooltipCidade(nome));
                         });
                         layer.on('click', ()=>{
+                            if (self.mapMode==='mercado'){
+                                if (self._mercadoInfo(nome)){ self._map.fitBounds(layer.getBounds(), { padding:[40,40] }); self.focarMercadoDoMapa(nome); }
+                                return;
+                            }
                             if (self.mapMode==='alerta'){
                                 const a = self._alertaInfo(nome);
                                 if (a){ self._map.fitBounds(layer.getBounds(), { padding:[40,40] }); self.expandirAlertaDoMapa(a.cidade); }
@@ -863,6 +980,18 @@ function mapaPedidos() {
             } catch(e){ console.error('GeoJSON IBGE:', e); }
         },
         _tooltipCidade(nome){
+            // Onde investir: cobertura vs meta + o que fazer.
+            if (this.mapMode==='mercado'){
+                const m = this._mercadoInfo(nome);
+                if (!m) return `<strong>${this._esc(nome)}</strong><br><span style="color:var(--text-muted);">fora da tabela de cobertura</span>`;
+                let acao;
+                if (m.faltam===0) acao = `<span style="color:#4ade80;">meta batida · manter ≥ ${this.fmtNum(m.alvo)}</span>`;
+                else acao = `<span style="color:${m.farol==='vermelho'?'#f87171':'#fbbf24'};">faltam ${this.fmtNum(m.faltam)} · ${m.ritmo_necessario}/ciclo (ritmo atual ${String(m.ritmo_historico).replace('.',',')})</span>`;
+                return `<strong>${this._esc(m.cidade)}</strong><br>`+
+                    `Cobertura: <b>${String(m.cobertura).replace('.',',')}</b>/mil · meta ${this.mercadoDados.meta||13}<br>`+
+                    `Base: ${this.fmtNum(m.base)} · alvo ${this.fmtNum(m.alvo)}<br>`+
+                    acao + `<br><span style="color:#fbbf24;">${this.fmtNum(m.paradas)} paradas</span> (≥ 3 ciclos s/ comprar)`;
+            }
             // Alerta: quantos clientes em alerta (5–7 ciclos sem comprar).
             if (this.mapMode==='alerta'){
                 const a = this._alertaInfo(nome);
@@ -896,6 +1025,15 @@ function mapaPedidos() {
         },
         _estilo(feature){
             const nome = feature.properties.nome;
+            // Modo onde investir: cor = farol da meta de cobertura.
+            if (this.mapMode==='mercado'){
+                const m = this._mercadoInfo(nome);
+                if (!m) return { fillColor:'#1a1a3e', fillOpacity:0.10, color:'rgba(139,92,246,.2)', weight:0.5 };
+                const cor = this.corFarol(m.farol);
+                // opacidade cresce com o tamanho do buraco (faltam / alvo)
+                const op = m.faltam>0 ? 0.45 + 0.4*Math.min(1, m.faltam/Math.max(1,m.alvo)) : 0.45;
+                return { fillColor:cor, fillOpacity:op, color:cor, weight:1 };
+            }
             // Modo alerta: pinta a cidade pela quantidade de clientes em alerta.
             if (this.mapMode==='alerta'){
                 const a = this._alertaInfo(nome);
@@ -1228,6 +1366,7 @@ function mapaPedidos() {
                 const data = await res.json();
                 if (!res.ok){ showToast(data.detail || 'Erro ao salvar base', 'error'); return; }
                 showToast('Base salva com sucesso!', 'success');
+                this._mercadoLoaded=false; this.mercadoDados={};   // cobertura recalcula com a base nova
                 await this.carregarAlerta();
             } catch(e){ showToast('Erro ao enviar base', 'error'); }
             finally { this.baseUploading=false; this.baseFile=null; this.baseFileName=''; this.$nextTick(()=>lucide.createIcons()); }
@@ -1238,8 +1377,66 @@ function mapaPedidos() {
             this.revBase = { has_data:false, estatisticas:{}, unidades:[], segmentos:[] };
             this.alertaResumo={}; this.alertaCidades=[]; this.alertaExpandida=''; this._alertaDetCache={};
             this.alertaUnidade=''; this.alertaSegmento=''; this._alertaLoaded=false;
+            this.mercadoDados={}; this._mercadoLoaded=false;   // cobertura depende da base
             this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
+        },
+
+        // ── Onde investir (cobertura vs população) ──
+        corFarol(f){ return { verde:'#4ade80', amarelo:'#fbbf24', vermelho:'#f87171' }[f] || '#64748b'; },
+        // chave igual à do backend: sem acento, só letras/números — casa
+        // "OLHO D'AGUA" (base), "OLHO D AGUA" (tabela) e "Olho d'Água Grande" (IBGE)
+        _chaveCidade(s){ return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,''); },
+        _mercadoInfo(nome){
+            const k = this._chaveCidade(nome);
+            return (this.mercadoDados.cidades||[]).find(c=>c.chave===k);
+        },
+        async carregarMercado(){
+            try {
+                const st = await fetch('/api/mercado/status').then(r=>r.json());
+                this.mercado = { has_data: !!st.has_data, estatisticas: st.estatisticas||{} };
+                await this.verificarBase();
+                if (!this.mercado.has_data || !this.revBase.has_data){ this.mercadoDados={}; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); return; }
+                const d = await fetch('/api/mercado/cidades').then(r=>r.json());
+                this.mercadoDados = (d.tem_tabela && d.tem_base) ? d : {};
+                this._atualizarMapa();
+                this.$nextTick(()=>lucide.createIcons());
+            } catch(e){
+                console.error('carregarMercado:', e);
+                this._mercadoLoaded = false;   // libera retry
+            }
+        },
+        onMercadoFile(e){ const f=e.target.files[0]; if(f){ this.mercadoFile=f; this.mercadoFileName=f.name; } },
+        async uploadMercado(){
+            if (!this.mercadoFile || this.mercadoUploading) return;
+            this.mercadoUploading = true;
+            try {
+                const form = new FormData(); form.append('file', this.mercadoFile);
+                const res = await fetch('/api/mercado/upload', { method:'POST', body:form });
+                const data = await res.json();
+                if (!res.ok){ showToast(data.detail || 'Erro ao salvar tabela', 'error'); return; }
+                showToast('Tabela de cobertura salva!', 'success');
+                await this.carregarMercado();
+            } catch(e){ showToast('Erro ao enviar tabela', 'error'); }
+            finally { this.mercadoUploading=false; this.mercadoFile=null; this.mercadoFileName=''; this.$nextTick(()=>lucide.createIcons()); }
+        },
+        async removerMercado(){
+            if (!confirm('Trocar/remover a tabela de cobertura salva?')) return;
+            await fetch('/api/mercado/clear', { method:'POST' });
+            this.mercado = { has_data:false, estatisticas:{} };
+            this.mercadoDados={};
+            this._atualizarMapa();
+            this.$nextTick(()=>lucide.createIcons());
+        },
+        focarMercadoDoMapa(cidade){
+            const c = this._mercadoInfo(cidade);
+            if (!c) return;
+            const el = document.getElementById('mercado-'+this.safeId(c.cidade));
+            if (el){
+                el.scrollIntoView({behavior:'smooth', block:'center'});
+                el.style.transition='background .3s'; el.style.background='rgba(74,222,128,.15)';
+                setTimeout(()=>{ el.style.background=''; }, 1600);
+            }
         },
 
         async limparDados(){

@@ -230,3 +230,22 @@ REV_REQUIRED_COLUMNS = [REV_COL_CODIGO, REV_COL_SITUACAO]
 # Persistente (sobrevive a restart/deploy via Render Disk)
 REV_PARQUET_PATH = str(PERSISTENT_DIR / "revendedores_base.parquet")
 REV_STATS_PATH   = str(PERSISTENT_DIR / "revendedores_base_stats.json")
+
+# =============================================================================
+# MERCADO (Tabela - Cobertura por cidades) — população e meta de cobertura
+# =============================================================================
+# A planilha entra com a POPULAÇÃO de cada cidade (estática) + Tier/RPA de
+# referência. O numerador da cobertura vem VIVO da base de revendedores:
+# re-subir a ConsultaRevendedores atualiza cobertura/faltantes sozinho.
+MERCADO_COL_CIDADE = "Cidade"
+MERCADO_COL_TIER = "Tier"
+MERCADO_COL_POP = "População"
+MERCADO_COL_BASE_TOTAL = "Base Total"       # snapshot de referência (não usado na conta viva)
+MERCADO_COL_RPA = "RPA"
+MERCADO_COL_ATIVIDADE = "Atividade"
+
+META_COBERTURA = 13.0        # clientes por mil habitantes, meta de fim de ano
+CICLOS_POR_ANO = 17          # calendário GB (~17 ciclos/ano)
+
+MERCADO_PARQUET_PATH = str(PERSISTENT_DIR / "mercado_cidades.parquet")
+MERCADO_STATS_PATH   = str(PERSISTENT_DIR / "mercado_cidades_stats.json")
