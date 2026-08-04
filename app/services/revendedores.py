@@ -298,6 +298,23 @@ def cobertura_revendedores(
 # divergir. Sem arquivo de pedidos na sessão, cai para a coluna da base.
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _marcos(ciclos: List[str], idx: Dict[str, int], comprou: set, ciclo_primeiro: str):
+    """(ini, ult) da janela do arquivo:
+      ini — 1º ciclo em que o cliente já era revendedor. Começou antes da
+            janela -> 0; começou depois dela -> len(ciclos), e aí nenhum ciclo
+            conta (senão um cadastro novo apareceria como "abandonando").
+      ult — último ciclo em que comprou (-1 se não comprou em nenhum).
+    """
+    if not ciclo_primeiro:
+        ini = 0
+    elif ciclo_primeiro in idx:
+        ini = idx[ciclo_primeiro]
+    else:
+        ini = len(ciclos) if _ordem_ciclo(ciclo_primeiro) > _ordem_ciclo(ciclos[-1]) else 0
+    ult = max((idx[c] for c in comprou if c in idx), default=-1)
+    return ini, ult
+
+
 def _estados_ciclo(ciclos: List[str], comprou: set, ciclo_primeiro: str) -> List[Dict[str, str]]:
     """Situação do cliente em cada ciclo do arquivo:
       comprou      — fez pedido no ciclo
@@ -305,9 +322,10 @@ def _estados_ciclo(ciclos: List[str], comprou: set, ciclo_primeiro: str) -> List
       gap          — sem comprar daí até hoje; é isto que a contagem soma
       intercalado  — pulou o ciclo, mas voltou a comprar depois; não conta
     """
+    if not ciclos:
+        return []
     idx = {c: i for i, c in enumerate(ciclos)}
-    ini = idx.get(ciclo_primeiro or "", 0)                       # fora da janela -> começo
-    ult = max((idx[c] for c in comprou if c in idx), default=-1)  # último ciclo comprado
+    ini, ult = _marcos(ciclos, idx, comprou, ciclo_primeiro)
     out = []
     for i, c in enumerate(ciclos):
         if c in comprou:
@@ -334,9 +352,8 @@ def _gaps_do_arquivo(df_rev: pl.DataFrame, df_ped) -> Dict[str, int]:
     gaps: Dict[str, int] = {}
     for r in df_rev.select(["_cod", "_ciclo_primeiro"]).iter_rows(named=True):
         comprou = compras.get(r["_cod"], set())
-        ult = max((idx[c] for c in comprou if c in idx), default=-1)
-        ini = idx.get(r["_ciclo_primeiro"] or "", 0)
-        gaps[r["_cod"]] = n - 1 - max(ult, ini - 1)
+        ini, ult = _marcos(ciclos, idx, comprou, r["_ciclo_primeiro"])
+        gaps[r["_cod"]] = n - 1 - max(ult, ini - 1)   # = nº de ciclos marcados "gap"
     return gaps
 
 
