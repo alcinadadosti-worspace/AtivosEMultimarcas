@@ -698,7 +698,7 @@ function mapaPedidos() {
             this.composicao = comp.composicao || [];
             if (filtros) this.filterOptions = filtros;
             // reset accordions on data change
-            this.expandida = ''; this._detCache = {};
+            this.expandida = ''; this._detCache = {}; this._limparInjetados('acc-');
             this.$nextTick(()=>lucide.createIcons());
         },
 
@@ -727,12 +727,19 @@ function mapaPedidos() {
 
         // ── Accordion ──
         safeId(cidade){ return (cidade||'').replace(/[^a-zA-Z0-9]/g,'_'); },
+        // O conteúdo do drill-down é injetado via innerHTML em divs que o x-for
+        // reaproveita pela :key (cidade). Trocar o filtro NÃO limpa esses divs
+        // sozinho — sem isso, reabrir a cidade mostra a lista do filtro anterior.
+        _limparInjetados(prefixo){
+            document.querySelectorAll('[id^="'+prefixo+'"]').forEach(el=>{ el.innerHTML=''; });
+        },
         async toggleCidade(c){
             if (this.expandida === c.cidade){ this.expandida=''; return; }
             this.expandida = c.cidade;
             if (this._detCache[c.cidade]){
                 await this.$nextTick(); this._injetar(c.cidade, this._detCache[c.cidade]); return;
             }
+            this._injetar(c.cidade, '');   // nada de conteúdo antigo aparecendo enquanto o fetch não volta
             this.detalheLoading = true;
             try {
                 const res = await fetch('/api/pedidos/cidade/detalhe?'+this._params({ cidade:c.cidade }));
@@ -1120,7 +1127,7 @@ function mapaPedidos() {
                 if (seq !== this._alertaSeq) return;   // uma requisição mais nova chegou primeiro
                 this.alertaResumo = res.resumo || {};
                 this.alertaCidades = cid.cidades || [];
-                this.alertaExpandida=''; this._alertaDetCache={};
+                this.alertaExpandida=''; this._alertaDetCache={}; this._limparInjetados('alerta-');
                 this._atualizarMapa();
                 this.$nextTick(()=>lucide.createIcons());
             } catch(e){
@@ -1132,6 +1139,7 @@ function mapaPedidos() {
             if (this.alertaExpandida===c.cidade){ this.alertaExpandida=''; return; }
             this.alertaExpandida = c.cidade;
             if (this._alertaDetCache[c.cidade]){ await this.$nextTick(); this._injAlerta(c.cidade, this._alertaDetCache[c.cidade]); return; }
+            this._injAlerta(c.cidade, '');   // nada de conteúdo antigo aparecendo enquanto o fetch não volta
             this.alertaDetLoading = true;
             const seq = this._alertaSeq;   // vincula ao filtro atual (muda em carregarAlerta)
             try {

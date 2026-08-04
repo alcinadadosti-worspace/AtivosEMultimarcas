@@ -147,12 +147,21 @@ def _filtrar_unidade(df: pl.DataFrame, unidade: Optional[str]) -> pl.DataFrame:
     return df
 
 
+def _ordem_ciclo(c: str):
+    """Ciclo vem como 'MM/AAAA'. Ordem alfabética quebra na virada do ano
+    ('01/2027' viria antes de '11/2026'), e a timeline depende da ordem certa."""
+    p = c.split("/")
+    if len(p) == 2 and p[0].strip().isdigit() and p[1].strip().isdigit():
+        return (1, int(p[1]), int(p[0]), c)
+    return (0, 0, 0, c)   # formato inesperado -> alfabético, antes dos demais
+
+
 def ciclos_do_arquivo(df_ped: pl.DataFrame) -> List[str]:
     vals = (
         df_ped.select(pl.col(PED_COL_CICLO).cast(pl.Utf8).str.strip_chars())
         .to_series().drop_nulls().unique().to_list()
     )
-    return sorted(c for c in vals if c)
+    return sorted((c for c in vals if c), key=_ordem_ciclo)
 
 
 def cobertura_resumo(df_rev: pl.DataFrame, df_ped: pl.DataFrame, unidade: Optional[str] = None) -> Dict[str, Any]:
