@@ -224,6 +224,7 @@ REV_COL_CICLO_CESSAMENTO = "CicloCessamento"
 REV_COL_MOTIVO_CESSAMENTO = "MotivoCessamento"
 REV_COL_TELEFONE = "TelCelular"
 REV_COL_CIDADE = "CidadeResidencial"
+REV_COL_BAIRRO = "BairroResidencial"        # drill-down do "Onde investir"
 
 REV_REQUIRED_COLUMNS = [REV_COL_CODIGO, REV_COL_SITUACAO]
 

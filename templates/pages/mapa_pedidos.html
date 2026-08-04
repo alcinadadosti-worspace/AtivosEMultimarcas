@@ -339,12 +339,13 @@
                 <span>Muitos em alerta</span>
                 <span style="margin-left:auto; font-style:italic;" x-text="alertaFaixa + ' sem comprar · clique numa cidade para ver os clientes'"></span>
             </div>
-            <!-- Legenda: onde investir (farol da meta) -->
+            <!-- Legenda: onde investir (farol pelo esforço = ritmo necessário ÷ ritmo atual) -->
             <div class="map-legend" x-show="mapMode==='mercado'" style="flex-wrap:wrap; gap:12px;">
-                <span class="seg-legend"><span class="seg-dot" style="background:#f87171;"></span>fora do ritmo (precisa acelerar)</span>
-                <span class="seg-legend"><span class="seg-dot" style="background:#fbbf24;"></span>abaixo da meta, mas o ritmo atual alcança</span>
+                <span class="seg-legend"><span class="seg-dot" style="background:#f87171;"></span>mais de 2x o ritmo atual</span>
+                <span class="seg-legend"><span class="seg-dot" style="background:#fb923c;"></span>até 2x — dá com um empurrão</span>
+                <span class="seg-legend"><span class="seg-dot" style="background:#fbbf24;"></span>o ritmo atual já alcança</span>
                 <span class="seg-legend"><span class="seg-dot" style="background:#4ade80;"></span>meta batida — manter</span>
-                <span style="margin-left:auto; font-style:italic;">meta até o fim do ano · clique numa cidade para achar na tabela</span>
+                <span style="margin-left:auto; font-style:italic;">cor = esforço que a meta exige da própria cidade · clique para abrir os bairros</span>
             </div>
         </div>
 
@@ -641,11 +642,11 @@
                 <div class="card">
                     <div class="card-header"><i data-lucide="target" style="color:#4ade80;width:17px;height:17px;"></i> Onde investir — cidade a cidade
                         <span class="sub" x-text="'(' + (mercadoDados.cidades||[]).length + ' cidades)'"></span>
-                        <span class="sub" style="margin-left:auto;">faltam = cadastros líquidos até a meta · paradas ≥ 3 ciclos s/ comprar (reativar não sobe cobertura, mas impede a queda)</span></div>
+                        <span class="sub" style="margin-left:auto;">ordenado por esforço · clique numa cidade para ver os bairros</span></div>
                     <div class="tbl-scroll">
                         <table class="ftable">
                             <thead><tr>
-                                <th class="no-sort" style="width:34px;" title="verde: meta batida · amarelo: abaixo, mas o ritmo histórico alcança · vermelho: precisa acelerar">Farol</th>
+                                <th class="no-sort" style="width:34px;" title="cor pelo esforço que a meta exige da própria cidade">Farol</th>
                                 <th class="no-sort">Cidade</th>
                                 <th class="no-sort">Tier</th>
                                 <th class="num-cell no-sort">População</th>
@@ -655,13 +656,14 @@
                                 <th class="num-cell no-sort" title="Cadastros líquidos que faltam até o alvo">Faltam</th>
                                 <th class="num-cell no-sort" title="Faltam ÷ ciclos restantes">Ritmo nec./ciclo</th>
                                 <th class="num-cell no-sort" title="Cadastros por ciclo nos últimos 6 ciclos (da própria base)">Ritmo atual</th>
+                                <th class="num-cell no-sort" title="Ritmo necessário ÷ ritmo atual — quantas vezes a cidade precisa fazer o próprio ritmo. É o que torna a cobrança justa entre cidades de tamanhos diferentes.">Esforço</th>
                                 <th class="num-cell no-sort" title="Clientes ≥ 3 ciclos sem comprar — a lista está na aba Alerta">Paradas</th>
                             </tr></thead>
-                            <tbody>
-                                <template x-for="c in (mercadoDados.cidades||[])" :key="c.chave">
-                                    <tr :id="'mercado-' + safeId(c.cidade)">
-                                        <td :title="c.farol==='verde'?'meta batida':(c.farol==='amarelo'?'abaixo da meta, ritmo atual alcança':'fora do ritmo — acelerar')"><span :style="'width:13px;height:13px;display:inline-block;border-radius:50%;background:'+corFarol(c.farol)+';box-shadow:0 0 6px '+corFarol(c.farol)+'55;'"></span></td>
-                                        <td style="font-weight:500;" x-text="c.cidade"></td>
+                            <template x-for="c in (mercadoDados.cidades||[])" :key="c.chave">
+                                <tbody>
+                                    <tr class="click-row" :id="'mercado-' + safeId(c.cidade)" :class="mercadoExpandida===c.cidade?'expanded':''" @click="toggleMercadoCidade(c)">
+                                        <td :title="textoFarol(c.farol)"><span :style="'width:13px;height:13px;display:inline-block;border-radius:50%;background:'+corFarol(c.farol)+';box-shadow:0 0 6px '+corFarol(c.farol)+'55;'"></span></td>
+                                        <td style="font-weight:500;"><span class="expand-icon" :class="mercadoExpandida===c.cidade?'open':''">▶</span> <span x-text="c.cidade" style="margin-left:6px;"></span></td>
                                         <td style="color:var(--text-muted);font-size:.78rem;" x-text="c.tier || '—'"></td>
                                         <td class="num-cell" x-text="fmtNum(c.pop)"></td>
                                         <td class="num-cell" x-text="fmtNum(c.base)"></td>
@@ -670,11 +672,19 @@
                                         <td class="num-cell" :style="c.faltam>0 ? 'color:#f87171;font-weight:700;' : ''" x-text="c.faltam>0 ? fmtNum(c.faltam) : ('+' + fmtNum(c.excedente))"></td>
                                         <td class="num-cell" x-text="c.faltam>0 ? fmtNum(c.ritmo_necessario) : '—'"></td>
                                         <td class="num-cell" style="color:var(--text-muted);" x-text="c.ritmo_historico.toFixed(1).replace('.',',')"></td>
+                                        <td class="num-cell" :style="'font-weight:700;color:'+corFarol(c.farol)" x-text="fmtEsforco(c)"></td>
                                         <td class="num-cell" style="color:#fbbf24;" x-text="fmtNum(c.paradas)"></td>
                                     </tr>
-                                </template>
-                                <tr x-show="(mercadoDados.cidades||[]).length===0"><td colspan="11" class="empty-msg">Carregando cidades...</td></tr>
-                            </tbody>
+                                    <tr x-show="mercadoExpandida===c.cidade">
+                                        <td colspan="12" style="padding:0;">
+                                            <div x-show="mercadoDetLoading && mercadoExpandida===c.cidade" style="padding:18px;text-align:center;color:var(--text-muted);font-size:.84rem;">
+                                                <span class="loading-spinner" style="border-top-color:#4ade80;"></span> Carregando bairros...</div>
+                                            <div :id="'mercadodet-'+safeId(c.cidade)"></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </template>
+                            <tbody x-show="(mercadoDados.cidades||[]).length===0"><tr><td colspan="12" class="empty-msg">Carregando cidades...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -724,6 +734,7 @@ function mapaPedidos() {
         // Onde investir (cobertura vs população)
         mercado:{ has_data:false, estatisticas:{} },
         mercadoDados:{}, mercadoFile:null, mercadoFileName:'', mercadoUploading:false, _mercadoLoaded:false, _mercadoSeq:0,
+        mercadoExpandida:'', mercadoDetLoading:false, _mercadoDetCache:{},
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
@@ -1367,6 +1378,7 @@ function mapaPedidos() {
                 if (!res.ok){ showToast(data.detail || 'Erro ao salvar base', 'error'); return; }
                 showToast('Base salva com sucesso!', 'success');
                 this._mercadoLoaded=false; this.mercadoDados={};   // cobertura recalcula com a base nova
+                this.mercadoExpandida=''; this._mercadoDetCache={};
                 await this.carregarAlerta();
             } catch(e){ showToast('Erro ao enviar base', 'error'); }
             finally { this.baseUploading=false; this.baseFile=null; this.baseFileName=''; this.$nextTick(()=>lucide.createIcons()); }
@@ -1378,12 +1390,25 @@ function mapaPedidos() {
             this.alertaResumo={}; this.alertaCidades=[]; this.alertaExpandida=''; this._alertaDetCache={};
             this.alertaUnidade=''; this.alertaSegmento=''; this._alertaLoaded=false;
             this.mercadoDados={}; this._mercadoLoaded=false;   // cobertura depende da base
+            this.mercadoExpandida=''; this._mercadoDetCache={}; this._limparInjetados('mercadodet-');
             this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
         },
 
         // ── Onde investir (cobertura vs população) ──
-        corFarol(f){ return { verde:'#4ade80', amarelo:'#fbbf24', vermelho:'#f87171' }[f] || '#64748b'; },
+        corFarol(f){ return { verde:'#4ade80', amarelo:'#fbbf24', laranja:'#fb923c', vermelho:'#f87171' }[f] || '#64748b'; },
+        textoFarol(f){ return {
+            verde:'meta batida — manter',
+            amarelo:'o ritmo atual já alcança',
+            laranja:'dá com um empurrão (até 2x o ritmo)',
+            vermelho:'exige plano diferente (mais de 2x o ritmo)',
+        }[f] || ''; },
+        // "5,1x" = precisa cadastrar 5,1 vezes o que a cidade cadastra hoje
+        fmtEsforco(c){
+            if (c.faltam===0) return '—';
+            if (c.esforco==null) return 'sem ritmo';
+            return String(c.esforco).replace('.',',') + 'x';
+        },
         // chave igual à do backend: sem acento, só letras/números — casa
         // "OLHO D'AGUA" (base), "OLHO D AGUA" (tabela) e "Olho d'Água Grande" (IBGE)
         _chaveCidade(s){ return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,''); },
@@ -1403,6 +1428,7 @@ function mapaPedidos() {
                 const d = await fetch('/api/mercado/cidades').then(r=>r.json());
                 if (seq !== this._mercadoSeq) return;   // base/tabela trocou no meio -> descarta
                 this.mercadoDados = (d.tem_tabela && d.tem_base) ? d : {};
+                this.mercadoExpandida=''; this._mercadoDetCache={}; this._limparInjetados('mercadodet-');
                 this._atualizarMapa();
                 this.$nextTick(()=>lucide.createIcons());
             } catch(e){
@@ -1428,19 +1454,78 @@ function mapaPedidos() {
             if (!confirm('Trocar/remover a tabela de cobertura salva?')) return;
             await fetch('/api/mercado/clear', { method:'POST' });
             this.mercado = { has_data:false, estatisticas:{} };
-            this.mercadoDados={};
+            this.mercadoDados={}; this.mercadoExpandida=''; this._mercadoDetCache={}; this._limparInjetados('mercadodet-');
             this._atualizarMapa();
             this.$nextTick(()=>lucide.createIcons());
         },
         focarMercadoDoMapa(cidade){
             const c = this._mercadoInfo(cidade);
             if (!c) return;
-            const el = document.getElementById('mercado-'+this.safeId(c.cidade));
-            if (el){
-                el.scrollIntoView({behavior:'smooth', block:'center'});
-                el.style.transition='background .3s'; el.style.background='rgba(74,222,128,.15)';
-                setTimeout(()=>{ el.style.background=''; }, 1600);
+            this.toggleMercadoCidade(c);
+            this.$nextTick(()=>document.getElementById('mercado-'+this.safeId(c.cidade))?.scrollIntoView({behavior:'smooth', block:'center'}));
+        },
+        async toggleMercadoCidade(c){
+            if (this.mercadoExpandida===c.cidade){ this.mercadoExpandida=''; return; }
+            this.mercadoExpandida = c.cidade;
+            if (this._mercadoDetCache[c.cidade]){ await this.$nextTick(); this._injMercado(c.cidade, this._mercadoDetCache[c.cidade]); return; }
+            this._injMercado(c.cidade, '');   // nada de bairro de outra cidade enquanto carrega
+            this.mercadoDetLoading = true;
+            const seq = this._mercadoSeq;     // vincula ao estado atual dos dados
+            try {
+                const res = await fetch('/api/mercado/cidade/detalhe?cidade='+encodeURIComponent(c.cidade));
+                const d = await res.json();
+                if (seq !== this._mercadoSeq || this.mercadoExpandida !== c.cidade){ this.mercadoDetLoading=false; return; }
+                const html = this._buildMercadoDet(c, d);
+                this._mercadoDetCache[c.cidade] = html;
+                this.mercadoDetLoading = false;
+                await this.$nextTick();
+                this._injMercado(c.cidade, html);
+            } catch(e){ console.error(e); this.mercadoDetLoading=false; }
+        },
+        _injMercado(cidade, html){ const el=document.getElementById('mercadodet-'+this.safeId(cidade)); if(el){ el.innerHTML=html; lucide.createIcons(); } },
+        _buildMercadoDet(c, d){
+            const bairros = d.bairros || [];
+            if (!d.tem_bairro){
+                return `<div style="background:rgba(10,10,25,.6);border-top:1px solid rgba(74,222,128,.12);padding:16px 30px;font-size:.84rem;color:#fbbf24;">
+                    A base salva foi importada antes da coluna de bairro existir. Vá na aba <b>Alerta</b> e re-suba a <b>Consulta de Revendedores</b> para ver os bairros.</div>`;
             }
+            if (!bairros.length) return `<div class="empty-msg" style="padding:14px;">Sem revendedores nesta cidade.</div>`;
+            const max = Math.max(...bairros.map(b=>b.revendedores), 1);
+            const rows = bairros.map(b=>{
+                const pctParado = b.revendedores ? Math.round(b.parados/b.revendedores*100) : 0;
+                // bairro pequeno num município deficitário = espaço pra recrutar;
+                // bairro com metade parada = reativar antes de recrutar
+                const acao = pctParado>=50 ? `<span style="color:#fbbf24;">reativar (${pctParado}% parada)</span>`
+                    : (c.faltam>0 && b.revendedores<=3 ? `<span style="color:#4ade80;">recrutar (base magra)</span>`
+                    : `<span style="color:var(--text-muted);">—</span>`);
+                return `<tr>
+                    <td style="padding:6px 12px 6px 30px;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${this._esc(b.bairro)}${b.variantes>1?' — agrupa '+b.variantes+' grafias do cadastro':''}">${this._esc(b.bairro)}${b.variantes>1?` <span style="color:var(--text-muted);font-size:.7rem;">(${b.variantes} grafias)</span>`:''}</td>
+                    <td class="num-cell" style="padding:6px 12px;font-weight:700;">${this.fmtNum(b.revendedores)}</td>
+                    <td class="num-cell" style="padding:6px 12px;color:#4ade80;">${this.fmtNum(b.ativos)}</td>
+                    <td class="num-cell" style="padding:6px 12px;color:#fbbf24;">${this.fmtNum(b.parados)}</td>
+                    <td style="padding:6px 12px;min-width:90px;"><div class="bar-bg"><div class="bar-fill2" style="background:linear-gradient(to right,#166534,#4ade80);width:${Math.round(b.revendedores/max*100)}%"></div></div></td>
+                    <td class="num-cell" style="padding:6px 12px;color:var(--text-muted);">${String(b.share).replace('.',',')}%</td>
+                    <td class="num-cell" style="padding:6px 12px;color:var(--text-muted);">${this.fmtNum(b.itens)}</td>
+                    <td style="padding:6px 12px;font-size:.78rem;">${acao}</td>
+                </tr>`; }).join('');
+            const nota = c.faltam>0
+                ? `Faltam <b style="color:#f87171;">${this.fmtNum(c.faltam)}</b> cadastros nesta cidade. Sem população por bairro não dá pra ter "cobertura do bairro" — o que a tabela mostra é <b>concentração</b>: onde a base está e onde ela parou.`
+                : `Cidade na meta. Aqui o trabalho é <b>segurar a base</b>: bairro com muita gente parada é onde a cobertura começa a cair.`;
+            return `<div style="background:rgba(10,10,25,.6);border-top:1px solid rgba(74,222,128,.12);overflow-x:auto;">
+                <div style="padding:8px 14px 4px 30px;font-size:.74rem;color:var(--text-muted);">${nota}</div>
+                <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+                    <thead><tr style="background:rgba(10,10,28,.7);">
+                        <th style="padding:6px 12px 6px 30px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Bairro</th>
+                        <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Revendedores</th>
+                        <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Ativos</th>
+                        <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Parados</th>
+                        <th style="padding:6px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Distribuição</th>
+                        <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">% cidade</th>
+                        <th style="padding:6px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Itens</th>
+                        <th style="padding:6px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Ação</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
         },
 
         async limparDados(){
@@ -1451,7 +1536,7 @@ function mapaPedidos() {
             // Alerta e Onde investir usam bases persistentes, mas o ciclo de
             // referência/paradas vêm da planilha da sessão; re-carregam ao reabrir.
             this._alertaLoaded=false; this.alertaResumo={}; this.alertaCidades=[];
-            this._mercadoLoaded=false; this.mercadoDados={};
+            this._mercadoLoaded=false; this.mercadoDados={}; this.mercadoExpandida=''; this._mercadoDetCache={};
             this._clearPies();
             if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },

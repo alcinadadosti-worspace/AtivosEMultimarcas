@@ -2901,6 +2901,21 @@ async def mercado_cidades(
     return {"tem_tabela": True, "tem_base": True, **dados}
 
 
+@api_router.get("/mercado/cidade/detalhe")
+async def mercado_cidade_detalhe(
+    request: Request,
+    cidade: str = Query(...),
+    session: tuple = Depends(get_user_session),
+):
+    """Drill-down: revendedores por bairro dentro da cidade (base) + parados."""
+    _, session_data = session
+    df_mercado = _get_df_mercado(request)
+    df_rev = _get_df_rev(request)
+    if df_mercado is None or df_rev is None:
+        return {"cidade": cidade, "bairros": [], "base": 0, "tem_bairro": False}
+    return mercado_svc.detalhe_cidade(df_mercado, df_rev, cidade, df_ped=_get_df_pedidos(session_data))
+
+
 @api_router.get("/mercado/export")
 async def mercado_export(
     request: Request,

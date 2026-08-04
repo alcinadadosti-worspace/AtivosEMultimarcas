@@ -27,7 +27,8 @@ from app.config import (
     META_COBERTURA,
     CICLOS_POR_ANO,
 )
-from app.services.revendedores import _ordem_ciclo, _com_inatividade, ciclos_do_arquivo
+from app.config import PED_COL_PESSOA
+from app.services.revendedores import _ordem_ciclo, _com_inatividade, ciclos_do_arquivo, _norm_cod
 
 
 def _chave_cidade(s: str) -> str:
@@ -163,12 +164,21 @@ def calcular_mercado(
         cobertura = base_viva * 1000 / r["_pop"]
         ritmo_nec = math.ceil(faltam / restantes) if faltam else 0
         rh = ritmo_hist.get(k, 0.0)
+        # Esforço = quantas vezes o próprio ritmo a cidade precisa fazer. É isto
+        # que torna a cobrança justa entre cidades de tamanhos diferentes: o
+        # gap absoluto favorece cidade grande, o esforço normaliza pela
+        # capacidade que a própria cidade demonstra ter.
+        esforco = None if (faltam == 0 or rh <= 0) else round(ritmo_nec / rh, 1)
         if faltam == 0:
             farol = "verde"
-        elif ritmo_nec <= rh:
-            farol = "amarelo"       # abaixo da meta, mas o ritmo atual alcança
+        elif esforco is None:
+            farol = "vermelho"          # não cadastra nada hoje — sem plano novo, não sai
+        elif esforco <= 1.0:
+            farol = "amarelo"           # o ritmo atual já alcança
+        elif esforco <= 2.0:
+            farol = "laranja"           # dá com um empurrão
         else:
-            farol = "vermelho"      # precisa acelerar além do histórico
+            farol = "vermelho"          # exige plano diferente
         cidades.append({
             "cidade": r["_cidade"],
             "chave": k,
@@ -182,11 +192,19 @@ def calcular_mercado(
             "excedente": max(0, base_viva - alvo),
             "ritmo_necessario": ritmo_nec,
             "ritmo_historico": round(rh, 1),
+            "esforco": esforco,
             "paradas": paradas.get(k, 0),
             "farol": farol,
             "rpa": round(float(r["_rpa"]), 0),
         })
-    cidades.sort(key=lambda c: (-c["faltam"], -c["pop"]))
+    # Ordena por dificuldade, não por gap absoluto: senão a cidade pequena que
+    # precisa de 5x o próprio ritmo cai pro fim da lista só por ser pequena.
+    # (esforço None = não cadastra nada hoje -> o caso mais duro, vai primeiro)
+    cidades.sort(key=lambda c: (
+        c["faltam"] == 0,
+        -(float("inf") if c["esforco"] is None and c["faltam"] else (c["esforco"] or 0)),
+        -c["faltam"],
+    ))
 
     fora = sum(v for k, v in viva.items() if k not in chaves_mercado)
     abaixo = [c for c in cidades if c["faltam"] > 0]
@@ -203,4 +221,87 @@ def calcular_mercado(
             "fora_do_mapa": fora,
         },
         "cidades": cidades,
+    }
+
+
+def detalhe_cidade(
+    df_mercado: pl.DataFrame,
+    df_rev: pl.DataFrame,
+    cidade: str,
+    df_ped=None,
+    meta: float = META_COBERTURA,
+) -> Dict[str, Any]:
+    """Dentro de uma cidade: revendedores por bairro, quantos estão parados e
+    quanto cada bairro comprou (do arquivo de pedidos).
+
+    Sem população por bairro não existe "cobertura do bairro" — o que dá pra
+    ler é CONCENTRAÇÃO: onde a base está, onde ela parou, e onde não tem
+    ninguém. Bairro com muitos parados = reativar; bairro com base magra num
+    município deficitário = recrutar.
+    """
+    alvo_chave = _chave_cidade(cidade)
+    linha = next((r for r in df_mercado.iter_rows(named=True) if r["_chave"] == alvo_chave), None)
+
+    com_inat = _com_inatividade(df_rev, df_ped)
+    tem_bairro = "_bairro" in com_inat.columns
+    if not tem_bairro:   # base salva antes da coluna de bairro existir
+        com_inat = com_inat.with_columns(pl.lit("").alias("_bairro"))
+
+    d = com_inat.filter(
+        pl.col("_cidade").map_elements(_chave_cidade, return_dtype=pl.Utf8) == alvo_chave
+    )
+    if d.is_empty():
+        return {"cidade": cidade, "bairros": [], "tem_bairro": tem_bairro, "base": 0}
+
+    # Compras por revendedor no arquivo de pedidos (itens/valor), pra mostrar
+    # o peso de cada bairro além da contagem de cabeças.
+    compras: Dict[str, Dict[str, float]] = {}
+    if df_ped is not None:
+        agg = (
+            df_ped.with_columns(_norm_cod(PED_COL_PESSOA).alias("_cod"))
+            .filter(pl.col("_cod") != "")
+            .group_by("_cod")
+            .agg([pl.col("_itens").sum().alias("itens"), pl.col("_valor").sum().alias("valor")])
+        )
+        compras = {r["_cod"]: {"itens": r["itens"], "valor": r["valor"]} for r in agg.iter_rows(named=True)}
+
+    # Agrupa pela mesma chave da cidade (sem acento/pontuação): o cadastro tem
+    # o mesmo bairro escrito de várias formas ("ALDEIA KARIRI XOCO" e "ALDEIA
+    # KARIRI-XOCÓ"), e sem juntar isso um bairro grande vira vários minúsculos
+    # — que a coluna Ação leria como "base magra, recrutar".
+    bairros: Dict[str, Dict[str, Any]] = {}
+    for r in d.select(["_cod", "_bairro", "_inat"]).iter_rows(named=True):
+        nome = (r["_bairro"] or "").strip() or "Não informado"
+        chave = _chave_cidade(nome) or "NAOINFORMADO"
+        b = bairros.setdefault(chave, {"_grafias": {}, "revendedores": 0, "parados": 0, "itens": 0, "valor": 0.0})
+        b["_grafias"][nome] = b["_grafias"].get(nome, 0) + 1
+        b["revendedores"] += 1
+        if r["_inat"] >= 3:
+            b["parados"] += 1
+        c = compras.get(r["_cod"])
+        if c:
+            b["itens"] += int(c["itens"] or 0)
+            b["valor"] += float(c["valor"] or 0.0)
+
+    total = d.height
+    out = []
+    for b in bairros.values():
+        grafias = b.pop("_grafias")
+        b["bairro"] = max(grafias, key=grafias.get)   # a grafia mais usada representa o grupo
+        b["variantes"] = len(grafias)
+        b["ativos"] = b["revendedores"] - b["parados"]
+        b["share"] = round(b["revendedores"] / total * 100, 1) if total else 0.0
+        b["valor"] = round(b["valor"], 2)
+        out.append(b)
+    out.sort(key=lambda b: -b["revendedores"])
+
+    faltam = 0
+    if linha is not None:
+        faltam = max(0, math.ceil(meta * linha["_pop"] / 1000) - total)
+    return {
+        "cidade": linha["_cidade"] if linha is not None else cidade,
+        "base": total,
+        "faltam": faltam,
+        "bairros": out,
+        "tem_bairro": tem_bairro,
     }
