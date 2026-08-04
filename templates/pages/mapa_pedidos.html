@@ -639,6 +639,45 @@
                     </div>
                 </div>
 
+                <!-- A base está crescendo ou caindo? (fluxo por ciclo) -->
+                <div class="card" x-show="(mercadoEvolucao.serie||[]).length">
+                    <div class="card-header"><i data-lucide="trending-up" style="color:#4ade80;width:17px;height:17px;"></i> A base está crescendo?
+                        <span class="sub" x-show="mercadoEvolucao.tem_reativacao" :style="'color:'+((mercadoEvolucao.saldo_3ciclos||0)>=0?'#4ade80':'#f87171')"
+                            x-text="'· últimos 3 ciclos: ' + ((mercadoEvolucao.saldo_3ciclos||0)>=0?'+':'') + fmtNum(mercadoEvolucao.saldo_3ciclos) + ' clientes'"></span>
+                        <span class="sub" style="margin-left:auto;">novas + reativadas − cessadas, por ciclo</span></div>
+                    <div x-show="!mercadoEvolucao.tem_reativacao" style="padding:10px 16px;font-size:.8rem;color:#fbbf24;">
+                        A base salva não tem a coluna <b>CicloReativacao</b> — re-suba a Consulta de Revendedores (aba Alerta) para o quadro completo.</div>
+                    <div class="tbl-scroll">
+                        <table class="ftable">
+                            <thead><tr>
+                                <th class="no-sort">Ciclo</th>
+                                <th class="num-cell no-sort" title="CicloPrimeiroPedido — clientes que fizeram a 1ª compra neste ciclo">Novas</th>
+                                <th class="num-cell no-sort" title="CicloReativacao — voltaram a revender neste ciclo">Reativadas</th>
+                                <th class="num-cell no-sort" title="CicloCessamento — saíram da base neste ciclo">Cessadas</th>
+                                <th class="num-cell no-sort" title="novas + reativadas − cessadas">Saldo</th>
+                                <th class="no-sort" style="min-width:150px;">Entradas × saídas</th>
+                            </tr></thead>
+                            <tbody>
+                                <template x-for="s in (mercadoEvolucao.serie||[])" :key="s.ciclo">
+                                    <tr>
+                                        <td style="font-weight:500;" x-text="s.ciclo"></td>
+                                        <td class="num-cell" style="color:#4ade80;" x-text="'+'+fmtNum(s.novas)"></td>
+                                        <td class="num-cell" style="color:#a78bfa;" x-text="mercadoEvolucao.tem_reativacao ? '+'+fmtNum(s.reativadas) : '—'"></td>
+                                        <td class="num-cell" style="color:#f87171;" x-text="'−'+fmtNum(s.cessadas)"></td>
+                                        <td class="num-cell" :style="'font-weight:700;color:'+(s.saldo>=0?'#4ade80':'#f87171')" x-text="(s.saldo>=0?'+':'')+fmtNum(s.saldo)"></td>
+                                        <td><div style="display:flex;align-items:center;gap:2px;height:14px;">
+                                            <div :style="'height:9px;border-radius:2px;background:linear-gradient(to right,#166534,#4ade80);width:'+Math.round((s.novas+s.reativadas)/maxEvolucao*100)+'%'"></div>
+                                            <div :style="'height:9px;border-radius:2px;background:linear-gradient(to right,#f87171,#7f1d1d);width:'+Math.round(s.cessadas/maxEvolucao*100)+'%'"></div>
+                                        </div></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="padding:7px 16px 10px;font-size:.72rem;color:var(--text-muted);font-style:italic;">
+                        O cadastro guarda só o último cessamento/reativação de cada cliente — ciclos antigos ficam subcontados. E cessamento é registrado com atraso (nasce de inatividade acumulada), então os ciclos mais recentes sempre parecem melhores do que vão terminar.</div>
+                </div>
+
                 <div class="card">
                     <div class="card-header"><i data-lucide="target" style="color:#4ade80;width:17px;height:17px;"></i> Onde investir — cidade a cidade
                         <span class="sub" x-text="'(' + (mercadoDados.cidades||[]).length + ' cidades)'"></span>
@@ -1415,6 +1454,11 @@ function mapaPedidos() {
         _mercadoInfo(nome){
             const k = this._chaveCidade(nome);
             return (this.mercadoDados.cidades||[]).find(c=>c.chave===k);
+        },
+        get mercadoEvolucao(){ return this.mercadoDados.evolucao || {}; },
+        get maxEvolucao(){
+            const s = this.mercadoEvolucao.serie || [];
+            return Math.max(...s.map(x=>Math.max(x.novas+x.reativadas, x.cessadas)), 1);
         },
         async carregarMercado(){
             const seq = ++this._mercadoSeq;   // só a requisição mais recente aplica o resultado

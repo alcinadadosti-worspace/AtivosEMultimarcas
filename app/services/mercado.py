@@ -221,6 +221,65 @@ def calcular_mercado(
             "fora_do_mapa": fora,
         },
         "cidades": cidades,
+        "evolucao": evolucao_base(df_rev),
+    }
+
+
+def _serie_por_ciclo(df_rev: pl.DataFrame, col_norm: str, col_raw: str) -> Optional[Dict[str, int]]:
+    """Contagem por ciclo de uma coluna de evento ('11/2026' -> n). Usa a
+    normalizada se existir; senão a crua (bases salvas por versões antigas);
+    None se a base não tiver a informação."""
+    if col_norm in df_rev.columns:
+        s = df_rev[col_norm]
+    elif col_raw in df_rev.columns:
+        s = df_rev[col_raw].cast(pl.Utf8)
+    else:
+        return None
+    out: Dict[str, int] = {}
+    for v in s.to_list():
+        v = (v or "").strip()
+        if v:
+            out[v] = out.get(v, 0) + 1
+    return out
+
+
+def evolucao_base(df_rev: pl.DataFrame, n_ciclos: int = 12) -> Dict[str, Any]:
+    """A base está crescendo ou caindo? Fluxo por ciclo:
+      novas (CicloPrimeiroPedido) + reativadas (CicloReativacao)
+      - cessadas (CicloCessamento) = saldo.
+
+    Duas honestidades que a tela precisa carregar:
+    - o cadastro guarda só o ÚLTIMO cessamento/reativação de cada cliente, então
+      ciclos antigos ficam subcontados (evento sobrescrito por um mais novo);
+    - cessamento é administrativo e vem ATRASADO (nasce de inatividade
+      acumulada) — os ciclos mais recentes sempre parecem melhores do que são.
+    """
+    from app.config import REV_COL_CICLO_PRIMEIRO, REV_COL_CICLO_CESSAMENTO, REV_COL_CICLO_REATIVACAO
+
+    novas = _serie_por_ciclo(df_rev, "_ciclo_primeiro", REV_COL_CICLO_PRIMEIRO) or {}
+    cessadas = _serie_por_ciclo(df_rev, "_ciclo_cessamento", REV_COL_CICLO_CESSAMENTO)
+    reativadas = _serie_por_ciclo(df_rev, "_ciclo_reativacao", REV_COL_CICLO_REATIVACAO)
+
+    todos = set(novas) | set(cessadas or {}) | set(reativadas or {})
+    ciclos = sorted(todos, key=_ordem_ciclo)[-n_ciclos:]
+    serie = []
+    for c in ciclos:
+        nv = novas.get(c, 0)
+        rv = (reativadas or {}).get(c, 0)
+        cs = (cessadas or {}).get(c, 0)
+        serie.append({
+            "ciclo": c,
+            "novas": nv,
+            "reativadas": rv,
+            "cessadas": cs,
+            "saldo": nv + rv - cs,
+        })
+    ult3 = serie[-3:]
+    return {
+        "serie": serie,
+        "saldo_3ciclos": sum(s["saldo"] for s in ult3),
+        "tem_reativacao": reativadas is not None,
+        "tem_cessamento": cessadas is not None,
     }
 
 

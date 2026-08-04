@@ -28,6 +28,7 @@ from app.config import (
     REV_COL_TELEFONE,
     REV_COL_CIDADE,
     REV_COL_BAIRRO,
+    REV_COL_CICLO_REATIVACAO,
     REV_REQUIRED_COLUMNS,
     PED_COL_PESSOA,
     PED_COL_CICLO,
@@ -38,7 +39,7 @@ _KEEP = [
     REV_COL_CODIGO, REV_COL_NOME, REV_COL_SITUACAO, REV_COL_CICLOS_INATIVIDADE,
     REV_COL_PAPEL, REV_COL_COD_SETOR, REV_COL_SETOR, REV_COL_CICLO_PRIMEIRO,
     REV_COL_CICLO_CESSAMENTO, REV_COL_MOTIVO_CESSAMENTO, REV_COL_TELEFONE, REV_COL_CIDADE,
-    REV_COL_BAIRRO,
+    REV_COL_BAIRRO, REV_COL_CICLO_REATIVACAO,
 ]
 
 
@@ -98,6 +99,8 @@ def processar_planilha_revendedores(content: bytes, filename: str) -> Dict[str, 
         pl.col(REV_COL_SETOR).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_setor"),
         pl.col(REV_COL_COD_SETOR).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_setor_cod"),
         pl.col(REV_COL_CICLO_PRIMEIRO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_ciclo_primeiro"),
+        pl.col(REV_COL_CICLO_CESSAMENTO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_ciclo_cessamento"),
+        pl.col(REV_COL_CICLO_REATIVACAO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_ciclo_reativacao"),
         pl.col(REV_COL_MOTIVO_CESSAMENTO).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_motivo_cessamento"),
         pl.col(REV_COL_TELEFONE).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_telefone"),
         pl.col(REV_COL_CIDADE).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_cidade"),
