@@ -628,8 +628,8 @@
 
                 <div class="ped-filters">
                     <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#4ade80;"></i>
-                        <span style="font-size:.82rem;">Meta: base ≥ <b x-text="(mercadoDados.meta||13) + ' por mil habitantes'"></b> até o ciclo <b x-text="mercadoDados.ciclos_ano + '/' + ((mercadoDados.ciclo_ref||'').split('/')[1]||'')"></b>
-                            · agora: ciclo <b x-text="mercadoDados.ciclo_ref"></b>
+                        <span style="font-size:.82rem;">Meta: base ≥ <b x-text="(mercadoDados.meta||13) + ' por mil habitantes'"></b> até o ciclo <b x-text="(mercadoDados.ciclos_ano||17) + '/' + ((mercadoDados.ciclo_ref||'').split('/')[1]||'')"></b>
+                            · agora: ciclo <b x-text="mercadoDados.ciclo_ref||'—'"></b>
                             · a base viva vem da Consulta de Revendedores — re-suba a base (aba Alerta) a cada ciclo e este painel se atualiza sozinho.</span></div>
                     <div class="export-row">
                         <a href="/api/mercado/export?formato=csv" class="btn-sm"><i data-lucide="download" style="width:11px;height:11px;"></i>CSV</a>
@@ -723,7 +723,7 @@ function mapaPedidos() {
         alertaExpandida:'', alertaDetLoading:false, _alertaDetCache:{}, _alertaLoaded:false, _alertaSeq:0,
         // Onde investir (cobertura vs população)
         mercado:{ has_data:false, estatisticas:{} },
-        mercadoDados:{}, mercadoFile:null, mercadoFileName:'', mercadoUploading:false, _mercadoLoaded:false,
+        mercadoDados:{}, mercadoFile:null, mercadoFileName:'', mercadoUploading:false, _mercadoLoaded:false, _mercadoSeq:0,
         // Accordion
         expandida:'', detalheLoading:false, _detCache:{},
         // Map
@@ -1392,18 +1392,22 @@ function mapaPedidos() {
             return (this.mercadoDados.cidades||[]).find(c=>c.chave===k);
         },
         async carregarMercado(){
+            const seq = ++this._mercadoSeq;   // só a requisição mais recente aplica o resultado
             try {
                 const st = await fetch('/api/mercado/status').then(r=>r.json());
+                if (seq !== this._mercadoSeq) return;
                 this.mercado = { has_data: !!st.has_data, estatisticas: st.estatisticas||{} };
                 await this.verificarBase();
+                if (seq !== this._mercadoSeq) return;
                 if (!this.mercado.has_data || !this.revBase.has_data){ this.mercadoDados={}; this._atualizarMapa(); this.$nextTick(()=>lucide.createIcons()); return; }
                 const d = await fetch('/api/mercado/cidades').then(r=>r.json());
+                if (seq !== this._mercadoSeq) return;   // base/tabela trocou no meio -> descarta
                 this.mercadoDados = (d.tem_tabela && d.tem_base) ? d : {};
                 this._atualizarMapa();
                 this.$nextTick(()=>lucide.createIcons());
             } catch(e){
                 console.error('carregarMercado:', e);
-                this._mercadoLoaded = false;   // libera retry
+                if (seq === this._mercadoSeq) this._mercadoLoaded = false;   // libera retry
             }
         },
         onMercadoFile(e){ const f=e.target.files[0]; if(f){ this.mercadoFile=f; this.mercadoFileName=f.name; } },
@@ -1444,8 +1448,10 @@ function mapaPedidos() {
             await fetch('/api/pedidos/clear', { method:'POST' });
             this.hasData=false; this.mapMode='intensidade'; this.cidades=[]; this.segmentos=[]; this.visitantes=[]; this.composicao=[];
             this.resumo={}; this.ciclo=''; this.nCiclos=1; this.expandida=''; this._detCache={};
-            // Alerta usa a base persistente (não a planilha); só força re-carregar ao reabrir.
+            // Alerta e Onde investir usam bases persistentes, mas o ciclo de
+            // referência/paradas vêm da planilha da sessão; re-carregam ao reabrir.
             this._alertaLoaded=false; this.alertaResumo={}; this.alertaCidades=[];
+            this._mercadoLoaded=false; this.mercadoDados={};
             this._clearPies();
             if (this._map){ this._map.remove(); this._map=null; } this._layer=null; this._cityLayers={};
         },

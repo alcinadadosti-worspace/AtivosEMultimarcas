@@ -57,18 +57,27 @@ def processar_planilha_mercado(content: bytes, filename: str) -> Dict[str, Any]:
         if c not in df.columns:
             df = df.with_columns(pl.lit("").alias(c))
 
+    # Números via Float64: célula numérica pode vir serializada como '38053.0',
+    # e o cast direto pra Int64 viraria null — cidade sumindo em silêncio.
+    def _int(col):
+        return pl.col(col).cast(pl.Float64, strict=False).fill_null(0.0).round(0).cast(pl.Int64)
+
     base = df.with_columns([
         pl.col(MERCADO_COL_CIDADE).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_cidade"),
         pl.col(MERCADO_COL_TIER).cast(pl.Utf8).fill_null("").str.strip_chars().alias("_tier"),
-        pl.col(pop_col).cast(pl.Int64, strict=False).fill_null(0).alias("_pop"),
-        pl.col(MERCADO_COL_BASE_TOTAL).cast(pl.Int64, strict=False).fill_null(0).alias("_base_ref"),
+        _int(pop_col).alias("_pop"),
+        _int(MERCADO_COL_BASE_TOTAL).alias("_base_ref"),
         pl.col(MERCADO_COL_RPA).cast(pl.Float64, strict=False).fill_null(0.0).alias("_rpa"),
         pl.col(MERCADO_COL_ATIVIDADE).cast(pl.Float64, strict=False).fill_null(0.0).alias("_atividade"),
     ]).select(["_cidade", "_tier", "_pop", "_base_ref", "_rpa", "_atividade"])
 
-    # Fora: linha "Total", agregados sem população (ex.: OUTRAS CIDADES).
+    # Fora: linha "Total" (pelo Tier OU pelo nome, caso a coluna Tier falte)
+    # e agregados sem população (ex.: OUTRAS CIDADES).
     base = base.filter(
-        (pl.col("_cidade") != "") & (pl.col("_tier") != "Total") & (pl.col("_pop") > 0)
+        (pl.col("_cidade") != "")
+        & (pl.col("_tier") != "Total")
+        & (pl.col("_cidade").str.to_uppercase() != "TOTAL")
+        & (pl.col("_pop") > 0)
     )
     if base.is_empty():
         raise ValueError("Nenhuma cidade com população encontrada na planilha.")
