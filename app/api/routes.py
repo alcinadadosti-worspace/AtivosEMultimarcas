@@ -2741,11 +2741,13 @@ async def alerta_resumo(
     setor: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
+    session: tuple = Depends(get_user_session),
 ):
+    _, session_data = session
     df = _get_df_rev(request)
     if df is None:
         return {"tem_base": False, "resumo": {}}
-    return {"tem_base": True, "resumo": rev_svc.alerta_resumo(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None)}
+    return {"tem_base": True, "resumo": rev_svc.alerta_resumo(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None, df_ped=_get_df_pedidos(session_data))}
 
 
 @api_router.get("/revendedores/alerta/cidades")
@@ -2756,11 +2758,13 @@ async def alerta_cidades(
     setor: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
+    session: tuple = Depends(get_user_session),
 ):
+    _, session_data = session
     df = _get_df_rev(request)
     if df is None:
         return {"cidades": []}
-    return {"cidades": rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None)}
+    return {"cidades": rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None, df_ped=_get_df_pedidos(session_data))}
 
 
 @api_router.get("/revendedores/alerta/detalhe")
@@ -2794,18 +2798,17 @@ async def alerta_export(
     setor: Optional[str] = Query(None),
     min_ciclos: int = Query(5, ge=1, le=30),
     max_ciclos: int = Query(7, ge=1, le=30),
+    session: tuple = Depends(get_user_session),
 ):
+    _, session_data = session
     df = _get_df_rev(request)
     if df is None:
         raise HTTPException(status_code=400, detail="Base de revendedores não carregada")
-    # todas as cidades em alerta, cliente a cliente
-    cidades = rev_svc.alerta_por_cidade(df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None)
-    linhas = []
-    for c in cidades:
-        det = rev_svc.alerta_detalhe_cidade(df, c["cidade"], unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos, segmento=segmento or None, setor=setor or None)
-        for cli in det.get("clientes", []):   # alerta_detalhe_cidade retorna {clientes, ciclos}
-            cli = {k: v for k, v in cli.items() if k != "historico"}   # histórico é lista -> fora do export tabular
-            linhas.append({"cidade": c["cidade"], **cli})
+    # todas as cidades em alerta, cliente a cliente, numa passada só
+    linhas = rev_svc.alerta_lista(
+        df, unidade=unidade or None, min_c=min_ciclos, max_c=max_ciclos,
+        segmento=segmento or None, setor=setor or None, df_ped=_get_df_pedidos(session_data),
+    )
     if not linhas:
         raise HTTPException(status_code=404, detail="Nenhum cliente em alerta")
     df_export = pl.DataFrame(linhas)

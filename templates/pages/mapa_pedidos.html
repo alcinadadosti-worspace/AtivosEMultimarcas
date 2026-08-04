@@ -494,7 +494,14 @@
 
                 <div class="ped-filters">
                     <div class="filter-group"><i data-lucide="info" style="width:14px;height:14px;color:#fbbf24;"></i>
-                        <span style="font-size:.82rem;">Clientes de <b x-text="alertaFaixa"></b> sem comprar (base de cadastro)</span></div>
+                        <span style="font-size:.82rem;">Clientes de <b x-text="alertaFaixa"></b> sem comprar
+                            <template x-if="alertaResumo.fonte==='pedidos'">
+                                <span style="color:var(--text-muted);">· contado no arquivo de pedidos, até o ciclo <b x-text="alertaResumo.ciclo_ref"></b> (<span x-text="alertaResumo.janela"></span> ciclos)</span>
+                            </template>
+                            <template x-if="alertaResumo.fonte==='base'">
+                                <span style="color:#fbbf24;">· sem planilha de pedidos na sessão — contando pelo <b>CiclosInatividade</b> da base, que é a foto do dia da extração. Suba a Consulta de Pedidos para a contagem ficar ao vivo.</span>
+                            </template>
+                        </span></div>
                     <div class="filter-group"><label>Unidade:</label>
                         <select x-model="alertaUnidade" @change="trocarUnidadeAlerta()">
                             <option value="">Todas</option>
@@ -1154,45 +1161,52 @@ function mapaPedidos() {
             } catch(e){ console.error(e); this.alertaDetLoading=false; }
         },
         _injAlerta(cidade, html){ const el=document.getElementById('alerta-'+this.safeId(cidade)); if(el){ el.innerHTML=html; lucide.createIcons(); } },
+        // O estado de cada ciclo vem pronto do servidor — é a MESMA conta que
+        // gera a coluna "Ciclos s/ comprar", então os dois não podem divergir.
+        _ESTADOS:{
+            comprou:     { bg:'rgba(34,197,94,.28)',  cl:'#4ade80', extra:'', txt:'comprou' },
+            gap:         { bg:'rgba(239,68,68,.4)',   cl:'#fecaca', extra:'box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);', txt:'sem comprar até hoje (conta no filtro)' },
+            intercalado: { bg:'rgba(239,68,68,.09)',  cl:'#f87171', extra:'', txt:'pulou o ciclo, mas voltou a comprar' },
+            antes:       { bg:'rgba(148,163,184,.10)',cl:'#64748b', extra:'', txt:'ainda não era revendedor (antes da 1ª compra)' },
+        },
         _timelineHTML(hist){
             hist = hist||[];
-            let lastGreen = -1;
-            hist.forEach((h,i)=>{ if (h.comprou) lastGreen=i; });
-            return `<div style="display:flex;gap:2px;flex-wrap:nowrap;">` + hist.map((h,i)=>{
+            return `<div style="display:flex;gap:2px;flex-wrap:nowrap;">` + hist.map(h=>{
                 const lbl = (h.ciclo||'').split('/')[0];
-                const trailing = !h.comprou && i>lastGreen;   // vermelho do FINAL = gap que conta (= inatividade)
-                let bg, cl, extra='', st;
-                if (h.comprou){ bg='rgba(34,197,94,.28)'; cl='#4ade80'; st='comprou'; }
-                else if (trailing){ bg='rgba(239,68,68,.4)'; cl='#fecaca'; extra='box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);'; st='não comprou (gap seguido)'; }
-                else { bg='rgba(239,68,68,.09)'; cl='#f87171'; st='não comprou (intercalado)'; }
-                return `<span title="${this._esc(h.ciclo)} — ${st}" style="min-width:19px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;background:${bg};color:${cl};${extra}">${lbl}</span>`;
+                const e = this._ESTADOS[h.estado] || this._ESTADOS.intercalado;
+                return `<span title="${this._esc(h.ciclo)} — ${e.txt}" style="min-width:19px;height:17px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;background:${e.bg};color:${e.cl};${e.extra}">${lbl}</span>`;
             }).join('') + `</div>`;
         },
         _buildAlertaDet(cli){
             const rows = cli.length ? cli.map(r=>{
                 const cc = r.inatividade>=7?'inat-high':r.inatividade>=6?'inat-mid':'';
                 const sb = (r.situacao||'').toLowerCase()==='ativo'?'sit-badge sit-ativo':'sit-badge sit-inativo';
+                const dif = (r.inatividade_base!=null && r.inatividade_base!==r.inatividade)
+                    ? ` title="A base salva diz ${r.inatividade_base} — foto do dia em que a planilha de revendedores foi extraída"` : '';
                 return `<tr>
                     <td style="padding:7px 12px 7px 30px;font-weight:500;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.nome)}</td>
                     <td class="num-cell ${cc}" style="padding:7px 12px;font-weight:700;">${r.inatividade}</td>
+                    <td class="num-cell" style="padding:7px 12px;color:var(--text-muted);font-size:.76rem;"${dif}>${r.inatividade_base==null?'—':r.inatividade_base}</td>
                     <td style="padding:7px 12px;">${this._timelineHTML(r.historico)}</td>
                     <td style="padding:7px 12px;"><span class="${sb}">${this._esc(r.situacao||'—')}</span></td>
                     <td style="padding:7px 12px;font-family:monospace;font-size:.8rem;color:#a78bfa;">${this._esc(r.telefone||'—')}</td>
                     <td style="padding:7px 12px;color:var(--text-muted);font-size:.79rem;">${this._esc(r.segmento||'—')}</td>
                     <td style="padding:7px 12px;color:#c4b5fd;font-size:.76rem;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${this._esc(r.setor||'')}">${this._esc(r.setor||'—')}</td>
-                </tr>`; }).join('') : `<tr><td colspan="7" class="empty-msg" style="padding:14px;">Sem clientes nesta faixa.</td></tr>`;
+                </tr>`; }).join('') : `<tr><td colspan="8" class="empty-msg" style="padding:14px;">Sem clientes nesta faixa.</td></tr>`;
             return `<div style="background:rgba(10,10,25,.6);border-top:1px solid rgba(139,92,246,.1);overflow-x:auto;">
                 <div style="padding:8px 14px 4px 30px;font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                     <span>Histórico por ciclo:</span>
                     <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(34,197,94,.28);display:inline-block;"></span>comprou</span>
-                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.4);box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);display:inline-block;"></span>não comprou <b>seguido</b> (= a coluna "ciclos s/ comprar")</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.4);box-shadow:inset 0 0 0 1px rgba(239,68,68,.75);display:inline-block;"></span><b>sem comprar até hoje</b> — é o que o filtro conta</span>
                     <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(239,68,68,.09);display:inline-block;"></span>pulou <b>intercalado</b> (mas voltou a comprar)</span>
-                    <span style="font-style:italic;">— gap seguido crescendo = largando a revenda</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;background:rgba(148,163,184,.10);display:inline-block;"></span>ainda não era revendedor (antes da 1ª compra)</span>
+                    <span style="font-style:italic;">— vermelho forte crescendo = largando a revenda</span>
                 </div>
                 <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
                     <thead><tr style="background:rgba(10,10,28,.7);">
                         <th style="padding:7px 12px 7px 30px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Nome</th>
-                        <th style="padding:7px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Ciclos s/ comprar</th>
+                        <th style="padding:7px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;" title="Contado no arquivo de pedidos — igual aos quadrados vermelhos do fim da timeline">Ciclos s/ comprar</th>
+                        <th style="padding:7px 12px;text-align:right;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;" title="CiclosInatividade da base salva no servidor — foto do dia da extração, só referência">Base</th>
                         <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Histórico (ciclos)</th>
                         <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Situação</th>
                         <th style="padding:7px 12px;text-align:left;color:var(--text-muted);font-size:.7rem;text-transform:uppercase;">Telefone</th>
