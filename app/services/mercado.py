@@ -221,8 +221,16 @@ def calcular_mercado(
             "fora_do_mapa": fora,
         },
         "cidades": cidades,
-        "evolucao": evolucao_base(df_rev),
+        "evolucao": evolucao_base(df_rev, df_ped),
     }
+
+
+def _chave_ciclo(c: str) -> str:
+    """'1/2026' e '01/2026' são o mesmo ciclo. O card cruza duas planilhas
+    (cadastro e pedidos), então a chave precisa ser canônica — senão a janela
+    não casa com as contagens e a tabela sai zerada."""
+    o = _ordem_ciclo(c)
+    return f"{o[2]:02d}/{o[1]}" if o[0] == 1 else (c or "").strip()
 
 
 def _serie_por_ciclo(df_rev: pl.DataFrame, col_norm: str, col_raw: str) -> Optional[Dict[str, int]]:
@@ -239,11 +247,34 @@ def _serie_por_ciclo(df_rev: pl.DataFrame, col_norm: str, col_raw: str) -> Optio
     for v in s.to_list():
         v = (v or "").strip()
         if v:
-            out[v] = out.get(v, 0) + 1
+            k = _chave_ciclo(v)
+            out[k] = out.get(k, 0) + 1
     return out
 
 
-def evolucao_base(df_rev: pl.DataFrame, n_ciclos: int = 12) -> Dict[str, Any]:
+def _janela_ciclos(todos: set, df_ped, n_ciclos: int) -> List[str]:
+    """Quais ciclos o card mostra. A janela é a MESMA do resto da aba: os ciclos
+    do arquivo de pedidos. Sem isso o card montava a própria janela ('os últimos
+    n ciclos que existem no cadastro') e, como o calendário tem 17 ciclos/ano
+    mas o arquivo tem 11, ela transbordava para o ano anterior — 16/2025 e
+    17/2025 apareciam ao lado de 01/2026 como se fossem ciclos do período.
+
+    Sem arquivo de pedidos, cai no ano mais recente do próprio cadastro: menos
+    linhas, mas nunca mistura calendários de anos diferentes.
+    """
+    if df_ped is not None:
+        do_arquivo = [_chave_ciclo(c) for c in ciclos_do_arquivo(df_ped)]
+        if do_arquivo:
+            return do_arquivo[-n_ciclos:]
+    ordenados = sorted(todos, key=_ordem_ciclo)
+    anos = [_ordem_ciclo(c)[1] for c in ordenados if _ordem_ciclo(c)[0] == 1]
+    if not anos:
+        return ordenados[-n_ciclos:]
+    ultimo_ano = max(anos)
+    return [c for c in ordenados if _ordem_ciclo(c)[:2] == (1, ultimo_ano)][-n_ciclos:]
+
+
+def evolucao_base(df_rev: pl.DataFrame, df_ped=None, n_ciclos: int = 12) -> Dict[str, Any]:
     """A base está crescendo ou caindo? Fluxo por ciclo:
       novas (CicloPrimeiroPedido) + reativadas (CicloReativacao)
       - cessadas (CicloCessamento) = saldo.
@@ -261,7 +292,13 @@ def evolucao_base(df_rev: pl.DataFrame, n_ciclos: int = 12) -> Dict[str, Any]:
     reativadas = _serie_por_ciclo(df_rev, "_ciclo_reativacao", REV_COL_CICLO_REATIVACAO)
 
     todos = set(novas) | set(cessadas or {}) | set(reativadas or {})
-    ciclos = sorted(todos, key=_ordem_ciclo)[-n_ciclos:]
+    ciclos = _janela_ciclos(todos, df_ped, n_ciclos)
+    # A base é extraída num ciclo e o arquivo de pedidos costuma ir mais longe.
+    # Os ciclos do fim que o cadastro ainda não alcançou sairiam como 0/0/0 —
+    # linha que se lê como "parou de crescer", quando é só dado que não existe.
+    faltando: List[str] = []
+    while ciclos and ciclos[-1] not in todos:
+        faltando.insert(0, ciclos.pop())
     serie = []
     for c in ciclos:
         nv = novas.get(c, 0)
@@ -280,6 +317,8 @@ def evolucao_base(df_rev: pl.DataFrame, n_ciclos: int = 12) -> Dict[str, Any]:
         "saldo_3ciclos": sum(s["saldo"] for s in ult3),
         "tem_reativacao": reativadas is not None,
         "tem_cessamento": cessadas is not None,
+        "ciclo_base": serie[-1]["ciclo"] if serie else "",
+        "ciclos_sem_base": faltando,
     }
 
 

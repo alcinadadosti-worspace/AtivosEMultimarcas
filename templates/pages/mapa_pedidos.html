@@ -647,6 +647,11 @@
                         <span class="sub" style="margin-left:auto;">novas + reativadas − cessadas, por ciclo</span></div>
                     <div x-show="!mercadoEvolucao.tem_reativacao" style="padding:10px 16px;font-size:.8rem;color:#fbbf24;">
                         A base salva não tem a coluna <b>CicloReativacao</b> — re-suba a Consulta de Revendedores (aba Alerta) para o quadro completo.</div>
+                    <div x-show="(mercadoEvolucao.ciclos_sem_base||[]).length" style="padding:10px 16px;font-size:.8rem;color:#fbbf24;">
+                        O cadastro salvo vai até o ciclo <b x-text="mercadoEvolucao.ciclo_base"></b>, então
+                        <b x-text="(mercadoEvolucao.ciclos_sem_base||[]).join(', ')"></b>
+                        <span x-text="(mercadoEvolucao.ciclos_sem_base||[]).length>1?'ainda não aparecem':'ainda não aparece'"></span>
+                        aqui — re-suba a Consulta de Revendedores (aba Alerta) para fechar com o arquivo de pedidos.</div>
                     <div class="tbl-scroll">
                         <table class="ftable">
                             <thead><tr>
