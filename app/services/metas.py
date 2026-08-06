@@ -141,7 +141,7 @@ def _normalizar(nome: str) -> str:
     - Standardize spacing around '/' → ' / '
     - Collapse multiple spaces
     """
-    nome = nome.upper().strip().rstrip("/ ").strip()
+    nome = str(nome or "").upper().strip().rstrip("/ ").strip()
     nome = re.sub(r"\s*/\s*", " / ", nome)
     nome = re.sub(r"\s+", " ", nome)
     return nome
