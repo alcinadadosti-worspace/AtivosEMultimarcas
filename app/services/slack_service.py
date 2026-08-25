@@ -7,6 +7,7 @@ from datetime import date
 from typing import Optional
 
 from app.config import SLACK_BOT_TOKEN, SLACK_USER_MAP, SLACK_DEFAULT_USER_ID
+from app.services.calendario_ciclos import hoje_brasil
 from app.services.metas import acumulado_valido, calcular_meta_diaria, calcular_meta_do_dia
 
 
@@ -44,12 +45,14 @@ def _fmt_currency(v) -> str:
 
 
 def _fmt_pct(v) -> str:
+    """Formata pontos percentuais (86.7 -> '86.7%').
+
+    Os valores chegam SEMPRE em pontos: os reais vêm de percent_* (já ×100) e
+    as metas de metas._parse_pct. Não reescalar valores <= 1 — um setor com
+    0,8% de IAF Make sairia no card como "80.0%".
+    """
     try:
-        v = float(v)
-        # Values <= 1 are fractions (0.73 = 73%)
-        if v <= 1.0:
-            v = v * 100
-        return f"{v:.1f}%"
+        return f"{float(v):.1f}%"
     except Exception:
         return "—"
 
@@ -137,8 +140,8 @@ def build_blocks(supervisora: str, setor: str, dados: dict) -> list:
         _linha_metrica("IAF Make %",       _fmt_pct(r_mak),      _fmt_pct(m_mak) if m_mak else "—",      pct(r_mak, m_mak)),
     ]
 
-    from datetime import date
-    hoje = date.today().strftime("%d/%m/%Y")
+    # Data de Brasília: o Render roda em UTC e date.today() vira "amanhã" após as 21h.
+    hoje = hoje_brasil().strftime("%d/%m/%Y")
 
     status_geral = _status_geral(dados)
     status_msg   = _STATUS_TEXTO.get(status_geral, "—")
@@ -235,8 +238,8 @@ def _detalhe_ritmo(item: dict, dias_restantes: int) -> str:
 
 def build_blocks_diario(supervisora: str, setor: str, dados: dict, posicao: dict) -> list:
     """
-    Block Kit da *meta diária* (Receita, IAF Cabelo, IAF Make), no mesmo
-    padrão visual do card do ciclo:
+    Block Kit da *meta diária* (indicadores de metas.INDICADORES_DIARIOS —
+    hoje só Receita), no mesmo padrão visual do card do ciclo:
 
     📍 Hoje — vendas do dia (recorte por DataCaptacao) contra a meta do dia
        (meta do ciclo ÷ dias úteis). Só se `dados["hoje"]` vier preenchido.
@@ -321,7 +324,7 @@ def build_blocks_diario(supervisora: str, setor: str, dados: dict, posicao: dict
             }],
         })
 
-    hoje = date.today().strftime("%d/%m/%Y")
+    hoje = hoje_brasil().strftime("%d/%m/%Y")
     ref = _fmt_data_br(posicao.get("data_ref", ""))
     blocks.append({"type": "divider"})
     blocks.append({

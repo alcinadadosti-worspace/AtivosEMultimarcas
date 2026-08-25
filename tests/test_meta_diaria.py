@@ -257,3 +257,35 @@ class TestBlocksDiario:
         r = enviar_meta_slack("KARINE", "X", DADOS, modo="diario", posicao=None)
         assert r["ok"] is False
         assert chamado["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Formatação dos cards (regressões)
+# ---------------------------------------------------------------------------
+
+class TestFormatacaoCard:
+    def test_fmt_pct_nao_reescala_valores_pequenos(self):
+        # Os valores chegam em pontos percentuais: 0,8% de IAF Make é "0.8%",
+        # não "80.0%" (bug antigo: valores <= 1 eram tratados como fração).
+        from app.services.slack_service import _fmt_pct
+        assert _fmt_pct(0.8) == "0.8%"
+        assert _fmt_pct(1.0) == "1.0%"
+        assert _fmt_pct(86.7) == "86.7%"
+        assert _fmt_pct("x") == "—"
+
+    def test_card_ciclo_pct_pequeno_coerente_com_barra(self):
+        dados = dict(DADOS, make=0.8, meta_make=60.0)
+        blocks = build_blocks("KARINE", "X", dados)
+        texto = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section" and "text" in b)
+        linha = next(l for l in texto.splitlines() if "IAF Make" in l)
+        assert "0.8%" in linha and "80.0%" not in linha
+        assert linha.rstrip().endswith("*1%*")
+
+    def test_rodape_usa_data_de_brasilia(self, monkeypatch):
+        # O Render roda em UTC: o rodapé "Gerado em" tem de vir de hoje_brasil().
+        import app.services.slack_service as svc
+        monkeypatch.setattr(svc, "hoje_brasil", lambda: date(2026, 8, 25))
+        pos = posicao_ciclo("12/2026", date(2026, 8, 25))
+        for blocks in (build_blocks("K", "X", DADOS), build_blocks_diario("K", "X", DADOS, pos)):
+            rodape = [b for b in blocks if b["type"] == "context"][-1]["elements"][0]["text"]
+            assert "Gerado em 25/08/2026" in rodape
