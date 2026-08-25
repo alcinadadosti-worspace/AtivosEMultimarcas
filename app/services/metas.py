@@ -174,3 +174,165 @@ def encontrar_meta_setor(
                 return meta
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Meta diária (ritmo dentro do ciclo)
+# ---------------------------------------------------------------------------
+
+# Indicadores da meta diária — escolha da gerência (ago/2026): Receita,
+# Multimarca, IAF Cabelo e IAF Make (os três últimos em clientes, meta Qtd da
+# planilha). Ativos, RPA e os % ficam apenas na meta do ciclo. Todos acumulam
+# ao longo do ciclo, então dividem por dia útil.
+#   (chave_real, chave_meta, label, tipo)
+INDICADORES_DIARIOS = [
+    ("receita",              "meta_receita",        "Receita",               "moeda"),
+    ("clientes_multimarcas", "meta_multimarca_qtd", "Multimarca (clientes)", "int"),
+    ("clientes_cabelos",     "meta_cabelos_qtd",    "IAF Cabelo (clientes)", "int"),
+    ("clientes_make",        "meta_make_qtd",       "IAF Make (clientes)",   "int"),
+]
+
+
+def _num(v) -> float:
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def calcular_meta_diaria(dados: Dict[str, Any], posicao: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Quebra a meta do ciclo em ritmo diário para os indicadores acumulativos.
+
+    Args:
+        dados:   mesmo dict enviado ao Slack (receita, meta_receita, ...).
+        posicao: saída de calendario_ciclos.posicao_ciclo.
+
+    Para cada indicador com meta > 0:
+        meta_dia        -> meta / dias úteis do ciclo (ritmo base)
+        esperado        -> meta_dia * dia_atual (onde deveria estar hoje)
+        falta           -> max(0, meta - real)
+        necessario_dia  -> falta / dias_restantes (None se não restam dias)
+        pct_meta        -> real / meta * 100
+        pct_ritmo       -> real / esperado * 100 (None no dia 0)
+        status          -> 'batida' | 'no_ritmo' | 'atrasado'
+    status_geral: 'batida' (todas), 'atrasado' (alguma), 'no_ritmo', 'sem_meta'.
+    """
+    total = int(posicao.get("dias_uteis") or 0)
+    dia_atual = int(posicao.get("dia_atual") or 0)
+    restantes = int(posicao.get("dias_restantes") or 0)
+
+    itens = []
+    for chave_real, chave_meta, label, tipo in INDICADORES_DIARIOS:
+        meta = _num(dados.get(chave_meta))
+        if meta <= 0 or total <= 0:
+            continue
+        real = _num(dados.get(chave_real))
+        meta_dia = meta / total
+        esperado = meta_dia * dia_atual
+        falta = max(0.0, meta - real)
+        necessario_dia = (falta / restantes) if restantes > 0 else None
+        pct_meta = real / meta * 100
+        pct_ritmo = (real / esperado * 100) if esperado > 0 else None
+
+        if real >= meta:
+            status = "batida"
+        elif esperado <= 0 or real >= esperado:
+            status = "no_ritmo"
+        else:
+            status = "atrasado"
+
+        itens.append({
+            "chave": chave_real,
+            "label": label,
+            "tipo": tipo,
+            "real": real,
+            "meta": meta,
+            "meta_dia": meta_dia,
+            "esperado": esperado,
+            "gap": real - esperado,
+            "falta": falta,
+            "necessario_dia": necessario_dia,
+            "pct_meta": pct_meta,
+            "pct_ritmo": pct_ritmo,
+            "status": status,
+        })
+
+    if not itens:
+        status_geral = "sem_meta"
+    elif all(i["status"] == "batida" for i in itens):
+        status_geral = "batida"
+    elif any(i["status"] == "atrasado" for i in itens):
+        status_geral = "atrasado"
+    else:
+        status_geral = "no_ritmo"
+
+    return {"itens": itens, "status_geral": status_geral, "posicao": posicao}
+
+
+# Tolerância (dias corridos) entre o início do ciclo e a primeira data da
+# planilha para ela ainda contar como "acumulado do ciclo".
+TOLERANCIA_ACUMULADO_DIAS = 2
+
+
+def acumulado_valido(planilha: Optional[Dict[str, Any]], posicao: Dict[str, Any]) -> bool:
+    """
+    A planilha cobre o ciclo desde o início (→ o realizado é o acumulado)?
+
+    planilha: saída de venda.obter_periodo_datas (data_min/data_max/n_dias).
+    Sem informação de data assume-se acumulado (comportamento anterior).
+    Uma planilha "só do dia" (data_min bem depois do início) NÃO serve para o
+    ritmo acumulado — só para o resultado do dia.
+    """
+    if not planilha or not planilha.get("tem_data", True) or not planilha.get("data_min"):
+        return True
+    try:
+        from datetime import date, timedelta
+        data_min = date.fromisoformat(str(planilha["data_min"])[:10])
+        inicio = date.fromisoformat(str(posicao.get("inicio", ""))[:10])
+    except (ValueError, TypeError):
+        return True
+    return data_min <= inicio + timedelta(days=TOLERANCIA_ACUMULADO_DIAS)
+
+
+def calcular_meta_do_dia(dados: Dict[str, Any], posicao: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Resultado DO DIA (recorte da planilha por DataCaptacao) contra a meta do
+    dia (meta do ciclo ÷ dias úteis).
+
+    dados["hoje"]: {data, receita, clientes_ativos, clientes_multimarcas,
+                    clientes_cabelos, clientes_make} — None se não houver recorte.
+    Para cada indicador com meta > 0:
+        real_dia, meta_dia, pct (real_dia / meta_dia), status 'batida' | 'abaixo'
+    status_geral: 'batida' (todas) | 'abaixo' | 'sem_meta' | 'sem_recorte'.
+    """
+    hoje = dados.get("hoje") or None
+    total = int(posicao.get("dias_uteis") or 0)
+    if not hoje or total <= 0:
+        return {"itens": [], "status_geral": "sem_recorte", "data": None}
+
+    itens = []
+    for chave_real, chave_meta, label, tipo in INDICADORES_DIARIOS:
+        meta = _num(dados.get(chave_meta))
+        if meta <= 0:
+            continue
+        real_dia = _num(hoje.get(chave_real))
+        meta_dia = meta / total
+        pct = real_dia / meta_dia * 100 if meta_dia > 0 else 0.0
+        itens.append({
+            "chave": chave_real,
+            "label": label,
+            "tipo": tipo,
+            "real_dia": real_dia,
+            "meta_dia": meta_dia,
+            "pct": pct,
+            "status": "batida" if real_dia >= meta_dia else "abaixo",
+        })
+
+    if not itens:
+        status_geral = "sem_meta"
+    elif all(i["status"] == "batida" for i in itens):
+        status_geral = "batida"
+    else:
+        status_geral = "abaixo"
+    return {"itens": itens, "status_geral": status_geral, "data": hoje.get("data")}

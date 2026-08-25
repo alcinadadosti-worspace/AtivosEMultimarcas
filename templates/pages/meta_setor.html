@@ -157,6 +157,49 @@
     color: #f8fafc;
 }
 
+.filtro-group input[type="date"] {
+    background: #1e1e2d;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 8px;
+    color: #f8fafc;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+    outline: none;
+    color-scheme: dark;
+}
+
+/* ── Envio Slack: modo diário ───────────────────────────── */
+.envio-info {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+}
+.envio-info.warn {
+    background: rgba(248, 113, 113, 0.08);
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #f87171;
+}
+.modo-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    white-space: nowrap;
+}
+.modo-badge.ciclo {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: #a78bfa;
+}
+.cell-ritmo { font-size: 0.7rem; color: #fbbf24; margin-top: 2px; white-space: nowrap; }
+
 
 /* ── Resumo cards ──────────────────────────────────────── */
 .legenda {
@@ -230,7 +273,7 @@
                 <div class="filtros-row">
                     <div class="filtro-group">
                         <label>Ciclo</label>
-                        <select x-model="filtros.ciclo" @change="buscarDados()">
+                        <select x-model="filtros.ciclo" @change="buscarDados(); carregarPosicao()">
                             <option value="">Todos os ciclos</option>
                             <template x-for="c in opcoes.ciclos" :key="c">
                                 <option :value="c" x-text="c"></option>
@@ -246,7 +289,23 @@
                             </template>
                         </select>
                     </div>
+                    <!-- Tipo de envio Slack (escolha da gerência; fica salvo no navegador) -->
+                    <div class="filtro-group">
+                        <label>Envio Slack</label>
+                        <select x-model="envio.modo" @change="mudarModoEnvio()" title="Meta do ciclo: resultado geral vs. meta. Meta diária: onde deveria estar hoje e quanto precisa por dia útil.">
+                            <option value="auto">🤖 Automático (pela planilha)</option>
+                            <option value="ciclo">📊 Meta do ciclo (geral)</option>
+                            <option value="diario">⏱️ Meta diária (ritmo do dia)</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group" x-show="modoEfetivo() === 'diario'">
+                        <label>Data de referência</label>
+                        <input type="date" x-model="envio.dataRef" @change="buscarDados(); carregarPosicao()" title="Dia considerado como 'hoje' no cálculo (padrão: hoje)">
+                    </div>
                 </div>
+                <div class="envio-info" x-show="modoEfetivo() === 'diario'" :class="{ warn: !!posicaoErro }" x-text="posicaoTexto()"></div>
+                <div class="envio-info warn" x-show="modoEfetivo() !== 'diario' && planilhaSoDoDia()"
+                     x-text="periodo ? `⚠️ A planilha carregada cobre só ${fmtDataBR(periodo.data_min)} → ${fmtDataBR(periodo.data_max)} — não é o acumulado do ciclo. Para ela, use o envio “Meta diária” (ou “Automático”); para a meta do ciclo, suba a planilha acumulada.` : ''"></div>
             </div>
 
             <!-- Tabela de desempenho -->
@@ -256,6 +315,7 @@
                     Desempenho por Setor
                     <span style="margin-left:auto;display:flex;align-items:center;gap:10px;">
                         <span style="font-size:0.8rem;font-weight:400;color:#64748b;" x-text="dados.length + ' setores'"></span>
+                        <span class="modo-badge" :class="{ ciclo: modoEfetivo() !== 'diario' }" x-text="badgeEnvio()"></span>
                         <button @click="enviarSlackTodos($el)" title="Enviar para todas as supervisoras via Slack"
                             style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(74,21,75,0.4),rgba(123,47,190,0.4));
                                    border:1px solid rgba(123,47,190,0.5);border-radius:8px;padding:5px 12px;
@@ -371,6 +431,8 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.currency(metaEfetiva(s, 'receita'))"></div>
                                                     <div :class="pctClass(s.receita, metaEfetiva(s,'receita'))" class="cell-pct" x-text="pctStr(s.receita, metaEfetiva(s,'receita'))"></div>
+                                                    <div class="cell-ritmo" x-show="modoEfetivo() === 'diario' && posicao" x-text="ritmoStr(s, 'receita', 'currency')"></div>
+                                                    <div class="cell-ritmo" style="color:#93c5fd;" x-show="modoEfetivo() === 'diario' && posicao && s.hoje" x-text="hojeStr(s, 'receita', 'currency')"></div>
                                                 </div>
                                             </template>
                                         </td>
@@ -404,6 +466,9 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_multimarcas'))"></div>
                                                     <div :class="pctClass(s.percent_multimarcas, metaEfetiva(s,'percent_multimarcas'))" class="cell-pct" x-text="pctStr(s.percent_multimarcas, metaEfetiva(s,'percent_multimarcas'))"></div>
+                                                    <!-- meta diária: em clientes multimarca (meta Qtd da planilha) -->
+                                                    <div class="cell-ritmo" x-show="modoEfetivo() === 'diario' && posicao" x-text="ritmoStr(s, 'clientes_multimarcas', 'number')"></div>
+                                                    <div class="cell-ritmo" style="color:#93c5fd;" x-show="modoEfetivo() === 'diario' && posicao && s.hoje" x-text="hojeStr(s, 'clientes_multimarcas', 'number')"></div>
                                                 </div>
                                             </template>
                                         </td>
@@ -415,6 +480,9 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_cabelos'))"></div>
                                                     <div :class="pctClass(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))" class="cell-pct" x-text="pctStr(s.percent_cabelos, metaEfetiva(s,'percent_cabelos'))"></div>
+                                                    <!-- meta diária: em clientes IAF Cabelo (meta Qtd da planilha) -->
+                                                    <div class="cell-ritmo" x-show="modoEfetivo() === 'diario' && posicao" x-text="ritmoStr(s, 'clientes_cabelos', 'number')"></div>
+                                                    <div class="cell-ritmo" style="color:#93c5fd;" x-show="modoEfetivo() === 'diario' && posicao && s.hoje" x-text="hojeStr(s, 'clientes_cabelos', 'number')"></div>
                                                 </div>
                                             </template>
                                         </td>
@@ -426,6 +494,9 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.percent(metaEfetiva(s, 'percent_make'))"></div>
                                                     <div :class="pctClass(s.percent_make, metaEfetiva(s,'percent_make'))" class="cell-pct" x-text="pctStr(s.percent_make, metaEfetiva(s,'percent_make'))"></div>
+                                                    <!-- meta diária: em clientes IAF Make (meta Qtd da planilha) -->
+                                                    <div class="cell-ritmo" x-show="modoEfetivo() === 'diario' && posicao" x-text="ritmoStr(s, 'clientes_make', 'number')"></div>
+                                                    <div class="cell-ritmo" style="color:#93c5fd;" x-show="modoEfetivo() === 'diario' && posicao && s.hoje" x-text="hojeStr(s, 'clientes_make', 'number')"></div>
                                                 </div>
                                             </template>
                                         </td>
@@ -452,6 +523,14 @@ function metaSetor() {
         filtros: { ciclo: '', gerencia: '' },
         enviados: {},            // setor → true após envio Slack bem-sucedido
 
+        // Tipo de envio Slack escolhido pela gerência: 'ciclo' (meta geral) ou
+        // 'diario' (ritmo do dia). Fica salvo no navegador.
+        envio: { modo: 'auto', dataRef: '' },   // 'auto' = decide pela planilha (só-dia → diária, acumulada → ciclo)
+        posicao: null,           // posição no ciclo (dia útil X de Y) — só no modo diário
+        posicaoErro: '',
+        periodo: null,           // datas cobertas pela planilha (só-dia vs acumulado) — modo diário
+        _posSeq: 0,              // sequência de carregarPosicao() (descarta respostas velhas)
+
         contagem: { bateu: 0, quase: 0, longe: 0, sem_meta: 0 },
 
         fmt: {
@@ -475,8 +554,201 @@ function metaSetor() {
         },
 
         async init() {
+            this.envio.dataRef = this.hojeISO();
+            try {
+                const salvo = localStorage.getItem('metas_modo_envio');
+                if (salvo === 'auto' || salvo === 'ciclo' || salvo === 'diario') this.envio.modo = salvo;
+            } catch (e) {}
             if (!this.hasData) return;
             await Promise.all([this.carregarOpcoes(), this.buscarDados()]);
+            await this.carregarPosicao();
+        },
+
+        hojeISO() {
+            const d = new Date();
+            const p = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+        },
+
+        fmtDataBR(iso) {
+            if (!iso) return '—';
+            const [y, m, d] = String(iso).split('-');
+            return `${d}/${m}/${y}`;
+        },
+
+        // Ciclo usado no envio diário: o do filtro ou, sem filtro, o único da planilha.
+        cicloEnvio() {
+            if (this.filtros.ciclo) return this.filtros.ciclo;
+            if (this.opcoes.ciclos.length === 1) return this.opcoes.ciclos[0];
+            return '';
+        },
+
+        mudarModoEnvio() {
+            try { localStorage.setItem('metas_modo_envio', this.envio.modo); } catch (e) {}
+            this.carregarPosicao();
+        },
+
+        async carregarPosicao() {
+            // Token de sequência: trocas rápidas de filtro/modo/data disparam várias
+            // chamadas; só a última pode escrever o estado.
+            const seq = ++this._posSeq;
+            this.posicao = null;
+            this.posicaoErro = '';
+            this.periodo = null;
+            const ciclo = this.cicloEnvio();
+            const params = new URLSearchParams();
+            if (ciclo)              params.set('ciclo',    ciclo);
+            if (this.envio.dataRef) params.set('data_ref', this.envio.dataRef);
+
+            // Período da planilha vale nos dois modos: avisa quando ela é só do dia.
+            try {
+                const r = await fetch('/api/metas/periodo-planilha?' + params);
+                const per = r.ok ? await r.json() : null;
+                if (seq !== this._posSeq) return;
+                this.periodo = per;
+            } catch (e) {}
+
+            if (this.modoEfetivo() !== 'diario') return;
+            if (!ciclo) {
+                this.posicaoErro = 'A planilha tem mais de um ciclo — selecione um ciclo no filtro para a meta diária.';
+                return;
+            }
+            try {
+                const res  = await fetch('/api/metas/calendario?' + params);
+                const data = await res.json();
+                if (seq !== this._posSeq) return;
+                if (!res.ok) { this.posicaoErro = data.detail || 'Ciclo fora do calendário'; return; }
+                this.posicao = data;
+                if (data.status === 'encerrado')  this.posicaoErro = `Ciclo ${data.ciclo} já encerrado — use o envio por ciclo.`;
+                else if (data.status === 'antes') this.posicaoErro = `Ciclo ${data.ciclo} ainda não começou (início ${this.fmtDataBR(data.inicio)}).`;
+            } catch (e) {
+                this.posicaoErro = 'Não foi possível carregar o calendário do ciclo.';
+            }
+        },
+
+        // Planilha só do dia carregada com envio "meta do ciclo" → números distorcidos
+        planilhaSoDoDia() {
+            const p = this.periodo;
+            return !!(p && p.tem_data && p.acumulado_valido === false);
+        },
+
+        // Modo que realmente vai no envio. 'auto' decide pela planilha carregada:
+        // só do dia → meta diária; acumulada (ou sem data) → meta do ciclo.
+        modoEfetivo() {
+            if (this.envio.modo === 'auto') return this.planilhaSoDoDia() ? 'diario' : 'ciclo';
+            return this.envio.modo;
+        },
+
+        badgeEnvio() {
+            const m = this.modoEfetivo() === 'diario' ? '⏱️ envio: meta diária' : '📊 envio: meta do ciclo';
+            return this.envio.modo === 'auto' ? `${m} (auto)` : m;
+        },
+
+        // Resumo do que a planilha carregada permite no envio diário
+        periodoTexto() {
+            const p = this.periodo;
+            if (!p || !p.tem_data) return 'planilha sem DataCaptacao → só acumulado do ciclo';
+            const faixa = p.data_min === p.data_max
+                ? `só ${this.fmtDataBR(p.data_min)}`
+                : `${this.fmtDataBR(p.data_min)} → ${this.fmtDataBR(p.data_max)} (${p.n_dias} dias)`;
+            const rec = p.dia_recorte ? `recorte "hoje" = ${this.fmtDataBR(p.dia_recorte)}` : 'sem vendas até a data de referência';
+            const acc = p.acumulado_valido
+                ? 'acumulado do ciclo ✓'
+                : 'só o resultado do dia (planilha não cobre o ciclo desde o início)';
+            return `planilha ${faixa} · ${rec} · ${acc}`;
+        },
+
+        posicaoTexto() {
+            if (this.posicaoErro) return '⚠️ ' + this.posicaoErro;
+            const p = this.posicao;
+            if (!p) return '⏱️ Carregando calendário do ciclo...';
+            const ext  = p.status === 'extensao' ? ' · extensão do ciclo' : '';
+            const hoje = p.hoje_util ? 'incl. hoje' : 'hoje não é dia útil';
+            return `⏱️ Meta diária · Ciclo ${p.ciclo} (${this.fmtDataBR(p.inicio)} → ${this.fmtDataBR(p.fim)}, +2 de extensão)`
+                 + ` · dia útil ${p.dia_atual} de ${p.dias_uteis} · faltam ${p.dias_restantes} dias úteis (${hoje})${ext}`
+                 + ` — ${this.periodoTexto()}`;
+        },
+
+        // "precisa R$ X/dia" para os indicadores acumulativos (modo diário)
+        ritmoStr(s, campo, tipo) {
+            const p = this.posicao;
+            const meta = this.metaEfetiva(s, campo);
+            if (!p || meta === null) return '';
+            const falta = Math.max(0, meta - (s[campo] || 0));
+            if (falta <= 0) return '✓ meta batida';
+            if (!p.dias_restantes) return 'sem dias úteis restantes';
+            const porDia = falta / p.dias_restantes;
+            const v = tipo === 'currency' ? this.fmt.currency(porDia) : porDia.toFixed(1).replace('.', ',');
+            return `precisa ${v}/dia`;
+        },
+
+        // "hoje: R$ X (meta do dia R$ Y)" — vendas do dia de recorte vs meta do ciclo ÷ dias úteis
+        hojeStr(s, campo, tipo) {
+            const p = this.posicao;
+            const meta = this.metaEfetiva(s, campo);
+            if (!p || !s.hoje || meta === null || !p.dias_uteis) return '';
+            const real = s.hoje[campo] || 0;
+            const metaDia = meta / p.dias_uteis;
+            const f = v => tipo === 'currency' ? this.fmt.currency(v) : (Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.', ','));
+            const ok = real >= metaDia ? '✓' : '·';
+            return `hoje ${this.fmtDataBR(s.hoje.data).slice(0, 5)}: ${f(real)} ${ok} meta/dia ${f(metaDia)}`;
+        },
+
+        podeEnviar() {
+            if (this.modoEfetivo() !== 'diario') {
+                // Só acontece se a gerência forçar "Meta do ciclo" com planilha só do dia:
+                // bloqueia (o servidor também recusa) — os números sairiam distorcidos.
+                if (this.planilhaSoDoDia()) {
+                    const p = this.periodo;
+                    alert(`A planilha carregada cobre só ${this.fmtDataBR(p.data_min)} → ${this.fmtDataBR(p.data_max)} — `
+                        + `não é o acumulado do ciclo, e a META DO CICLO sairia distorcida.\n\n`
+                        + `Use o envio "Meta diária" (ou "Automático") para essa planilha, ou suba a planilha acumulada.`);
+                    return false;
+                }
+                return true;
+            }
+            if (this.posicaoErro || !this.posicao) {
+                alert(this.posicaoErro || 'Calendário do ciclo ainda não carregado.');
+                return false;
+            }
+            return true;
+        },
+
+        // Corpo do POST /api/slack/enviar-meta para um setor, no modo escolhido.
+        montarPayload(s) {
+            const mp = s.meta_planilha || {};
+            const dados = {
+                receita:              s.receita || 0,
+                meta_receita:         mp.receita || null,
+                clientes_ativos:      s.clientes_ativos || 0,
+                meta_ativo:           mp.clientes_ativos || null,
+                rpa:                  s.rpa || 0,
+                meta_rpa:             mp.rpa || null,
+                multimarca:           s.percent_multimarcas || 0,
+                meta_multimarca:      mp.percent_multimarcas || null,
+                cabelos:              s.percent_cabelos || 0,
+                meta_cabelos:         mp.percent_cabelos || null,
+                make:                 s.percent_make || 0,
+                meta_make:            mp.percent_make || null,
+                // contagens — usadas na meta diária (quantos clientes faltam por dia)
+                clientes_multimarcas: s.clientes_multimarcas || 0,
+                meta_multimarca_qtd:  mp.clientes_multimarcas || null,
+                clientes_cabelos:     s.clientes_cabelos || 0,
+                meta_cabelos_qtd:     mp.clientes_cabelos || null,
+                clientes_make:        s.clientes_make || 0,
+                meta_make_qtd:        mp.clientes_make || null,
+                // recorte do dia + datas da planilha — só o envio diário usa
+                hoje:                 s.hoje || null,
+                planilha:             this.periodo || null,
+            };
+            return {
+                supervisora: s.supervisora || '',
+                setor:       s.setor,
+                dados,
+                modo:        this.modoEfetivo(),
+                ciclo:       this.cicloEnvio(),
+                data_ref:    this.envio.dataRef || null,
+            };
         },
 
         async carregarOpcoes() {
@@ -496,6 +768,8 @@ function metaSetor() {
                 const params = new URLSearchParams();
                 if (this.filtros.ciclo)    params.set('ciclos',    this.filtros.ciclo);
                 if (this.filtros.gerencia) params.set('gerencias', this.filtros.gerencia);
+                // Recorte "hoje" de cada setor (usado na meta diária); inofensivo no modo ciclo
+                if (this.envio.dataRef)    params.set('dia',       this.envio.dataRef);
 
                 const res  = await fetch('/api/metas/por-setor?' + params);
                 this.dados = await res.json();
@@ -583,29 +857,15 @@ function metaSetor() {
         },
 
         async enviarSlackSetor(s, btn) {
+            if (!this.podeEnviar()) return;
             const orig = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳';
-            const mp = s.meta_planilha || {};
-            const dados = {
-                receita:         s.receita || 0,
-                meta_receita:    mp.receita || null,
-                clientes_ativos: s.clientes_ativos || 0,
-                meta_ativo:      mp.clientes_ativos || null,
-                rpa:             s.rpa || 0,
-                meta_rpa:        mp.rpa || null,
-                multimarca:      s.percent_multimarcas || 0,
-                meta_multimarca: mp.percent_multimarcas || null,
-                cabelos:         s.percent_cabelos || 0,
-                meta_cabelos:    mp.percent_cabelos || null,
-                make:            s.percent_make || 0,
-                meta_make:       mp.percent_make || null,
-            };
             try {
                 const r = await fetch('/api/slack/enviar-meta', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({supervisora: s.supervisora || '', setor: s.setor, dados}),
+                    body: JSON.stringify(this.montarPayload(s)),
                 });
                 const data = await r.json();
                 if (data.ok) {
@@ -624,32 +884,19 @@ function metaSetor() {
         },
 
         async enviarSlackTodos(btn) {
-            if (!confirm(`Enviar resultado via Slack para todas as ${this.dados.length} supervisoras?`)) return;
+            if (!this.podeEnviar()) return;
+            const tipo = this.modoEfetivo() === 'diario' ? 'a META DIÁRIA (ritmo do dia)' : 'a META DO CICLO (resultado geral)';
+            if (!confirm(`Enviar ${tipo} via Slack para todas as ${this.dados.length} supervisoras?`)) return;
             const origText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '⏳ Enviando...';
             let ok = 0, erro = 0;
             for (const s of this.dados) {
-                const mp = s.meta_planilha || {};
-                const dados = {
-                    receita:         s.receita || 0,
-                    meta_receita:    mp.receita || null,
-                    clientes_ativos: s.clientes_ativos || 0,
-                    meta_ativo:      mp.clientes_ativos || null,
-                    rpa:             s.rpa || 0,
-                    meta_rpa:        mp.rpa || null,
-                    multimarca:      s.percent_multimarcas || 0,
-                    meta_multimarca: mp.percent_multimarcas || null,
-                    cabelos:         s.percent_cabelos || 0,
-                    meta_cabelos:    mp.percent_cabelos || null,
-                    make:            s.percent_make || 0,
-                    meta_make:       mp.percent_make || null,
-                };
                 try {
                     const r = await fetch('/api/slack/enviar-meta', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({supervisora: s.supervisora || '', setor: s.setor, dados}),
+                        body: JSON.stringify(this.montarPayload(s)),
                     });
                     const data = await r.json();
                     if (data.ok) { ok++; this.enviados[s.setor] = true; } else erro++;
@@ -803,7 +1050,7 @@ function metaSetor() {
   <!-- Ações -->
   <div class="actions">
     <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
-    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">💬 Enviar via Slack</button>
+    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">💬 Enviar via Slack (${this.modoEfetivo() === 'diario' ? 'meta diária' : 'meta do ciclo'})</button>
     <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
@@ -851,7 +1098,18 @@ const _slackMeta = {
         meta_cabelos: ${JSON.stringify(s.meta_planilha && s.meta_planilha.percent_cabelos ? s.meta_planilha.percent_cabelos : null)},
         make: ${s.percent_make || 0},
         meta_make: ${JSON.stringify(s.meta_planilha && s.meta_planilha.percent_make ? s.meta_planilha.percent_make : null)},
-    }
+        clientes_multimarcas: ${s.clientes_multimarcas || 0},
+        meta_multimarca_qtd: ${JSON.stringify(s.meta_planilha && s.meta_planilha.clientes_multimarcas ? s.meta_planilha.clientes_multimarcas : null)},
+        clientes_cabelos: ${s.clientes_cabelos || 0},
+        meta_cabelos_qtd: ${JSON.stringify(s.meta_planilha && s.meta_planilha.clientes_cabelos ? s.meta_planilha.clientes_cabelos : null)},
+        clientes_make: ${s.clientes_make || 0},
+        meta_make_qtd: ${JSON.stringify(s.meta_planilha && s.meta_planilha.clientes_make ? s.meta_planilha.clientes_make : null)},
+        hoje: ${JSON.stringify(s.hoje || null)},
+        planilha: ${JSON.stringify(this.periodo || null)},
+    },
+    modo: ${JSON.stringify(this.modoEfetivo())},
+    ciclo: ${JSON.stringify(this.cicloEnvio())},
+    data_ref: ${JSON.stringify(this.envio.dataRef || null)},
 };
 function salvarImagem() {
     const btn = document.getElementById('btnImg');
@@ -878,7 +1136,8 @@ function enviarSlack() {
     fetch(_slackMeta.base + '/api/slack/enviar-meta', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({supervisora: _slackMeta.supervisora, setor: _slackMeta.setor, dados: _slackMeta.dados}),
+        body: JSON.stringify({supervisora: _slackMeta.supervisora, setor: _slackMeta.setor, dados: _slackMeta.dados,
+                              modo: _slackMeta.modo, ciclo: _slackMeta.ciclo, data_ref: _slackMeta.data_ref}),
     }).then(r => r.json()).then(data => {
         btn.disabled = false;
         if (data.ok) {

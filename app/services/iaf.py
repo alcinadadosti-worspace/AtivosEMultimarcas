@@ -17,6 +17,7 @@ from app.config import (
     VENDAS_COL_QTD_ITENS,
     VENDAS_COL_VALOR,
     VENDAS_COL_GERENCIA,
+    VENDAS_COL_DATA_ISO,
     TIPO_VENDA,
 )
 from app.utils.normalizers import normalizar_sku
@@ -271,6 +272,8 @@ def cruzar_vendas_com_iaf(
                 "TipoTransacao": tipo_transacao,
                 VENDAS_COL_QTD_ITENS: row[VENDAS_COL_QTD_ITENS],
                 VENDAS_COL_VALOR: row[VENDAS_COL_VALOR],
+                # Data ('AAAA-MM-DD') para o recorte "hoje" da meta diária
+                VENDAS_COL_DATA_ISO: row.get(VENDAS_COL_DATA_ISO),
             })
 
     if not resultados:

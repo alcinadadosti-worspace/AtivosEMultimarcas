@@ -21,6 +21,8 @@ from app.config import (
     VENDAS_COL_QTD_ITENS,
     VENDAS_COL_VALOR,
     VENDAS_COL_GERENCIA,
+    VENDAS_COL_DATA,
+    VENDAS_COL_DATA_ISO,
     VENDAS_REQUIRED_COLUMNS,
     TIPO_VENDA,
     MARCA_DESCONHECIDA,
@@ -94,6 +96,23 @@ def normalizar_valor_brasileiro(valor: str) -> str:
     # If only dot or no separators, leave as is (already standard format)
 
     return valor
+
+
+def normalizar_data_iso(valor: Optional[str]) -> Optional[str]:
+    """
+    'AAAA-MM-DD' a partir da DataCaptacao, em qualquer formato que a planilha traga:
+        '2026-08-25T00:00:00.000' (xlsx) · '25/08/2026 00:00:00' (CSV) · '2026-08-25'
+    None se vazio ou irreconhecível.
+    """
+    s = str(valor or "").strip()
+    if not s:
+        return None
+    cabeca = s[:10]
+    if len(cabeca) == 10 and cabeca[4] == "-" and cabeca[7] == "-" and cabeca[:4].isdigit():
+        return cabeca
+    if len(cabeca) == 10 and cabeca[2] == "/" and cabeca[5] == "/" and cabeca[6:].isdigit():
+        return f"{cabeca[6:]}-{cabeca[3:5]}-{cabeca[:2]}"
+    return None
 
 
 def ler_planilha(file_bytes: bytes, filename: str) -> pl.DataFrame:
@@ -244,6 +263,15 @@ def processar_planilha_vendas(
           .alias(VENDAS_COL_SETOR)
     )
 
+    # 2c. DATA DE CAPTAÇÃO → 'AAAA-MM-DD' (coluna derivada). Serve ao recorte
+    # "hoje" da meta diária e à detecção de planilha só-do-dia vs acumulada.
+    if VENDAS_COL_DATA in df.columns:
+        df = df.with_columns(
+            pl.col(VENDAS_COL_DATA).cast(pl.Utf8)
+              .map_elements(normalizar_data_iso, return_dtype=pl.Utf8)
+              .alias(VENDAS_COL_DATA_ISO)
+        )
+
     # 3. NORMALIZE SKUs
     df = df.with_columns([
         pl.col(VENDAS_COL_CODIGO_PRODUTO)
@@ -338,6 +366,25 @@ def processar_planilha_vendas(
             "taxa_match": taxa_match,
         },
         "avisos": avisos
+    }
+
+
+def obter_periodo_datas(df: pl.DataFrame) -> Dict[str, Any]:
+    """
+    Datas de captação presentes na planilha (só linhas de venda).
+
+    Returns:
+        tem_data, data_min, data_max ('AAAA-MM-DD'), n_dias, dias (ordenadas)
+    """
+    if df is None or VENDAS_COL_DATA_ISO not in df.columns:
+        return {"tem_data": False, "data_min": None, "data_max": None, "n_dias": 0, "dias": []}
+    dias = sorted(d for d in df[VENDAS_COL_DATA_ISO].unique().to_list() if d)
+    return {
+        "tem_data": bool(dias),
+        "data_min": dias[0] if dias else None,
+        "data_max": dias[-1] if dias else None,
+        "n_dias": len(dias),
+        "dias": dias,
     }
 
 

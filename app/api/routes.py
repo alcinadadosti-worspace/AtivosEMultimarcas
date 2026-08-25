@@ -19,7 +19,7 @@ import polars as pl
 from openpyxl import Workbook, load_workbook
 
 from app.api.dependencies import get_db
-from app.config import DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, MARCAS_GRUPO, MOTIVO_MATCH_EXATO, VENDAS_COL_SETOR, VENDAS_COL_GERENCIA
+from app.config import DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, MARCAS_GRUPO, MOTIVO_MATCH_EXATO, VENDAS_COL_SETOR, VENDAS_COL_GERENCIA, VENDAS_COL_DATA_ISO
 from app.utils.normalizers import normalizar_sku
 from app.api.schemas import (
     UploadResponse,
@@ -37,6 +37,7 @@ from app.services.session import (
 from app.services.venda import (
     processar_planilha_vendas,
     obter_ciclos_unicos,
+    obter_periodo_datas,
     obter_setores_unicos,
     obter_marcas_unicas,
     obter_gerencias_unicas,
@@ -66,7 +67,8 @@ from app.services.auditoria import (
     listar_auditoria,
     listar_produtos_novos,
 )
-from app.services.metas import ler_planilha_metas, encontrar_meta_setor
+from app.services.metas import ler_planilha_metas, encontrar_meta_setor, acumulado_valido
+from app.services.calendario_ciclos import posicao_ciclo, ciclo_da_data, hoje_brasil
 from app.services.slack_service import enviar_meta_slack, resolver_slack_id
 from app.services.categoria import (
     classificar_vendas,
@@ -1168,10 +1170,64 @@ async def get_iaf_por_setor(
 # METAS POR SETOR
 # =============================================================================
 
+def _resolver_dia_recorte(df_vendas, data_ref: Optional[str]) -> Optional[str]:
+    """Último dia com vendas na planilha que não passe de data_ref ('AAAA-MM-DD').
+
+    Cobre a extração feita de manhã (a planilha fecha em ontem): o recorte
+    "hoje" vira o último dia disponível. None se a planilha não tem data.
+    """
+    periodo = obter_periodo_datas(df_vendas)
+    if not periodo["tem_data"]:
+        return None
+    ref = (data_ref or hoje_brasil().isoformat())[:10]
+    candidatos = [d for d in periodo["dias"] if d <= ref]
+    return candidatos[-1] if candidatos else None
+
+
+def _metricas_do_dia(
+    session_data: dict,
+    ciclos_list: Optional[List[str]],
+    gerencias_list: Optional[List[str]],
+    dia: str,
+) -> Dict[str, Dict[str, Any]]:
+    """Receita / ativos / multimarca / cabelo / make por setor considerando SÓ
+    as vendas captadas em `dia`. {} se a planilha não traz DataCaptacao."""
+    df_vendas = session_data.get("df_vendas")
+    if df_vendas is None or VENDAS_COL_DATA_ISO not in df_vendas.columns:
+        return {}
+    df_v = aplicar_filtros(df_vendas, ciclos=ciclos_list, gerencias=gerencias_list)
+    df_v = df_v.filter(pl.col(VENDAS_COL_DATA_ISO) == dia)
+    if df_v.is_empty():
+        return {}
+    df_c = calcular_metricas_cliente(df_v)
+
+    df_iaf = session_data.get("df_iaf")
+    if df_iaf is None or df_iaf.is_empty() or VENDAS_COL_DATA_ISO not in df_iaf.columns:
+        df_i = pl.DataFrame()
+    else:
+        df_i = aplicar_filtros(df_iaf, ciclos=ciclos_list, gerencias=gerencias_list)
+        df_i = df_i.filter(pl.col(VENDAS_COL_DATA_ISO) == dia)
+    iaf = {i["setor"]: i for i in calcular_iaf_por_setor(df_c, df_i)}
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for m in calcular_metricas_por_setor(df_c):
+        i = iaf.get(m["setor"], {})
+        out[m["setor"]] = {
+            "data": dia,
+            "receita": m["receita"],
+            "clientes_ativos": m["clientes_ativos"],
+            "clientes_multimarcas": m["clientes_multimarcas"],
+            "clientes_cabelos": i.get("clientes_cabelos", 0),
+            "clientes_make": i.get("clientes_make", 0),
+        }
+    return out
+
+
 def _montar_metas_por_setor(
     session_data: dict,
     ciclos_list: Optional[List[str]],
     gerencias_list: Optional[List[str]],
+    dia: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Monta a lista de métricas reais por setor cruzada com as metas da planilha.
 
@@ -1241,6 +1297,26 @@ def _montar_metas_por_setor(
             m["supervisora"] = ""
             m["meta_planilha"] = None
 
+    # Recorte do dia (meta diária): métricas só das vendas captadas no último
+    # dia da planilha que não passe de `dia`. None por setor se não houver.
+    hoje_por_setor: Dict[str, Dict[str, Any]] = {}
+    dia_recorte = None
+    if dia:
+        dia_recorte = _resolver_dia_recorte(session_data.get("df_vendas"), dia)
+        if dia_recorte:
+            hoje_por_setor = _metricas_do_dia(session_data, ciclos_list, gerencias_list, dia_recorte)
+    # Setor sem venda no dia recebe zeros (é o alerta útil: "hoje ainda não
+    # vendeu"); só fica None quando a planilha não tem data nenhuma.
+    sem_venda = {
+        "receita": 0.0, "clientes_ativos": 0, "clientes_multimarcas": 0,
+        "clientes_cabelos": 0, "clientes_make": 0,
+    }
+    for m in metricas:
+        if dia_recorte:
+            m["hoje"] = hoje_por_setor.get(m["setor"]) or {"data": dia_recorte, **sem_venda}
+        else:
+            m["hoje"] = None
+
     return metricas
 
 
@@ -1248,6 +1324,7 @@ def _montar_metas_por_setor(
 async def get_metas_por_setor(
     ciclos: Optional[str] = Query(None),
     gerencias: Optional[str] = Query(None),
+    dia: Optional[str] = Query(None, description="AAAA-MM-DD: anexa 'hoje' (vendas só desse dia) a cada setor"),
     session: tuple = Depends(get_user_session),
 ):
     """Get per-sector metrics for goal tracking page."""
@@ -1255,8 +1332,9 @@ async def get_metas_por_setor(
 
     ciclos_list = ciclos.split(",") if ciclos else None
     gerencias_list = gerencias.split(",") if gerencias else None
+    dia_iso = _parse_data_ref(dia).isoformat() if dia else None
 
-    return _montar_metas_por_setor(session_data, ciclos_list, gerencias_list)
+    return _montar_metas_por_setor(session_data, ciclos_list, gerencias_list, dia=dia_iso)
 
 
 @api_router.get("/metas/export")
@@ -1306,6 +1384,53 @@ async def export_metas(
 async def get_metas_planilha():
     """Return the raw parsed content of metas.xlsx."""
     return ler_planilha_metas()
+
+
+def _parse_data_ref(valor: Optional[str]):
+    """'2026-08-25' -> date. Vazio -> hoje (Brasília). Inválido -> 400."""
+    if not valor:
+        return hoje_brasil()
+    try:
+        from datetime import date as _date
+        return _date.fromisoformat(str(valor)[:10])
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"data_ref inválida: {valor} (use AAAA-MM-DD)")
+
+
+@api_router.get("/metas/calendario")
+async def get_metas_calendario(
+    ciclo: Optional[str] = Query(None, description="Ex.: 12/2026. Vazio = ciclo de hoje"),
+    data_ref: Optional[str] = Query(None, description="AAAA-MM-DD. Vazio = hoje (Brasília)"),
+):
+    """Posição no ciclo (dia útil X de Y, dias restantes) usada pela meta diária."""
+    ref = _parse_data_ref(data_ref)
+    ciclo = (ciclo or "").strip() or ciclo_da_data(ref)
+    if not ciclo:
+        raise HTTPException(status_code=404, detail=f"Nenhum ciclo no calendário para {ref.strftime('%d/%m/%Y')}")
+    pos = posicao_ciclo(ciclo, ref)
+    if not pos:
+        raise HTTPException(status_code=404, detail=f"Ciclo {ciclo} não está no calendário de ciclos")
+    return pos
+
+
+@api_router.get("/metas/periodo-planilha")
+async def get_metas_periodo_planilha(
+    ciclo: Optional[str] = Query(None, description="Ex.: 12/2026 — para saber se a planilha cobre o ciclo"),
+    data_ref: Optional[str] = Query(None, description="AAAA-MM-DD. Vazio = hoje (Brasília)"),
+    session: tuple = Depends(get_user_session),
+):
+    """Datas cobertas pela planilha de vendas da sessão, o dia que entra como
+    'hoje' na meta diária e se ela serve como acumulado do ciclo."""
+    session_id, session_data = session
+    df_vendas = session_data.get("df_vendas")
+    periodo = obter_periodo_datas(df_vendas)
+    periodo.pop("dias", None)
+    ref = _parse_data_ref(data_ref)
+    periodo["data_ref"] = ref.isoformat()
+    periodo["dia_recorte"] = _resolver_dia_recorte(df_vendas, ref.isoformat()) if df_vendas is not None else None
+    pos = posicao_ciclo(ciclo, ref) if ciclo else None
+    periodo["acumulado_valido"] = acumulado_valido(periodo, pos) if pos else True
+    return periodo
 
 
 @api_router.get("/iaf/vendas")
@@ -2948,20 +3073,71 @@ async def mercado_export(
 # =============================================================================
 
 @api_router.post("/slack/enviar-meta")
-async def slack_enviar_meta(request: Request):
+async def slack_enviar_meta(request: Request, session: tuple = Depends(get_user_session)):
     """Send formatted sector goal metrics to supervisora via Slack DM."""
     from app.config import SLACK_BOT_TOKEN
+    session_id, session_data = session
     body = await request.json()
     supervisora = body.get("supervisora", "")
     setor = body.get("setor", "")
-    dados = body.get("dados", {})
+    dados = body.get("dados") or {}
+    if not isinstance(dados, dict):
+        raise HTTPException(status_code=400, detail="dados deve ser um objeto")
 
     if not setor:
         raise HTTPException(status_code=400, detail="setor obrigatório")
     if not SLACK_BOT_TOKEN:
         raise HTTPException(status_code=503, detail="SLACK_BOT_TOKEN não configurado no servidor")
 
-    result = enviar_meta_slack(supervisora=supervisora, setor=setor, dados=dados)
+    # modo: "ciclo" (meta geral, padrão) ou "diario" (ritmo do dia dentro do ciclo)
+    modo = str(body.get("modo") or "ciclo").strip().lower()
+    if modo not in ("ciclo", "diario"):
+        raise HTTPException(status_code=400, detail=f"modo inválido: {modo} (use 'ciclo' ou 'diario')")
+
+    posicao = None
+    if modo == "diario":
+        ciclo = str(body.get("ciclo") or "").strip()
+        if not ciclo:
+            raise HTTPException(status_code=400, detail="Selecione um ciclo para o envio da meta diária")
+        posicao = posicao_ciclo(ciclo, _parse_data_ref(body.get("data_ref")))
+        if not posicao:
+            raise HTTPException(status_code=400, detail=f"Ciclo {ciclo} não está no calendário de ciclos")
+        if posicao["status"] == "encerrado":
+            raise HTTPException(status_code=400, detail=f"Ciclo {ciclo} já encerrado — use o envio por ciclo")
+        if posicao["status"] == "antes":
+            raise HTTPException(status_code=400, detail=f"Ciclo {ciclo} ainda não começou")
+        # Datas da planilha e recorte "hoje" vêm da SESSÃO (verdade do servidor).
+        # A tela manda o mesmo, mas assim um payload velho/incompleto não engana o card.
+        df_vendas = session_data.get("df_vendas")
+        if df_vendas is not None:
+            periodo = obter_periodo_datas(df_vendas)
+            periodo.pop("dias", None)
+            dados["planilha"] = periodo
+            if dados.get("hoje") is None and periodo["tem_data"]:
+                dia_recorte = _resolver_dia_recorte(df_vendas, posicao["data_ref"])
+                if dia_recorte:
+                    por_setor = _metricas_do_dia(session_data, [ciclo], None, dia_recorte)
+                    dados["hoje"] = por_setor.get(setor) or {
+                        "data": dia_recorte, "receita": 0.0, "clientes_ativos": 0,
+                        "clientes_multimarcas": 0, "clientes_cabelos": 0, "clientes_make": 0,
+                    }
+    else:
+        # Meta do ciclo com planilha só-do-dia sai distorcida (realizado de 1 dia
+        # contra a meta do ciclo). Confere pela planilha da SESSÃO, não pelo que
+        # a tela mandou — assim um clique errado não passa.
+        ciclo = str(body.get("ciclo") or "").strip()
+        df_vendas = session_data.get("df_vendas")
+        pos_ciclo = posicao_ciclo(ciclo, _parse_data_ref(body.get("data_ref"))) if ciclo else None
+        if pos_ciclo is not None and df_vendas is not None:
+            periodo = obter_periodo_datas(df_vendas)
+            if periodo["tem_data"] and not acumulado_valido(periodo, pos_ciclo):
+                raise HTTPException(status_code=400, detail=(
+                    f"A planilha carregada cobre só {periodo['data_min']} → {periodo['data_max']} — "
+                    "não é o acumulado do ciclo, a meta do ciclo sairia distorcida. "
+                    "Use a meta diária ou suba a planilha acumulada."
+                ))
+
+    result = enviar_meta_slack(supervisora=supervisora, setor=setor, dados=dados, modo=modo, posicao=posicao)
     if result["ok"]:
         return {"ok": True, "message": f"Enviado para {supervisora or 'usuário'} via Slack"}
     else:
