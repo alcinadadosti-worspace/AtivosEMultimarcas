@@ -305,7 +305,7 @@ def build_blocks_diario(supervisora: str, setor: str, dados: dict, posicao: dict
                 ))
                 linhas.append(_detalhe_ritmo(it, restantes))
         else:
-            linhas.append("_Nenhuma meta de Receita / Multimarca / IAF Cabelo / IAF Make cadastrada para este setor._")
+            linhas.append("_Nenhuma meta de Receita cadastrada para este setor._")
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(linhas)}})
     else:
         blocks.append({"type": "divider"})

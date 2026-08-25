@@ -85,13 +85,13 @@ class TestCalcularMetaDoDia:
         assert por["receita"]["meta_dia"] == pytest.approx(2250.0)
         assert por["receita"]["pct"] == pytest.approx(3200 / 2250 * 100)
         assert por["receita"]["status"] == "batida"
-        assert list(por) == ["receita", "clientes_multimarcas", "clientes_cabelos", "clientes_make"]   # os 4 da gerência
-        assert por["clientes_multimarcas"]["status"] == "abaixo"   # 2 < 3,3
-        assert por["clientes_cabelos"]["meta_dia"] == pytest.approx(1.6)
-        assert por["clientes_cabelos"]["status"] == "abaixo"      # 1 < 1,6
-        assert por["clientes_make"]["status"] == "batida"         # 3 ≥ 1,6
-        assert r["status_geral"] == "abaixo"
+        assert list(por) == ["receita"]                            # só Receita no aviso diário
+        assert r["status_geral"] == "batida"
         assert r["data"] == "2026-08-25"
+
+        abaixo = calcular_meta_do_dia({**DADOS, "hoje": {**HOJE, "receita": 1000}}, self.POS)
+        assert abaixo["itens"][0]["status"] == "abaixo"
+        assert abaixo["status_geral"] == "abaixo"
 
     def test_sem_recorte(self):
         r = calcular_meta_do_dia(DADOS, self.POS)
@@ -136,7 +136,7 @@ class TestBlocksComRecorte:
         assert "Acumulado no ciclo" not in t
         assert "↳" not in t                          # nenhuma linha de ritmo acumulado
         assert "cobre só 24/08 → 25/08" in t
-        assert "Dia abaixo da meta" in t          # status vem do dia, não do acumulado
+        assert "Dia batido" in t                  # status vem do dia (3.200 ≥ 2.250), não do acumulado
 
     def test_sem_recorte_mantem_formato_antigo(self):
         t = _texto(build_blocks_diario("KARINE", "X", DADOS, self.POS))

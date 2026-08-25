@@ -159,19 +159,18 @@ class TestCalcularMetaDiaria:
         assert rec["pct_ritmo"] == pytest.approx(25000 / 31500 * 100)
         assert rec["status"] == "atrasado"
 
-    def test_cabelo_no_ritmo_e_make_batida(self, posicao):
-        r = calcular_meta_diaria(DADOS, posicao)
-        por_chave = {i["chave"]: i for i in r["itens"]}
-        assert por_chave["clientes_cabelos"]["status"] == "no_ritmo"   # 30 ≥ esperado 22,4
-        assert por_chave["clientes_make"]["status"] == "batida"
-        assert por_chave["clientes_make"]["falta"] == 0
-        assert r["status_geral"] == "atrasado"     # basta um atrasado (receita)
+    def test_no_ritmo_e_batida(self, posicao):
+        no_ritmo = calcular_meta_diaria({"receita": 32000, "meta_receita": 45000}, posicao)   # ≥ esperado 31.500
+        assert no_ritmo["itens"][0]["status"] == "no_ritmo"
+        assert no_ritmo["status_geral"] == "no_ritmo"
+        batida = calcular_meta_diaria({"receita": 46000, "meta_receita": 45000}, posicao)
+        assert batida["itens"][0]["status"] == "batida"
+        assert batida["itens"][0]["falta"] == 0
 
-    def test_so_receita_cabelo_make(self, posicao):
-        """Escolha da gerência: ativos, RPA e % ficam só na meta do ciclo."""
+    def test_so_receita(self, posicao):
+        """Escolha da gerência: o aviso diário só traz Receita; o resto fica na meta do ciclo."""
         r = calcular_meta_diaria(DADOS, posicao)
-        chaves = [i["chave"] for i in r["itens"]]
-        assert chaves == ["receita", "clientes_multimarcas", "clientes_cabelos", "clientes_make"]
+        assert [i["chave"] for i in r["itens"]] == ["receita"]
 
     def test_sem_meta(self, posicao):
         r = calcular_meta_diaria({"receita": 100}, posicao)
@@ -231,8 +230,9 @@ class TestBlocksDiario:
         blocks = build_blocks_diario("KARINE", "X", DADOS, pos)
         texto = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section" and "text" in b)
         ctx = " ".join(b["elements"][0]["text"] for b in blocks if b["type"] == "context")
-        assert "Receita" in texto and "Multimarca" in texto and "IAF Cabelo" in texto and "IAF Make" in texto
-        assert "Clientes Ativos" not in texto
+        assert "Receita" in texto
+        for outro in ("Clientes Ativos", "Multimarca", "IAF Cabelo", "IAF Make"):
+            assert outro not in texto
         assert "RPA" not in texto and "RPA" not in ctx
 
     def test_modo_ciclo_continua_igual(self):
