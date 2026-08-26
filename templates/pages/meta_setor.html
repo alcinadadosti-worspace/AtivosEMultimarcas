@@ -696,23 +696,29 @@ function metaSetor() {
             return `hoje ${this.fmtDataBR(s.hoje.data).slice(0, 5)}: ${f(real)} ${ok} meta/dia ${f(metaDia)}`;
         },
 
-        podeEnviar() {
+        // Motivo pelo qual o envio Slack está bloqueado agora (null = pode enviar).
+        // Também vai embutido nos popups, que não têm acesso a este estado.
+        motivoBloqueioEnvio() {
             if (this.modoEfetivo() !== 'diario') {
                 // Só acontece se a gerência forçar "Meta do ciclo" com planilha só do dia:
                 // bloqueia (o servidor também recusa) — os números sairiam distorcidos.
                 if (this.planilhaSoDoDia()) {
                     const p = this.periodo;
-                    alert(`A planilha carregada cobre só ${this.fmtDataBR(p.data_min)} → ${this.fmtDataBR(p.data_max)} — `
-                        + `não é o acumulado do ciclo, e a META DO CICLO sairia distorcida.\n\n`
-                        + `Use o envio "Meta diária" (ou "Automático") para essa planilha, ou suba a planilha acumulada.`);
-                    return false;
+                    return `A planilha carregada cobre só ${this.fmtDataBR(p.data_min)} → ${this.fmtDataBR(p.data_max)} — `
+                        + `não é o acumulado do ciclo, e a META DO CICLO sairia distorcida. `
+                        + `Use o envio "Meta diária" (ou "Automático") para essa planilha, ou suba a planilha acumulada.`;
                 }
-                return true;
+                return null;
             }
             if (this.posicaoErro || !this.posicao) {
-                alert(this.posicaoErro || 'Calendário do ciclo ainda não carregado.');
-                return false;
+                return this.posicaoErro || 'Calendário do ciclo ainda não carregado.';
             }
+            return null;
+        },
+
+        podeEnviar() {
+            const motivo = this.motivoBloqueioEnvio();
+            if (motivo) { alert(motivo); return false; }
             return true;
         },
 
@@ -877,23 +883,36 @@ function metaSetor() {
                 } else {
                     btn.textContent = '✗';
                     btn.style.color = '#f87171';
+                    // O servidor explica a recusa (planilha só-do-dia, ciclo encerrado, token...) — mostra.
+                    alert(`Não enviado (${s.setor}): ${data.detail || 'erro desconhecido'}`);
                 }
             } catch(e) {
                 btn.textContent = '✗';
                 btn.style.color = '#f87171';
+                alert(`Não enviado (${s.setor}): ${e}`);
             }
             setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 3000);
         },
 
+        // Setores que realmente têm card para mandar: sem meta cadastrada não há
+        // supervisora — o card iria para o Slack padrão como "Sem meta definida".
+        setoresParaEnvio() {
+            return this.dados.filter(s => s.meta_planilha);
+        },
+
         async enviarSlackTodos(btn) {
             if (!this.podeEnviar()) return;
+            const alvos = this.setoresParaEnvio();
+            if (!alvos.length) { alert('Nenhum setor com meta cadastrada para enviar.'); return; }
             const tipo = this.modoEfetivo() === 'diario' ? 'a META DIÁRIA (ritmo do dia)' : 'a META DO CICLO (resultado geral)';
-            if (!confirm(`Enviar ${tipo} via Slack para todas as ${this.dados.length} supervisoras?`)) return;
+            const semMeta = this.dados.length - alvos.length;
+            const aviso = semMeta ? ` (${semMeta} sem meta cadastrada ficam de fora)` : '';
+            if (!confirm(`Enviar ${tipo} via Slack para ${alvos.length} supervisoras${aviso}?`)) return;
             const origText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '⏳ Enviando...';
-            let ok = 0, erro = 0;
-            for (const s of this.dados) {
+            let ok = 0, erro = 0, motivo = '';
+            for (const s of alvos) {
                 try {
                     const r = await fetch('/api/slack/enviar-meta', {
                         method: 'POST',
@@ -901,14 +920,16 @@ function metaSetor() {
                         body: JSON.stringify(this.montarPayload(s)),
                     });
                     const data = await r.json();
-                    if (data.ok) { ok++; this.enviados[s.setor] = true; } else erro++;
-                } catch(e) { erro++; }
-                btn.innerHTML = `⏳ ${ok + erro}/${this.dados.length}`;
+                    if (data.ok) { ok++; this.enviados[s.setor] = true; }
+                    else { erro++; motivo = motivo || `${s.setor}: ${data.detail || 'erro desconhecido'}`; }
+                } catch(e) { erro++; motivo = motivo || `${s.setor}: ${e}`; }
+                btn.innerHTML = `⏳ ${ok + erro}/${alvos.length}`;
             }
             btn.innerHTML = erro === 0 ? `✓ ${ok} enviadas!` : `✓${ok} ✗${erro}`;
             btn.style.background = erro === 0
                 ? 'linear-gradient(135deg,#059669,#10b981)'
                 : 'linear-gradient(135deg,#b45309,#d97706)';
+            if (erro) alert(`${erro} envio(s) falharam. Primeiro erro — ${motivo}`);
             setTimeout(() => { btn.innerHTML = origText; btn.style.background = ''; btn.disabled = false; }, 5000);
         },
 
@@ -1112,6 +1133,7 @@ const _slackMeta = {
     modo: ${JSON.stringify(this.modoEfetivo())},
     ciclo: ${JSON.stringify(this.cicloEnvio())},
     data_ref: ${JSON.stringify(this.envio.dataRef || null)},
+    bloqueio: ${JSON.stringify(this.motivoBloqueioEnvio())},
 };
 function salvarImagem() {
     const btn = document.getElementById('btnImg');
@@ -1132,7 +1154,9 @@ function salvarImagem() {
     });
 }
 function enviarSlack() {
+    if (_slackMeta.bloqueio) { alert(_slackMeta.bloqueio); return; }
     const btn = document.getElementById('btnSlack');
+    const rotulo = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Enviando...';
     fetch(_slackMeta.base + '/api/slack/enviar-meta', {
@@ -1148,13 +1172,15 @@ function enviarSlack() {
         } else {
             btn.textContent = '✗ Erro';
             console.error(data);
+            alert('Não enviado: ' + (data.detail || 'erro desconhecido'));
         }
-        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; btn.style.background = ''; }, 4000);
+        setTimeout(() => { btn.textContent = rotulo; btn.style.background = ''; }, 4000);
     }).catch(err => {
         btn.disabled = false;
         btn.textContent = '✗ Erro';
         console.error(err);
-        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; }, 4000);
+        alert('Não enviado: ' + err);
+        setTimeout(() => { btn.textContent = rotulo; }, 4000);
     });
 }
 <\/script>
@@ -1235,6 +1261,10 @@ function enviarSlack() {
             const filtro  = this.filtros.gerencia ? ` · Gerência ${this.filtros.gerencia}` : '';
             const ciclo   = this.filtros.ciclo    ? ` · Ciclo ${this.filtros.ciclo}`       : '';
             const resumo  = `${this.dados.length} setores${filtro}${ciclo} · ${data}`;
+            // Envio Slack do popup: um card por setor com meta, no modo escolhido na tela
+            // (o popup não tem acesso ao estado Alpine, então os payloads vão embutidos).
+            const payloadsSlack = this.setoresParaEnvio().map(s => this.montarPayload(s));
+            const rotuloSlack   = `💬 Enviar via Slack (${this.modoEfetivo() === 'diario' ? 'meta diária' : 'meta do ciclo'}) — ${payloadsSlack.length} setores`;
 
             const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1261,7 +1291,7 @@ function enviarSlack() {
 
   <div class="actions">
     <button class="btn-action btn-img" id="btnImg" onclick="salvarImagem()">📷 Salvar como PNG</button>
-    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">💬 Enviar via Slack</button>
+    <button class="btn-action btn-slack" id="btnSlack" onclick="enviarSlack()">${rotuloSlack}</button>
     <button class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
@@ -1294,28 +1324,38 @@ function salvarImagem() {
         btn.textContent = '📷 Salvar como PNG';
     });
 }
-function enviarSlack() {
+const _slackTodos    = ${JSON.stringify(payloadsSlack)};
+const _slackBloqueio = ${JSON.stringify(this.motivoBloqueioEnvio())};
+const _slackRotulo   = ${JSON.stringify(rotuloSlack)};
+async function enviarSlack() {
+    if (_slackBloqueio) { alert(_slackBloqueio); return; }
+    if (!_slackTodos.length) { alert('Nenhum setor com meta cadastrada para enviar.'); return; }
+    if (!confirm('Enviar via Slack para ' + _slackTodos.length + ' supervisoras?')) return;
     const btn = document.getElementById('btnSlack');
     btn.disabled = true;
-    btn.textContent = 'Enviando...';
-    fetch(_slackBase + '/api/slack/enviar-meta', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({supervisora: '', setor: 'Resumo — Todos os Setores', dados: {status: ''}}),
-    }).then(r => r.json()).then(data => {
-        btn.disabled = false;
-        if (data.ok) {
-            btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
-            btn.textContent = '✓ Enviado!';
-        } else {
-            btn.textContent = '✗ Erro';
-        }
-        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; btn.style.background = ''; }, 4000);
-    }).catch(() => {
-        btn.disabled = false;
-        btn.textContent = '✗ Erro';
-        setTimeout(() => { btn.textContent = '💬 Enviar via Slack'; }, 4000);
-    });
+    let ok = 0, erro = 0, motivo = '';
+    for (const p of _slackTodos) {
+        btn.textContent = 'Enviando ' + (ok + erro + 1) + '/' + _slackTodos.length + '...';
+        try {
+            const r = await fetch(_slackBase + '/api/slack/enviar-meta', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(p),
+            });
+            const data = await r.json();
+            if (data.ok) ok++;
+            else { erro++; motivo = motivo || (p.setor + ': ' + (data.detail || 'erro desconhecido')); }
+        } catch (e) { erro++; motivo = motivo || (p.setor + ': ' + e); }
+    }
+    btn.disabled = false;
+    if (erro === 0) {
+        btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+        btn.textContent = '✓ ' + ok + ' enviadas!';
+    } else {
+        btn.textContent = '✓' + ok + ' ✗' + erro;
+        alert(erro + ' envio(s) falharam. Primeiro erro — ' + motivo);
+    }
+    setTimeout(() => { btn.textContent = _slackRotulo; btn.style.background = ''; }, 5000);
 }
 <\/script>
 </body>

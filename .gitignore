@@ -80,3 +80,6 @@ data/*.csv
 uploads/
 *.tmp
 *.csv
+
+# Claude Code — configuração local (allowlist pode conter tokens)
+.claude/settings.local.json
