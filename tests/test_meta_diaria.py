@@ -312,3 +312,41 @@ class TestFormatacaoCard:
         for blocks in (build_blocks("K", "X", DADOS), build_blocks_diario("K", "X", DADOS, pos)):
             rodape = [b for b in blocks if b["type"] == "context"][-1]["elements"][0]["text"]
             assert "Gerado em 25/08/2026" in rodape
+
+
+# ---------------------------------------------------------------------------
+# Planilha só do dia: o acumulado do ciclo não existe — nada pode "cobrar"
+# um ritmo calculado sobre a venda de um dia só.
+# ---------------------------------------------------------------------------
+
+class TestPlanilhaSoDoDia:
+    SO_DIA = {"tem_data": True, "data_min": "2026-08-26", "data_max": "2026-08-26", "n_dias": 1}
+
+    def test_card_diario_nao_cobra_ritmo_inflado(self):
+        # Bronze 2: meta R$ 50.000 (R$ 2.500/dia); a planilha só tem os R$ 261,60 de hoje.
+        pos = posicao_ciclo("12/2026", date(2026, 8, 26))
+        dados = {"receita": 261.6, "meta_receita": 50000, "clientes_ativos": 2, "meta_ativo": 90,
+                 "hoje": {"data": "2026-08-26", "receita": 261.6, "clientes_ativos": 2},
+                 "planilha": self.SO_DIA}
+        blocks = build_blocks_diario("KARINE", "BRONZE 2", dados, pos)
+        texto = "\n".join(b["text"]["text"] for b in blocks if b["type"] == "section" and "text" in b)
+        ctx = "\n".join(b["elements"][0]["text"] for b in blocks if b["type"] == "context")
+        assert "meta do dia R$ 2.500" in texto
+        assert "precisa" not in texto and "8.289" not in texto      # sem ritmo sobre 1 dia
+        assert "Acumulado no ciclo" not in texto
+        assert "cobre só 26/08 → 26/08" in ctx
+
+    def test_rota_diaria_sem_planilha_na_sessao_recusa(self, monkeypatch):
+        # Sem planilha na sessão o servidor não consegue validar o período — recusa
+        # em vez de montar o card com os números que a tela mandou.
+        import app.config as cfg
+        monkeypatch.setattr(cfg, "SLACK_BOT_TOKEN", "xoxb-fake")
+        from fastapi.testclient import TestClient
+        import main
+        c = TestClient(main.app)
+        body = {"supervisora": "KARINE", "setor": "BRONZE 2 / PENEDO /",
+                "dados": {"receita": 261.6, "meta_receita": 50000},
+                "modo": "diario", "ciclo": "12/2026", "data_ref": "2026-08-26"}
+        r = c.post("/api/slack/enviar-meta", json=body)
+        assert r.status_code == 400
+        assert "planilha" in r.json()["detail"].lower()

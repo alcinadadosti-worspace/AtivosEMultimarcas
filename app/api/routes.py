@@ -3107,20 +3107,26 @@ async def slack_enviar_meta(request: Request, session: tuple = Depends(get_user_
         if posicao["status"] == "antes":
             raise HTTPException(status_code=400, detail=f"Ciclo {ciclo} ainda não começou")
         # Datas da planilha e recorte "hoje" vêm da SESSÃO (verdade do servidor).
-        # A tela manda o mesmo, mas assim um payload velho/incompleto não engana o card.
+        # A tela manda o mesmo, mas assim um payload velho/incompleto não engana o card:
+        # sem planilha na sessão o card sairia com o acumulado calculado sobre a
+        # venda de um dia só (ex.: "precisa R$ 8.289/dia" com meta/dia de R$ 2.500).
         df_vendas = session_data.get("df_vendas")
-        if df_vendas is not None:
-            periodo = obter_periodo_datas(df_vendas)
-            periodo.pop("dias", None)
-            dados["planilha"] = periodo
-            if dados.get("hoje") is None and periodo["tem_data"]:
-                dia_recorte = _resolver_dia_recorte(df_vendas, posicao["data_ref"])
-                if dia_recorte:
-                    por_setor = _metricas_do_dia(session_data, [ciclo], None, dia_recorte)
-                    dados["hoje"] = por_setor.get(setor) or {
-                        "data": dia_recorte, "receita": 0.0, "clientes_ativos": 0,
-                        "clientes_multimarcas": 0, "clientes_cabelos": 0, "clientes_make": 0,
-                    }
+        if df_vendas is None:
+            raise HTTPException(status_code=400, detail=(
+                "Suba a planilha de vendas antes de enviar a meta diária — "
+                "o recorte do dia e o período do ciclo vêm da planilha da sessão"
+            ))
+        periodo = obter_periodo_datas(df_vendas)
+        periodo.pop("dias", None)
+        dados["planilha"] = periodo
+        if dados.get("hoje") is None and periodo["tem_data"]:
+            dia_recorte = _resolver_dia_recorte(df_vendas, posicao["data_ref"])
+            if dia_recorte:
+                por_setor = _metricas_do_dia(session_data, [ciclo], None, dia_recorte)
+                dados["hoje"] = por_setor.get(setor) or {
+                    "data": dia_recorte, "receita": 0.0, "clientes_ativos": 0,
+                    "clientes_multimarcas": 0, "clientes_cabelos": 0, "clientes_make": 0,
+                }
     else:
         # Meta do ciclo com planilha só-do-dia sai distorcida (realizado de 1 dia
         # contra a meta do ciclo). Confere pela planilha da SESSÃO, não pelo que

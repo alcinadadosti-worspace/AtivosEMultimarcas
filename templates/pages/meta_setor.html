@@ -676,6 +676,10 @@ function metaSetor() {
             const p = this.posicao;
             const meta = this.metaEfetiva(s, campo);
             if (!p || meta === null) return '';
+            // Planilha só do dia: s[campo] é a venda de HOJE, não o acumulado do ciclo —
+            // o "precisa/dia" sairia inflado (ex.: R$ 8.289/dia com meta/dia de R$ 2.500).
+            // O card do Slack também omite o acumulado nesse caso.
+            if (this.planilhaSoDoDia()) return 'precisa —/dia (planilha só do dia)';
             const falta = Math.max(0, meta - (s[campo] || 0));
             if (falta <= 0) return '✓ meta batida';
             if (!p.dias_restantes) return 'sem dias úteis restantes';
