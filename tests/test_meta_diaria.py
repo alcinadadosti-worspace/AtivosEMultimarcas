@@ -167,10 +167,17 @@ class TestCalcularMetaDiaria:
         assert batida["itens"][0]["status"] == "batida"
         assert batida["itens"][0]["falta"] == 0
 
-    def test_so_receita(self, posicao):
-        """Escolha da gerência: o aviso diário só traz Receita; o resto fica na meta do ciclo."""
+    def test_so_receita_e_ativos(self, posicao):
+        """Escolha da gerência: o aviso diário traz Receita e Clientes Ativos; o resto fica na meta do ciclo."""
         r = calcular_meta_diaria(DADOS, posicao)
-        assert [i["chave"] for i in r["itens"]] == ["receita"]
+        assert [i["chave"] for i in r["itens"]] == ["receita", "clientes_ativos"]
+        atv = r["itens"][1]
+        assert atv["meta_dia"] == pytest.approx(3.5)            # 70 ÷ 20
+        assert atv["esperado"] == pytest.approx(49.0)           # 3,5 × 14
+        assert atv["falta"] == pytest.approx(15.0)              # 70 − 55
+        assert atv["necessario_dia"] == pytest.approx(15 / 7)
+        assert atv["status"] == "no_ritmo"                      # 55 ≥ 49, mas < 70
+        assert r["status_geral"] == "atrasado"                  # a Receita puxa o geral
 
     def test_sem_meta(self, posicao):
         r = calcular_meta_diaria({"receita": 100}, posicao)
@@ -225,15 +232,31 @@ class TestBlocksDiario:
             if b["type"] == "section" and "text" in b:
                 assert len(b["text"]["text"]) < 3000
 
-    def test_so_receita_cabelo_make_na_mensagem(self):
+    def test_so_receita_e_ativos_na_mensagem(self):
         pos = posicao_ciclo("12/2026", date(2026, 8, 25))
         blocks = build_blocks_diario("KARINE", "X", DADOS, pos)
         texto = " ".join(b["text"]["text"] for b in blocks if b["type"] == "section" and "text" in b)
         ctx = " ".join(b["elements"][0]["text"] for b in blocks if b["type"] == "context")
         assert "Receita" in texto
-        for outro in ("Clientes Ativos", "Multimarca", "IAF Cabelo", "IAF Make"):
+        assert "Clientes Ativos" in texto
+        for outro in ("Multimarca", "IAF Cabelo", "IAF Make"):
             assert outro not in texto
         assert "RPA" not in texto and "RPA" not in ctx
+
+    def test_clientes_ativos_no_acumulado_com_ritmo(self):
+        # DADOS: 55 ativos de meta 70 no dia 14 de 20 → esperado 49, batendo o ritmo.
+        pos = posicao_ciclo("12/2026", date(2026, 8, 25))
+        blocks = build_blocks_diario("KARINE", "X", DADOS, pos)
+        texto = "\n".join(b["text"]["text"] for b in blocks if b["type"] == "section" and "text" in b)
+        linhas = texto.splitlines()
+        i = next(k for k, l in enumerate(linhas) if "*Clientes Ativos:*" in l)
+        assert "55  ›  meta 70" in linhas[i]
+        detalhe = linhas[i + 1]
+        assert detalhe.startswith("↳ ritmo 112%")
+        assert "esperado até hoje 49" in detalhe
+        assert "falta 15" in detalhe
+        assert "base 3,5/dia" in detalhe
+        assert "precisa *2,1/dia* nos 7 dias" in detalhe
 
     def test_modo_ciclo_continua_igual(self):
         blocks = build_blocks("KARINE", "X", DADOS)

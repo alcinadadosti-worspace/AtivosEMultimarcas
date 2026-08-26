@@ -180,14 +180,16 @@ def encontrar_meta_setor(
 # Meta diária (ritmo dentro do ciclo)
 # ---------------------------------------------------------------------------
 
-# Indicadores do aviso diário no Slack — escolha da gerência (ago/2026): SÓ
-# Receita. Os demais (ativos, multimarca, cabelo, make, RPA, %) ficam apenas
-# na meta do ciclo. Para incluir outro, basta acrescentar a linha aqui — os
-# acumulativos em clientes usam a meta Qtd da planilha, ex.:
+# Indicadores do aviso diário no Slack — escolha da gerência (ago/2026):
+# Receita e Clientes Ativos. Os demais (multimarca, cabelo, make, RPA, %)
+# ficam apenas na meta do ciclo. Para incluir outro, basta acrescentar a linha
+# aqui — os acumulativos em clientes usam a meta Qtd da planilha, ex.:
 #   ("clientes_cabelos", "meta_cabelos_qtd", "IAF Cabelo (clientes)", "int")
 #   (chave_real, chave_meta, label, tipo)
+# No bloco "Hoje", clientes = revendedoras com venda captada no dia.
 INDICADORES_DIARIOS = [
     ("receita", "meta_receita", "Receita", "moeda"),
+    ("clientes_ativos", "meta_ativo", "Clientes Ativos", "int"),
 ]
 
 

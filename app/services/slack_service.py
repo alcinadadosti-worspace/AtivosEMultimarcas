@@ -239,7 +239,7 @@ def _detalhe_ritmo(item: dict, dias_restantes: int) -> str:
 def build_blocks_diario(supervisora: str, setor: str, dados: dict, posicao: dict) -> list:
     """
     Block Kit da *meta diária* (indicadores de metas.INDICADORES_DIARIOS —
-    hoje só Receita), no mesmo padrão visual do card do ciclo:
+    Receita e Clientes Ativos), no mesmo padrão visual do card do ciclo:
 
     📍 Hoje — vendas do dia (recorte por DataCaptacao) contra a meta do dia
        (meta do ciclo ÷ dias úteis). Só se `dados["hoje"]` vier preenchido.

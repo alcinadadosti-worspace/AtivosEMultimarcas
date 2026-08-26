@@ -444,6 +444,8 @@
                                                 <div>
                                                     <div class="cell-meta" x-text="'meta: ' + fmt.number(metaEfetiva(s, 'clientes_ativos'))"></div>
                                                     <div :class="pctClass(s.clientes_ativos, metaEfetiva(s,'clientes_ativos'))" class="cell-pct" x-text="pctStr(s.clientes_ativos, metaEfetiva(s,'clientes_ativos'))"></div>
+                                                    <div class="cell-ritmo" x-show="modoEfetivo() === 'diario' && posicao" x-text="ritmoStr(s, 'clientes_ativos', 'number')"></div>
+                                                    <div class="cell-ritmo" style="color:#93c5fd;" x-show="modoEfetivo() === 'diario' && posicao && s.hoje" x-text="hojeStr(s, 'clientes_ativos', 'number')"></div>
                                                 </div>
                                             </template>
                                         </td>

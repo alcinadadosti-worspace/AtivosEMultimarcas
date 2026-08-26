@@ -85,13 +85,20 @@ class TestCalcularMetaDoDia:
         assert por["receita"]["meta_dia"] == pytest.approx(2250.0)
         assert por["receita"]["pct"] == pytest.approx(3200 / 2250 * 100)
         assert por["receita"]["status"] == "batida"
-        assert list(por) == ["receita"]                            # só Receita no aviso diário
+        assert list(por) == ["receita", "clientes_ativos"]         # Receita + Clientes Ativos no aviso diário
+        assert por["clientes_ativos"]["meta_dia"] == pytest.approx(3.5)   # 70 ativos ÷ 20 dias úteis
+        assert por["clientes_ativos"]["real_dia"] == 5
+        assert por["clientes_ativos"]["status"] == "batida"
         assert r["status_geral"] == "batida"
         assert r["data"] == "2026-08-25"
 
         abaixo = calcular_meta_do_dia({**DADOS, "hoje": {**HOJE, "receita": 1000}}, self.POS)
         assert abaixo["itens"][0]["status"] == "abaixo"
-        assert abaixo["status_geral"] == "abaixo"
+        assert abaixo["status_geral"] == "abaixo"                  # basta um indicador abaixo
+
+        so_ativos = calcular_meta_do_dia({**DADOS, "hoje": {**HOJE, "clientes_ativos": 2}}, self.POS)
+        assert {i["chave"]: i["status"] for i in so_ativos["itens"]} == {"receita": "batida", "clientes_ativos": "abaixo"}
+        assert so_ativos["status_geral"] == "abaixo"
 
     def test_sem_recorte(self):
         r = calcular_meta_do_dia(DADOS, self.POS)
@@ -122,6 +129,7 @@ class TestBlocksComRecorte:
         t = _texto(build_blocks_diario("KARINE", "X", d, self.POS))
         assert "Hoje (25/08)" in t
         assert "R$ 3.200" in t and "meta do dia R$ 2.250" in t
+        assert "*Clientes Ativos:* 5  ›  meta do dia 3,5" in t   # 5 revendedoras com venda no dia vs 70 ÷ 20
         assert "Acumulado no ciclo" in t
         assert "esperado até hoje" in t
         assert "↳ ritmo" in t                               # detalhe de ritmo por indicador
