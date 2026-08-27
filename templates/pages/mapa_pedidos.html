@@ -1266,7 +1266,9 @@ function mapaPedidos() {
             const c = this.alertaCidades.find(x=>this._norm(x.cidade)===this._norm(cidade));
             if (c){ this.toggleAlertaCidade(c); this.$nextTick(()=>document.getElementById('alerta-'+this.safeId(c.cidade))?.scrollIntoView({behavior:'smooth', block:'center'})); }
         },
-        _norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); },
+        // S\u00f3 letras/n\u00fameros, sem acento: o ap\u00f3strofo do IBGE ("Olho d'\u00c1gua
+        // Grande") n\u00e3o pode decidir se a cidade acha ou n\u00e3o o pol\u00edgono dela.
+        _norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,''); },
         _info(nome){
             const n = this._norm(nome);
             return this.cidades.find(c=>this._norm(c.cidade)===n)

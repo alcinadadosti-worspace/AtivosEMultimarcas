@@ -12,7 +12,6 @@ do ano com o ritmo histórico de cadastro da própria cidade.
 """
 import io
 import math
-import unicodedata
 from typing import Any, Dict, List, Optional
 
 import polars as pl
@@ -29,13 +28,7 @@ from app.config import (
 )
 from app.config import PED_COL_PESSOA
 from app.services.revendedores import _ordem_ciclo, _com_inatividade, ciclos_do_arquivo, _norm_cod
-
-
-def _chave_cidade(s: str) -> str:
-    """Só letras/números, sem acento: casa "OLHO D'AGUA" (base), "OLHO D AGUA"
-    (planilha) e "Olho d'Água Grande" (IBGE) na mesma chave."""
-    s = unicodedata.normalize("NFD", (s or "").strip().upper())
-    return "".join(c for c in s if c.isalnum())
+from app.utils.normalizers import chave_cidade as _chave_cidade   # uma só implementação
 
 
 def processar_planilha_mercado(content: bytes, filename: str) -> Dict[str, Any]:

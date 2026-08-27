@@ -39,6 +39,7 @@ from app.config import (
     PED_UNIDADES,
 )
 from app.services.venda import ler_planilha
+from app.utils.normalizers import canonizar_cidade
 
 # Ordem canônica das segmentações (metais + demais papéis), do topo para a base.
 SEGMENTOS_ORDEM = [
@@ -68,6 +69,19 @@ _OPTIONAL_COLS = [
     PED_COL_LOGRADOURO_ENTREGA,
     PED_COL_BAIRRO_ENTREGA,
 ]
+
+
+def _ordem_ciclo_expr(col: str) -> pl.Expr:
+    """
+    Chave ordenável a partir de 'MM/AAAA' -> 'AAAAMM'.
+
+    Ordenar a string crua quebra na virada do ano: '01/2027' viria antes de
+    '16/2026'. Formato inesperado (sem '/') cai em '0000MM' e fica na frente,
+    igual ao `_ordem_ciclo` da base de revendedores.
+    """
+    num = pl.col(col).cast(pl.Utf8).str.extract(r"^\s*(\d+)", 1).fill_null("")
+    ano = pl.col(col).cast(pl.Utf8).str.extract(r"/\s*(\d+)\s*$", 1).fill_null("")
+    return ano.str.zfill(4) + num.str.zfill(2)
 
 
 def _num_float(col: str) -> pl.Expr:
@@ -186,6 +200,10 @@ def processar_planilha_pedidos(content: bytes, filename: str) -> Dict[str, Any]:
         .otherwise(pl.col("_cidade_moradia"))
         .alias("_cidade_moradia")
     )
+    # Uma cidade, uma grafia. A planilha traz "OLHO D'ÁGUA GRANDE" e
+    # "OLHO DÁGUA GRANDE" para o mesmo município: sem juntar, viram duas linhas
+    # no ranking e a segunda nunca acha o polígono do mapa.
+    df = canonizar_cidade(df, "_cidade_moradia")
 
     # Segmento (Papel), com fallback. Padroniza tirando o sufixo " GB"
     # (Diamante GB -> Diamante, Esmeralda GB -> Esmeralda; funde com os puros).
@@ -202,16 +220,27 @@ def processar_planilha_pedidos(content: bytes, filename: str) -> Dict[str, Any]:
     )
 
     # Ciclos presentes no arquivo (pode ter 1 ou vários: 01/2026..10/2026).
-    ciclos_norm = sorted(
-        df.select(pl.col(PED_COL_CICLO).str.extract(r"^(\d+)", 1))
-        .to_series().drop_nulls().unique().to_list()
+    # Ordena por ano+ciclo: um arquivo que cruza o ano (16/2026..01/2027) tem
+    # que sair nessa ordem, e não em "01–16".
+    ciclos_full = (
+        df.select([pl.col(PED_COL_CICLO), _ordem_ciclo_expr(PED_COL_CICLO).alias("_ord")])
+        .filter(pl.col(PED_COL_CICLO) != "")
+        .unique(subset=[PED_COL_CICLO])
+        .sort("_ord")
+        .to_series()
+        .to_list()
     )
-    ciclos_norm = [c for c in ciclos_norm if c]
-    n_ciclos = len(ciclos_norm)
+    n_ciclos = len(ciclos_full)
+    anos = {c.split("/")[1].strip() for c in ciclos_full if "/" in c}
+    # Um ano só: rótulo curto ("01–10"). Mais de um: mostra o ano, senão
+    # "16–01" ficaria lido de trás pra frente.
+    def _rotulo(c: str) -> str:
+        return c.split("/")[0].strip() if len(anos) <= 1 and "/" in c else c
+
     if n_ciclos <= 1:
-        ciclo = ciclos_norm[0] if ciclos_norm else ""
+        ciclo = _rotulo(ciclos_full[0]) if ciclos_full else ""
     else:
-        ciclo = f"{ciclos_norm[0]}–{ciclos_norm[-1]}"   # ex.: "01–10"
+        ciclo = f"{_rotulo(ciclos_full[0])}–{_rotulo(ciclos_full[-1])}"   # ex.: "01–10"
 
     estatisticas = _resumo(df)
     estatisticas["ciclo"] = ciclo
@@ -317,7 +346,12 @@ def _atribuir_segmento_atual(df: pl.DataFrame, chaves: List[str]) -> pl.DataFram
     atual = (
         df.filter(pl.col(PED_COL_PESSOA) != "")
         .group_by(chaves)
-        .agg(pl.col("_segmento").sort_by(PED_COL_CICLO).last().alias("_seg_rev"))
+        .agg(
+            pl.col("_segmento")
+            .sort_by(_ordem_ciclo_expr(PED_COL_CICLO))
+            .last()
+            .alias("_seg_rev")
+        )
     )
     return df.join(atual, on=chaves, how="left").with_columns(
         pl.coalesce([pl.col("_seg_rev"), pl.col("_segmento")]).alias("_seg_rev")
@@ -461,11 +495,15 @@ def calcular_detalhe_cidade(df: pl.DataFrame, cidade: str, **filtros) -> Dict[st
     ]
 
     # Revendedores da cidade (agrega por pessoa; pega o "melhor" segmento/setor).
+    # O segmento é o do pedido mais recente — o mesmo critério da rosquinha.
+    # Com `_segmento.first()` a tabela mostrava o Papel antigo de quem subiu de
+    # segmentação, e não batia com o gráfico logo acima dela.
+    df = _atribuir_segmento_atual(df, [PED_COL_PESSOA])
     rev_df = (
         df.group_by([PED_COL_PESSOA])
         .agg([
             pl.col(PED_COL_NOME).first().alias("nome"),
-            pl.col("_segmento").first().alias("segmento"),
+            pl.col("_seg_rev").first().alias("segmento"),
             pl.col("_bairro_moradia").first().alias("bairro"),
             pl.col(PED_COL_COD_ESTRUTURA).first().alias("setor_cod"),
             pl.col(PED_COL_ESTRUTURA).first().alias("setor"),

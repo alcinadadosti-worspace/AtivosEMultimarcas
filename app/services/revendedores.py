@@ -33,6 +33,7 @@ from app.config import (
     PED_COL_PESSOA,
     PED_COL_CICLO,
 )
+from app.utils.normalizers import canonizar_cidade
 
 # Colunas mantidas da base (as demais são descartadas).
 _KEEP = [
@@ -111,6 +112,9 @@ def processar_planilha_revendedores(content: bytes, filename: str) -> Dict[str, 
     ])
     # Remove linhas sem código e deduplica por código (mantém a 1ª ocorrência).
     base = base.filter(pl.col("_cod") != "").unique(subset=["_cod"], keep="first")
+    # Uma cidade, uma grafia — senão o mesmo município vira duas linhas no
+    # Alerta e só uma delas acha o polígono do mapa.
+    base = canonizar_cidade(base, "_cidade")
 
     ativos = int(base.filter(pl.col("_situacao").str.to_lowercase() == "ativo").height)
     estatisticas = {
@@ -209,9 +213,9 @@ def cobertura_por_ciclo(df_ped: pl.DataFrame, unidade: Optional[str] = None) -> 
             pl.col("_itens").sum().alias("itens"),
             pl.col("_valor").sum().alias("valor"),
             pl.len().alias("pedidos"),
-        ]).sort("_ciclo")
+        ])
     )
-    return [
+    linhas = [
         {
             "ciclo": r["_ciclo"],
             "revendedores": int(r["revendedores"]),
@@ -221,6 +225,10 @@ def cobertura_por_ciclo(df_ped: pl.DataFrame, unidade: Optional[str] = None) -> 
         }
         for r in res.iter_rows(named=True)
     ]
+    # Ordem cronológica de verdade: ordenar '_ciclo' como texto colocaria
+    # '01/2027' antes de '16/2026' e a timeline sairia invertida.
+    linhas.sort(key=lambda r: _ordem_ciclo(r["ciclo"]))
+    return linhas
 
 
 def cobertura_frequencia(df_rev: pl.DataFrame, df_ped: pl.DataFrame, unidade: Optional[str] = None) -> List[Dict[str, Any]]:

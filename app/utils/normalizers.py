@@ -1,12 +1,15 @@
 """
-Normalization utilities for SKU codes and brand names.
+Normalization utilities for SKU codes, brand names and city names.
 
 Critical functions for ensuring consistent data matching across sales
 spreadsheets and product database.
 """
 import re
 import math
+import unicodedata
 from typing import Any
+
+import polars as pl
 
 from app.config import MARCA_ALIASES, MARCA_DESCONHECIDA
 
@@ -104,3 +107,61 @@ def normalizar_marca(marca: Any) -> str:
 
     # If no alias found, return original (stripped)
     return marca_str.strip()
+
+
+def chave_cidade(valor: Any) -> str:
+    """
+    Chave canônica de município: só letras e números, sem acento.
+
+    As planilhas escrevem o mesmo lugar de jeitos diferentes e o IBGE de um
+    terceiro. Sem uma chave comum o município vira duas cidades no ranking e
+    uma delas não acha o polígono do mapa.
+
+    Examples:
+        >>> chave_cidade("OLHO D'ÁGUA GRANDE")
+        "OLHODAGUAGRANDE"
+        >>> chave_cidade("OLHO DÁGUA GRANDE")
+        "OLHODAGUAGRANDE"
+        >>> chave_cidade("Olho d'Água Grande")
+        "OLHODAGUAGRANDE"
+        >>> chave_cidade(None)
+        ""
+    """
+    if valor is None or (isinstance(valor, float) and math.isnan(valor)):
+        return ""
+    s = unicodedata.normalize("NFD", str(valor).strip().upper())
+    return "".join(c for c in s if c.isalnum())
+
+
+def canonizar_cidade(df: pl.DataFrame, col: str) -> pl.DataFrame:
+    """
+    Faz as grafias do mesmo município convergirem para uma só em ``col``.
+
+    Vence a grafia mais frequente do arquivo (empate: ordem alfabética), então
+    a que sobra é a que o pessoal mais usa — e é ela que vai ao mapa e à
+    tabela. Sem isto, "OLHO D'ÁGUA GRANDE" e "OLHO DÁGUA GRANDE" viram duas
+    linhas e só a primeira casa com o polígono do IBGE.
+    """
+    if df.is_empty() or col not in df.columns:
+        return df
+
+    chave = pl.col(col).map_elements(chave_cidade, return_dtype=pl.Utf8)
+    canon = (
+        df.select(col)
+        .with_columns(chave.alias("_chave"))
+        .group_by(["_chave", col])
+        .agg(pl.len().alias("_n"))
+        .group_by("_chave")
+        .agg(
+            pl.col(col)
+            .sort_by(["_n", col], descending=[True, False])
+            .first()
+            .alias("_canon")
+        )
+    )
+    return (
+        df.with_columns(chave.alias("_chave"))
+        .join(canon, on="_chave", how="left")
+        .with_columns(pl.coalesce([pl.col("_canon"), pl.col(col)]).alias(col))
+        .drop(["_chave", "_canon"])
+    )
