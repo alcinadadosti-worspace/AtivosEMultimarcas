@@ -983,9 +983,15 @@ function mapaPedidos() {
             if (this._map) return;
             if (!document.getElementById('mapa-pedidos')){ setTimeout(()=>this.iniciarMapa(),150); return; }
             this._map = L.map('mapa-pedidos', { center:[-9.62,-36.7], zoom:8 });
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18,
-            }).addTo(this._map);
+            // A CARTO passou a exigir chave nos basemaps públicos e devolve o tile
+            // com "API KEY REQUIRED" escrito por cima. O Dark Gray Canvas da Esri é
+            // aberto, tem o mesmo tom escuro e não pede chave. Ele só tem tile até o
+            // zoom 16, então o Leaflet amplia esse nível nos zooms 17 e 18.
+            const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+            const tileOpts = { attribution:'&copy; Esri', maxZoom:18, maxNativeZoom:16 };
+            L.tileLayer(esri+'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', tileOpts).addTo(this._map);
+            // Camada só de nomes de cidade/estrada — fica sob os polígonos, igual antes.
+            L.tileLayer(esri+'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', tileOpts).addTo(this._map);
             // As rosquinhas são desenhadas em SVG na MESMA camada dos polígonos,
             // então acompanham a cidade no zoom/arrasto igual ao contorno dela.
             // Só reposiciono os centróides ao fim do zoom (os pontos de camada mudam).
