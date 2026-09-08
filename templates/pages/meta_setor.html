@@ -116,6 +116,35 @@
 .badge-longe   { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
 .badge-sem-meta{ background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.2); font-style: italic; }
 
+/* ── Setor em destaque (Berçário Franquia) ─────────────── */
+/* Turquesa de propósito: verde/amarelo/vermelho já significam desempenho e
+   roxo é a cor da tela — o destaque não pode ser lido como status. */
+.meta-table tbody tr.row-destaque {
+    background: linear-gradient(90deg, rgba(45,212,191,0.10) 0%, rgba(45,212,191,0.03) 55%, transparent 100%);
+}
+.meta-table tbody tr.row-destaque:hover {
+    background: linear-gradient(90deg, rgba(45,212,191,0.18) 0%, rgba(45,212,191,0.06) 55%, transparent 100%);
+}
+.meta-table tbody tr.row-destaque td { border-bottom-color: rgba(45,212,191,0.18); }
+.meta-table tbody tr.row-destaque td:first-child { box-shadow: inset 3px 0 0 #2dd4bf; }
+
+.badge-destaque {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(45,212,191,0.15);
+    border: 1px solid rgba(45,212,191,0.35);
+    color: #2dd4bf;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    vertical-align: middle;
+}
 
 /* ── Filtros ───────────────────────────────────────────── */
 .filtros-row {
@@ -401,7 +430,7 @@
                             </thead>
                             <tbody>
                                 <template x-for="s in dados" :key="s.setor">
-                                    <tr>
+                                    <tr :class="{ 'row-destaque': isDestaque(s) }">
                                         <!-- Botão envio Slack -->
                                         <td style="text-align:center;padding:6px;">
                                             <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -415,7 +444,12 @@
                                             </div>
                                         </td>
 
-                                        <td style="font-weight:600;color:#f8fafc;max-width:200px;white-space:normal;" x-text="s.setor"></td>
+                                        <td style="font-weight:600;color:#f8fafc;max-width:200px;white-space:normal;">
+                                            <span x-text="s.setor"></span>
+                                            <template x-if="isDestaque(s)">
+                                                <span class="badge-destaque" title="Setor em destaque">★ Franquia</span>
+                                            </template>
+                                        </td>
                                         <td style="color:#94a3b8;font-size:0.78rem;" x-text="s.supervisora || '—'"></td>
                                         <td>
                                             <span :class="badgeClass(s._status)" class="badge">
@@ -519,6 +553,7 @@
 function metaSetor() {
     return {
         hasData: {{ 'true' if has_data else 'false' }},
+        setoresDestaque: {{ setores_destaque | tojson }},   // SETORES_DESTAQUE (app/config.py)
         loading: false,
         dados: [],               // setores com métricas reais + meta_planilha
         opcoes: { ciclos: [], gerencias: [] },
@@ -844,6 +879,13 @@ function metaSetor() {
             if (p >= 100) return 'pct-ok';
             if (p >= 80)  return 'pct-near';
             return 'pct-bad';
+        },
+
+        // Setor que a gerência quer ver destacado na tabela (faixa turquesa +
+        // selo "Franquia"). Só muda a aparência — não afeta meta nem status.
+        isDestaque(s) {
+            const nome = String(s.setor || '').trim().toUpperCase();
+            return this.setoresDestaque.includes(nome);
         },
 
         badgeClass(status) {

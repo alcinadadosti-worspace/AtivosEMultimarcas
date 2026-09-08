@@ -55,6 +55,21 @@ VENDAS_OPTIONAL_COLUMNS = [VENDAS_COL_MEIO_CAPTACAO, VENDAS_COL_GERENCIA, VENDAS
 TIPO_VENDA = "Venda"
 
 # =============================================================================
+# SETORES CANÔNICOS
+# =============================================================================
+# Setores que a planilha traz separados mas que a gerência acompanha como um só.
+# Aplicado na normalização do Setor (venda.py), então vale para toda a análise
+# derivada da planilha de vendas: metas, dashboard, ranking, IAF e filtros.
+# Chave = nome exato como vem da planilha (após strip/colapso de espaços).
+SETORES_CANONICOS = {
+    "BERÇÁRIO PALMEIRA 13706": "BERÇÁRIO FRANQUIA",
+    "BERÇÁRIO PENEDO 13707": "BERÇÁRIO FRANQUIA",
+}
+
+# Setores com destaque visual na aba de metas (nome já canônico, maiúsculas).
+SETORES_DESTAQUE = ["BERÇÁRIO FRANQUIA"]
+
+# =============================================================================
 # SLACK
 # =============================================================================
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
@@ -71,6 +86,7 @@ SLACK_DEFAULT_USER_ID = os.getenv("SLACK_DEFAULT_USER_ID", "U0895CZ8HU7")
 # POR CIMA e sobrescreve estas entradas.
 _DEFAULT_SLACK_USER_MAP = {
     "GESSICA": "U09G04R3CNP",
+    "GESSYCA": "U08JJH9BWP5",    # Berçário Franquia — NÃO é a GESSICA acima
     "ANALUIZA": "U08ERHMN6F9",   # Platina / Penedo (ciclo 10)
     "RODRIGO": "U0922F5KB7U",    # Bronze 1 / Coruripe (ciclo 12; cobre férias da Natali)
 }

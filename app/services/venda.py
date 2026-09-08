@@ -24,6 +24,7 @@ from app.config import (
     VENDAS_COL_DATA,
     VENDAS_COL_DATA_ISO,
     VENDAS_REQUIRED_COLUMNS,
+    SETORES_CANONICOS,
     TIPO_VENDA,
     MARCA_DESCONHECIDA,
     MOTIVO_NAO_ENCONTRADO,
@@ -255,11 +256,16 @@ def processar_planilha_vendas(
     # setores na tela de metas. Tira espaços das pontas e colapsa os internos.
     # fill_null: no CSV o campo vazio vem como null (no xlsx vem como "");
     # sem isso, setores nulos quebram o cruzamento com as metas.
+    # replace(SETORES_CANONICOS): setores que a planilha separa mas a gerência
+    # acompanha como um só — ex.: Berçário Palmeira 13706 + Berçário Penedo
+    # 13707 viram "BERÇÁRIO FRANQUIA". Vem depois da limpeza de espaços porque
+    # as chaves do mapa são os nomes já limpos.
     df = df.with_columns(
         pl.col(VENDAS_COL_SETOR).cast(pl.Utf8)
           .fill_null("")
           .str.strip_chars()
           .str.replace_all(r"\s+", " ")
+          .replace(SETORES_CANONICOS)
           .alias(VENDAS_COL_SETOR)
     )
 

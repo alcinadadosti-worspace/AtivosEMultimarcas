@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-from app.config import DATABASE_PATH, DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH
+from app.config import DATABASE_PATH, DATA_DIR, GEO_PARQUET_PATH, GEO_STATS_PATH, SETORES_DESTAQUE
 from app.api.routes import api_router, SESSION_COOKIE_NAME
 from app.api.dependencies import get_db
 from app.services.session import get_session
@@ -288,7 +288,15 @@ async def page_meta_setor(
     has_data: bool = Depends(get_user_has_data),
 ):
     """Goal tracking by sector page."""
-    return templates.TemplateResponse(request, "pages/meta_setor.html", {"page": "meta_setor", "has_data": has_data})
+    return templates.TemplateResponse(
+        request,
+        "pages/meta_setor.html",
+        {
+            "page": "meta_setor",
+            "has_data": has_data,
+            "setores_destaque": SETORES_DESTAQUE,
+        },
+    )
 
 
 # =============================================================================
