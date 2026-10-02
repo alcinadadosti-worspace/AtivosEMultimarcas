@@ -88,7 +88,8 @@ _DEFAULT_SLACK_USER_MAP = {
     "GESSICA": "U09G04R3CNP",
     "GESSYCA": "U08JJH9BWP5",    # Berçário Franquia — NÃO é a GESSICA acima
     "ANALUIZA": "U08ERHMN6F9",   # Platina / Penedo (ciclo 10)
-    "RODRIGO": "U0922F5KB7U",    # Bronze 1 / Coruripe (ciclo 12; cobre férias da Natali)
+    "RODRIGO": "U0922F5KB7U",    # Bronze 5 / Coruripe / Junqueiro (ciclo 14)
+    "MARILIA": "U0AKMRS669L",    # Bronze 2 / Todas as Cidades 13706 (ciclo 14)
 }
 
 _raw_map = os.getenv("SLACK_USER_MAP", "{}")
