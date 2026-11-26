@@ -76,6 +76,10 @@ HAIR_KEYWORDS = [
     'CABELO', 'CAPILAR', 'HAIR',
     # Abreviações comuns de shampoo/condicionador em nomes de combo
     'SHP', 'CND', 'SH+C', 'SH/C',
+    # Linha capilar Match (oBoticário): combos/sachês nem sempre trazem SH/COND
+    # no nome (ex.: "CJ SCH MATCH SCIENCE RECONS"). Os batons Niina "PERFECT
+    # MATCH" não são afetados — maquiagem é testada antes da regra de cabelo.
+    'MATCH',
 ]
 
 
